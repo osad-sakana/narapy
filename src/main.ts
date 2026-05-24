@@ -2,6 +2,8 @@ import {
   inject,
   Theme,
   Themes,
+  Events,
+  svgResize,
   type utils,
 } from 'blockly'
 import { pythonGenerator } from 'blockly/python'
@@ -110,11 +112,18 @@ const workspace: WorkspaceSvg = inject('blocklyDiv', {
   scrollbars: true,
 })
 
-// ブロック変更時にエディタへ Python コードを反映
+// ブロック���更時にエディタへ Python コードを反映
 workspace.addChangeListener(() => {
   const code = pythonGenerator.workspaceToCode(workspace)
   codeEditor.value = code
   void triggerValidation(code)
+})
+
+// flyout 開閉後にレイアウトを再計算してスクロールバーをリセット
+workspace.addChangeListener((event) => {
+  if (event.type === Events.TOOLBOX_ITEM_SELECT) {
+    requestAnimationFrame(() => svgResize(workspace))
+  }
 })
 
 // --- DOM 参照 ---------------------------------------------------------

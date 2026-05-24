@@ -5,6 +5,12 @@
   height: 100%;
 }
 
+/* flyout が閉じているとき内部のスクロールバー SVG を非表示にする */
+.blocklyFlyout[display="none"] .blocklyScrollbarVertical,
+.blocklyFlyout[display="none"] .blocklyScrollbarHorizontal {
+  display: none;
+}
+
 /* スクロールバーをダークテーマに合わせる */
 ::-webkit-scrollbar {
   width: 6px;

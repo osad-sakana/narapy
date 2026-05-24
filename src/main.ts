@@ -4,6 +4,7 @@ import {
   Themes,
   Events,
   svgResize,
+  Msg,
   type utils,
 } from 'blockly'
 import { pythonGenerator } from 'blockly/python'
@@ -18,12 +19,32 @@ interface WorkerMessage {
 
 // --- Blockly 初期化 ---------------------------------------------------
 
+// ブロックのラベルを Python 構文に準拠させる
+Object.assign(Msg, {
+  // 真偽値: Python は大文字始まり
+  LOGIC_BOOLEAN_TRUE:  'True',
+  LOGIC_BOOLEAN_FALSE: 'False',
+  // 論理演算子: Pythonキーワードそのまま（and/or/not はデフォルトで既に一致）
+  // 繰り返し回数指定: for _ in range(n):
+  CONTROLS_REPEAT_TITLE:     'for _ in range(%1):',
+  CONTROLS_REPEAT_INPUT_DO:  '',
+  // while ループ
+  CONTROLS_WHILEUNTIL_OPERATOR_WHILE: 'while',
+  CONTROLS_WHILEUNTIL_OPERATOR_UNTIL: 'while not',
+  CONTROLS_WHILEUNTIL_INPUT_DO:       '',
+  // カウンタ for ループ: for i in range(start, end, step):
+  CONTROLS_FOR_TITLE:    'for %1 in range(%2, %3, %4):',
+  // break / continue
+  CONTROLS_FLOW_STATEMENTS_OPERATOR_BREAK:    'break',
+  CONTROLS_FLOW_STATEMENTS_OPERATOR_CONTINUE: 'continue',
+})
+
 const TOOLBOX_CONFIG: utils.toolbox.ToolboxDefinition = {
   kind: 'categoryToolbox',
   contents: [
     {
       kind: 'category',
-      name: 'ロジック',
+      name: 'if / bool',
       colour: '#5C81A6',
       contents: [
         { kind: 'block', type: 'controls_if' },
@@ -35,7 +56,7 @@ const TOOLBOX_CONFIG: utils.toolbox.ToolboxDefinition = {
     },
     {
       kind: 'category',
-      name: 'ループ',
+      name: 'for / while',
       colour: '#5BA55B',
       contents: [
         { kind: 'block', type: 'controls_repeat_ext' },
@@ -46,19 +67,19 @@ const TOOLBOX_CONFIG: utils.toolbox.ToolboxDefinition = {
     },
     {
       kind: 'category',
-      name: '変数',
+      name: '変数 (var)',
       colour: '#A55B80',
       custom: 'VARIABLE',
     },
     {
       kind: 'category',
-      name: '関数',
+      name: 'def (関数)',
       colour: '#995BA5',
       custom: 'PROCEDURE',
     },
     {
       kind: 'category',
-      name: '数学',
+      name: 'int / float',
       colour: '#5B67A5',
       contents: [
         { kind: 'block', type: 'math_number' },
@@ -68,7 +89,7 @@ const TOOLBOX_CONFIG: utils.toolbox.ToolboxDefinition = {
     },
     {
       kind: 'category',
-      name: 'テキスト',
+      name: 'str (文字列)',
       colour: '#5BA58C',
       contents: [
         { kind: 'block', type: 'text' },

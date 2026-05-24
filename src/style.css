@@ -11,10 +11,11 @@
   height: 100%;
 }
 
-/* flyout が閉じているとき内部のスクロールバー SVG を非表示にする */
-.blocklyFlyout[display="none"] .blocklyScrollbarVertical,
-.blocklyFlyout[display="none"] .blocklyScrollbarHorizontal {
-  display: none;
+/* Tailwind の svg{display:block} リセットが Blockly の setAttribute("display","none") を
+   上書きしてスクロールバーが残留するのを防ぐ */
+.blocklyScrollbarVertical[display="none"],
+.blocklyScrollbarHorizontal[display="none"] {
+  display: none !important;
 }
 
 /* スクロールバーをパープルテーマに合わせる */

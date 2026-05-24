@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Atmospya — Python Learning Environment</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body class="bg-slate-950 text-slate-100 h-screen flex flex-col overflow-hidden font-sans">
+
+    <!-- ヘッダー -->
+    <header class="flex items-center justify-between px-6 py-3 bg-slate-900 border-b border-slate-700 shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center text-white font-bold text-sm select-none">
+          A
+        </div>
+        <span class="text-lg font-semibold tracking-tight text-slate-100">Atmospya</span>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+          Python Learning
+        </span>
+      </div>
+      <button
+        id="runBtn"
+        class="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 active:bg-sky-600 text-white text-sm font-medium transition-colors"
+      >
+        ▶ 実行
+      </button>
+    </header>
+
+    <!-- メインエリア（2カラム） -->
+    <main class="flex flex-1 overflow-hidden">
+
+      <!-- 左カラム: Blockly ワークスペース -->
+      <section class="flex flex-col w-1/2 border-r border-slate-700">
+        <div class="flex items-center gap-2 px-4 py-2 bg-slate-900/60 border-b border-slate-700/50 shrink-0">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-widest">ブロックエディタ</span>
+        </div>
+        <div id="blocklyDiv" class="flex-1 w-full bg-slate-900"></div>
+      </section>
+
+      <!-- 右カラム: テキストエディタ + 実行ログ -->
+      <section class="flex flex-col w-1/2">
+
+        <!-- テキストエディタ（上半分） -->
+        <div class="flex flex-col flex-1 border-b border-slate-700">
+          <div class="flex items-center justify-between px-4 py-2 bg-slate-900/60 border-b border-slate-700/50 shrink-0">
+            <span class="text-xs font-semibold text-slate-400 uppercase tracking-widest">Pythonエディタ</span>
+            <span id="validationBadge" class="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-400 transition-all">
+              待機中
+            </span>
+          </div>
+          <textarea
+            id="codeEditor"
+            spellcheck="false"
+            autocomplete="off"
+            autocorrect="off"
+            class="flex-1 w-full resize-none bg-slate-950 text-slate-100 font-mono text-sm p-4 outline-none placeholder-slate-600 leading-relaxed"
+            placeholder="# ここにPythonコードを入力…&#10;print('Hello, Atmospya!')"
+          ></textarea>
+        </div>
+
+        <!-- 実行ログ（下半分） -->
+        <div class="flex flex-col flex-1 min-h-0">
+          <div class="flex items-center justify-between px-4 py-2 bg-slate-900/60 border-b border-slate-700/50 shrink-0">
+            <span class="text-xs font-semibold text-slate-400 uppercase tracking-widest">実行ログ</span>
+            <button
+              id="clearLogBtn"
+              class="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              クリア
+            </button>
+          </div>
+          <div
+            id="outputLog"
+            class="flex-1 overflow-y-auto p-4 font-mono text-sm text-slate-300 bg-slate-950 leading-relaxed"
+          >
+            <span class="text-slate-600 italic">実行結果がここに表示されます…</span>
+          </div>
+        </div>
+
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

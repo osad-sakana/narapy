@@ -67,7 +67,7 @@ const TOOLBOX_CONFIG: utils.toolbox.ToolboxDefinition = {
     },
     {
       kind: 'category',
-      name: '変数 (var)',
+      name: '変数',
       colour: '#A55B80',
       custom: 'VARIABLE',
     },

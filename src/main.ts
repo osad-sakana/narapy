@@ -4,10 +4,6 @@ import type { WorkspaceSvg } from 'blockly'
 
 // --- 型定義 -----------------------------------------------------------
 
-interface WasmModule {
-  parse_and_validate: (source: string) => string
-}
-
 interface WorkerMessage {
   type: 'result' | 'error' | 'stdout'
   payload: string
@@ -81,7 +77,7 @@ const workspace: WorkspaceSvg = Blockly.inject('blocklyDiv', {
   toolbox: TOOLBOX_CONFIG,
   theme: Blockly.Theme.defineTheme('atmospya', {
     name: 'atmospya',
-    base: Blockly.Themes.Dark,
+    base: Blockly.Themes.Classic,
     componentStyles: {
       workspaceBackgroundColour: '#0f172a',
       toolboxBackgroundColour: '#1e293b',
@@ -123,29 +119,29 @@ const clearLogBtn = document.getElementById('clearLogBtn') as HTMLButtonElement
 
 // --- Rust Wasm バリデーション -----------------------------------------
 
-let wasmModule: WasmModule | null = null
+// wasm-pack が出力する named export を直接参照する
+type ParseFn = (source: string) => string
+let wasmParseAndValidate: ParseFn | null = null
 
 async function loadWasm(): Promise<void> {
   try {
-    // wasm-pack が src/wasm/ に出力したモジュールを動的 import
-    const mod = await import('./wasm/atmospya_core.js') as { default: () => Promise<WasmModule>; parse_and_validate?: WasmModule['parse_and_validate'] }
-    if (typeof mod.default === 'function') {
-      wasmModule = (await mod.default()) as unknown as WasmModule
-    } else {
-      wasmModule = mod as unknown as WasmModule
-    }
+    // wasm-pack --target web の出力: default が init 関数、named export が API
+    const { default: init, parse_and_validate } =
+      await import('./wasm/atmospya_core.js')
+    await init()
+    wasmParseAndValidate = parse_and_validate as ParseFn
   } catch {
     appendLog('[警告] Rust Wasm モジュールの読み込みに失敗しました。`pnpm build:wasm` を実行してください。', 'warn')
   }
 }
 
 async function triggerValidation(source: string): Promise<void> {
-  if (!wasmModule || source.trim() === '') {
+  if (!wasmParseAndValidate || source.trim() === '') {
     setBadge('待機中', 'neutral')
     return
   }
   try {
-    const result = wasmModule.parse_and_validate(source)
+    const result = wasmParseAndValidate(source)
     const parsed = JSON.parse(result) as { status: string }
     if (parsed.status === 'success') {
       setBadge('構文OK', 'success')

@@ -88,9 +88,9 @@ const workspace: WorkspaceSvg = inject('blocklyDiv', {
     name: 'atmospya',
     base: Themes.Classic,
     componentStyles: {
-      workspaceBackgroundColour: '#080510',
-      toolboxBackgroundColour: '#110826',
-      flyoutBackgroundColour: '#110826',
+      workspaceBackgroundColour: '#060d16',
+      toolboxBackgroundColour: '#0c1e30',
+      flyoutBackgroundColour: '#0c1e30',
     },
   }),
   grid: {

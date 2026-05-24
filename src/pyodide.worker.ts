@@ -1,8 +1,5 @@
 /// <reference lib="webworker" />
 
-// Pyodide を CDN から動的ロードする（wasm ファイルを自前でホストする場合は indexURL を変更）
-declare function importScripts(...urls: string[]): void
-
 interface RunMessage {
   type: 'run'
   code: string
@@ -22,20 +19,24 @@ interface PyodideInterface {
   }
 }
 
-declare const loadPyodide: (options: {
-  indexURL: string
-  stdout?: (text: string) => void
-  stderr?: (text: string) => void
-}) => Promise<PyodideInterface>
+interface PyodideModule {
+  loadPyodide: (options: {
+    indexURL: string
+    stdout?: (text: string) => void
+    stderr?: (text: string) => void
+  }) => Promise<PyodideInterface>
+}
 
 const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/'
 
 let pyodide: PyodideInterface | null = null
 let isReady = false
 
-// Pyodide を非同期で初期化（Worker 起動と同時に開始）
 async function initPyodide(): Promise<void> {
-  importScripts(`${PYODIDE_CDN}pyodide.js`)
+  // module worker では importScripts() が禁止のため dynamic import() を使用
+  const { loadPyodide } = await import(
+    /* @vite-ignore */ `${PYODIDE_CDN}pyodide.mjs`
+  ) as PyodideModule
 
   pyodide = await loadPyodide({
     indexURL: PYODIDE_CDN,

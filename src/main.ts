@@ -97,15 +97,16 @@ const workspace: WorkspaceSvg = inject('blocklyDiv', {
     colour: '#1e293b',
     snap: true,
   },
+  sounds: false,
   zoom: {
-    controls: true,
+    controls: false,
     wheel: true,
     startScale: 1.0,
     maxScale: 3,
     minScale: 0.3,
     scaleSpeed: 1.2,
   },
-  trashcan: true,
+  trashcan: false,
   scrollbars: true,
 })
 

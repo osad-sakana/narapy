@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* フォント設定: Tailwind v4 の @theme でデフォルトを上書き */
+@theme {
+  --font-sans: 'BIZ UDPGothic', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+  --font-mono: '0xProto', ui-monospace, SFMono-Regular, 'SF Mono', Consolas, monospace;
+}
+
 /* Blockly インジェクト先の SVG が height:100% を要求するため明示的に指定 */
 #blocklyDiv svg {
   height: 100%;
@@ -11,7 +17,7 @@
   display: none;
 }
 
-/* スクロールバーをダークテーマに合わせる */
+/* スクロールバーをパープルテーマに合わせる */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -20,9 +26,9 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #4c1d95;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #6d28d9;
 }

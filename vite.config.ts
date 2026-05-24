@@ -2,12 +2,22 @@ import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
 import wasm from 'vite-plugin-wasm'
 import topLevelAwait from 'vite-plugin-top-level-await'
+import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 export default defineConfig({
   plugins: [
     tailwindcss(),
     wasm(),
     topLevelAwait(),
+    // COEP 環境でも Blockly メディアを同一オリジンから配信するためにコピー
+    viteStaticCopy({
+      targets: [
+        {
+          src: 'node_modules/blockly/media/*',
+          dest: 'blockly-media',
+        },
+      ],
+    }),
   ],
 
   server: {

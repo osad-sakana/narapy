@@ -1,4 +1,9 @@
-import * as Blockly from 'blockly'
+import {
+  inject,
+  Theme,
+  Themes,
+  type utils,
+} from 'blockly'
 import { pythonGenerator } from 'blockly/python'
 import type { WorkspaceSvg } from 'blockly'
 
@@ -11,7 +16,7 @@ interface WorkerMessage {
 
 // --- Blockly 初期化 ---------------------------------------------------
 
-const TOOLBOX_CONFIG: Blockly.utils.toolbox.ToolboxDefinition = {
+const TOOLBOX_CONFIG: utils.toolbox.ToolboxDefinition = {
   kind: 'categoryToolbox',
   contents: [
     {
@@ -73,11 +78,11 @@ const TOOLBOX_CONFIG: Blockly.utils.toolbox.ToolboxDefinition = {
   ],
 }
 
-const workspace: WorkspaceSvg = Blockly.inject('blocklyDiv', {
+const workspace: WorkspaceSvg = inject('blocklyDiv', {
   toolbox: TOOLBOX_CONFIG,
-  theme: Blockly.Theme.defineTheme('atmospya', {
+  theme: Theme.defineTheme('atmospya', {
     name: 'atmospya',
-    base: Blockly.Themes.Classic,
+    base: Themes.Classic,
     componentStyles: {
       workspaceBackgroundColour: '#0f172a',
       toolboxBackgroundColour: '#1e293b',

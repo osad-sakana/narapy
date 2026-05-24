@@ -24,7 +24,8 @@ export default defineConfig({
   },
 
   optimizeDeps: {
-    exclude: ['blockly'],
+    // blockly は CJS モジュールのため esbuild でプリバンドル（ESM 変換）させる
+    include: ['blockly', 'blockly/python'],
   },
 
   worker: {

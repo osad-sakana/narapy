@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/* Blockly インジェクト先の SVG が height:100% を要求するため明示的に指定 */
+#blocklyDiv svg {
+  height: 100%;
+}
+
+/* スクロールバーをダークテーマに合わせる */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}

@@ -4,14 +4,14 @@ Python学習向けWebアプリのプロトタイプ。フロントエンド完�
 
 ## 技術スタック
 
-| レイヤー | 技術 |
-|----------|------|
-| ビルド | Vite 6 + TypeScript (Vanilla TS、フレームワークなし) |
-| スタイル | Tailwind CSS v4（`@tailwindcss/vite` プラグイン、設定ファイル不要） |
-| ブロックUI | Google Blockly 12 |
-| Python実行 | Pyodide v0.27（Web Worker経由） |
-| コアエンジン | Rust → wasm-pack → WebAssembly |
-| パッケージ管理 | **pnpm のみ**（npm / yarn 禁止） |
+| レイヤー       | 技術                                                                |
+| -------------- | ------------------------------------------------------------------- |
+| ビルド         | Vite 6 + TypeScript (Vanilla TS、フレームワークなし)                |
+| スタイル       | Tailwind CSS v4（`@tailwindcss/vite` プラグイン、設定ファイル不要） |
+| ブロックUI     | Google Blockly 12                                                   |
+| Python実行     | Pyodide v0.27（Web Worker経由）                                     |
+| コアエンジン   | Rust → wasm-pack → WebAssembly                                      |
+| パッケージ管理 | **pnpm のみ**（npm / yarn 禁止）                                    |
 
 ## ディレクトリ構造
 
@@ -54,23 +54,29 @@ pnpm typecheck
 ## アーキテクチャ上の重要事項
 
 ### COOP/COEP ヘッダー
+
 `SharedArrayBuffer`（Pyodide に必要）のため `vite.config.ts` の `server.headers` に以下を設定済み。
 S3/CloudFront デプロイ時も同様のヘッダーを付与すること。
+
 ```
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
 ### Blockly メディアファイル
+
 外部 CDN（`blockly-demo.appspot.com`）が COEP でブロックされるため、`vite-plugin-static-copy` で `node_modules/blockly/media/*` を `/blockly-media/` にコピーし、`inject()` の `media` オプションで指定している。
 
 ### Blockly の ESM 読み込み
+
 Blockly 12 は CJS モジュールのため `optimizeDeps.include` に追加して esbuild でプリバンドルしている。`import * as Blockly` は使わず named import を使うこと。
 
 ### Pyodide Web Worker
+
 `type: 'module'` の Worker では `importScripts()` が禁止。`/* @vite-ignore */` コメント付きの dynamic `import()` で CDN から読み込んでいる。
 
 ### WASM モジュールの利用パターン
+
 ```typescript
 import init, { parse_and_validate } from './wasm/atmospya_core.js'
 await init()
@@ -94,3 +100,4 @@ cd core && wasm-pack build --target web --out-dir ../src/wasm
 - ファイルは 800 行以内、関数は 50 行以内
 - `console.log` は残さない
 - コメントは「なぜ」が自明でない箇所のみ
+- 1作業ごとにコミットすること

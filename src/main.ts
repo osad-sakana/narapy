@@ -21,82 +21,160 @@ interface WorkerMessage {
 
 // ブロックのラベルを Python 構文に準拠させる
 Object.assign(Msg, {
-  // 真偽値: Python は大文字始まり
+  // 真偽値
   LOGIC_BOOLEAN_TRUE:  'True',
   LOGIC_BOOLEAN_FALSE: 'False',
-  // 論理演算子: Pythonキーワードそのまま（and/or/not はデフォルトで既に一致）
-  // 繰り返し回数指定: for _ in range(n):
-  CONTROLS_REPEAT_TITLE:     'for _ in range(%1):',
-  CONTROLS_REPEAT_INPUT_DO:  '',
+  // 比較・論理（and/or/not はデフォルトで一致）
+  // input()
+  TEXT_PROMPT_TYPE_TEXT:   'input(文字列) メッセージ:',
+  TEXT_PROMPT_TYPE_NUMBER: 'input(数値) メッセージ:',
+  // for ループ
+  CONTROLS_REPEAT_TITLE:            'for _ in range(%1):',
+  CONTROLS_REPEAT_INPUT_DO:         '',
+  CONTROLS_FOR_TITLE:               'for %1 in range(%2, %3, %4):',
+  CONTROLS_FOREACH_TITLE:           'for %1 in %2:',
+  CONTROLS_FOREACH_INPUT_DO:        '',
   // while ループ
   CONTROLS_WHILEUNTIL_OPERATOR_WHILE: 'while',
   CONTROLS_WHILEUNTIL_OPERATOR_UNTIL: 'while not',
   CONTROLS_WHILEUNTIL_INPUT_DO:       '',
-  // カウンタ for ループ: for i in range(start, end, step):
-  CONTROLS_FOR_TITLE:    'for %1 in range(%2, %3, %4):',
   // break / continue
   CONTROLS_FLOW_STATEMENTS_OPERATOR_BREAK:    'break',
   CONTROLS_FLOW_STATEMENTS_OPERATOR_CONTINUE: 'continue',
+  // リスト
+  LISTS_CREATE_WITH_INPUT_WITH: 'リスト:',
+  LISTS_LENGTH_TITLE:           'len(%1)',
 })
 
 const TOOLBOX_CONFIG: utils.toolbox.ToolboxDefinition = {
   kind: 'categoryToolbox',
   contents: [
+    // 1. 入出力
     {
       kind: 'category',
-      name: 'if / bool',
-      colour: '#5C81A6',
+      name: '入出力',
+      colour: '#5BA58C',
       contents: [
-        { kind: 'block', type: 'controls_if' },
-        { kind: 'block', type: 'logic_compare' },
-        { kind: 'block', type: 'logic_operation' },
-        { kind: 'block', type: 'logic_negate' },
-        { kind: 'block', type: 'logic_boolean' },
+        { kind: 'block', type: 'text_print' },
+        { kind: 'block', type: 'text_prompt_ext' },
       ],
     },
-    {
-      kind: 'category',
-      name: 'for / while',
-      colour: '#5BA55B',
-      contents: [
-        { kind: 'block', type: 'controls_repeat_ext' },
-        { kind: 'block', type: 'controls_whileUntil' },
-        { kind: 'block', type: 'controls_for' },
-        { kind: 'block', type: 'controls_flow_statements' },
-      ],
-    },
+    // 2. 変数
     {
       kind: 'category',
       name: '変数',
       colour: '#A55B80',
       custom: 'VARIABLE',
     },
+    // 3. 数値・演算
     {
       kind: 'category',
-      name: 'def (関数)',
-      colour: '#995BA5',
-      custom: 'PROCEDURE',
-    },
-    {
-      kind: 'category',
-      name: 'int / float',
+      name: '数値・演算',
       colour: '#5B67A5',
       contents: [
         { kind: 'block', type: 'math_number' },
         { kind: 'block', type: 'math_arithmetic' },
         { kind: 'block', type: 'math_single' },
+        { kind: 'block', type: 'math_round' },
+        { kind: 'block', type: 'math_modulo' },
+        { kind: 'block', type: 'math_random_int' },
+        { kind: 'block', type: 'math_number_property' },
       ],
     },
+    // 4. 文字列
     {
       kind: 'category',
       name: 'str (文字列)',
-      colour: '#5BA58C',
+      colour: '#5B8A6A',
       contents: [
         { kind: 'block', type: 'text' },
-        { kind: 'block', type: 'text_print' },
         { kind: 'block', type: 'text_join' },
         { kind: 'block', type: 'text_length' },
+        { kind: 'block', type: 'text_indexOf' },
+        { kind: 'block', type: 'text_charAt' },
+        { kind: 'block', type: 'text_getSubstring' },
+        { kind: 'block', type: 'text_changeCase' },
+        { kind: 'block', type: 'text_trim' },
+        { kind: 'block', type: 'text_replace' },
+        { kind: 'block', type: 'text_count' },
+        { kind: 'block', type: 'text_reverse' },
       ],
+    },
+    // 5. 比較・論理
+    {
+      kind: 'category',
+      name: '比較・論理',
+      colour: '#5C81A6',
+      contents: [
+        { kind: 'block', type: 'logic_boolean' },
+        { kind: 'block', type: 'logic_compare' },
+        { kind: 'block', type: 'logic_operation' },
+        { kind: 'block', type: 'logic_negate' },
+      ],
+    },
+    // 6. リスト
+    {
+      kind: 'category',
+      name: 'リスト',
+      colour: '#A5745B',
+      contents: [
+        { kind: 'block', type: 'lists_create_with' },
+        { kind: 'block', type: 'lists_create_empty' },
+        { kind: 'block', type: 'lists_length' },
+        { kind: 'block', type: 'lists_isEmpty' },
+        { kind: 'block', type: 'lists_getIndex' },
+        { kind: 'block', type: 'lists_setIndex' },
+        { kind: 'block', type: 'lists_indexOf' },
+        { kind: 'block', type: 'lists_getSublist' },
+        { kind: 'block', type: 'lists_sort' },
+        { kind: 'block', type: 'lists_reverse' },
+        { kind: 'block', type: 'lists_split' },
+      ],
+    },
+    // 7. for ループ
+    {
+      kind: 'category',
+      name: 'for ループ',
+      colour: '#5BA55B',
+      contents: [
+        { kind: 'block', type: 'controls_for' },
+        { kind: 'block', type: 'controls_forEach' },
+        { kind: 'block', type: 'controls_repeat_ext' },
+        { kind: 'block', type: 'controls_flow_statements' },
+      ],
+    },
+    // 8. while ループ
+    {
+      kind: 'category',
+      name: 'while ループ',
+      colour: '#3D8A3D',
+      contents: [
+        { kind: 'block', type: 'controls_whileUntil' },
+        { kind: 'block', type: 'controls_flow_statements' },
+      ],
+    },
+    // 9. 条件分岐
+    {
+      kind: 'category',
+      name: '条件分岐 (if)',
+      colour: '#4A7FA5',
+      contents: [
+        { kind: 'block', type: 'controls_if' },
+      ],
+    },
+    // 10. 関数
+    {
+      kind: 'category',
+      name: '関数 (def)',
+      colour: '#995BA5',
+      custom: 'PROCEDURE',
+    },
+    // 11. クラス（カスタムブロック未実装 — TODO）
+    {
+      kind: 'category',
+      name: 'クラス (class)',
+      colour: '#7A5BA5',
+      contents: [],
     },
   ],
 }

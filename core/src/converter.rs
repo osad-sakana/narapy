@@ -162,12 +162,12 @@ fn is_range_call(iter: &Expr) -> bool {
     false
 }
 
-/// `range(stop)` （1引数のみ）を ForRange に変換。
-/// 引数が1つでない場合は None を返す。
+/// `range(stop)` （1引数のみ、かつ変数名が `_` でない）を ForRange に変換。
+/// 条件を満たさない場合は None を返す。
 fn try_convert_range(iter: &Expr, var_name: &str, body: Vec<IrNode>, source: &str) -> Option<IrNode> {
     if let Expr::Call(call) = iter {
         if let Expr::Name(fname) = call.func.as_ref() {
-            if fname.id.as_str() == "range" && call.args.len() == 1 {
+            if fname.id.as_str() == "range" && call.args.len() == 1 && var_name != "_" {
                 return Some(IrNode::ForRange {
                     var_name: var_name.to_string(),
                     from: Box::new(IrNode::NumLit { value: 0.0 }),
@@ -394,6 +394,13 @@ mod tests {
     #[test]
     fn test_for_range_multi_arg_unsupported() {
         let src = "for i in range(0, 10):\n  pass";
+        let nodes = parse_ir(src);
+        assert!(matches!(&nodes[0], IrNode::Unsupported { .. }));
+    }
+
+    #[test]
+    fn test_for_underscore_range_unsupported() {
+        let src = "for _ in range(10):\n  pass";
         let nodes = parse_ir(src);
         assert!(matches!(&nodes[0], IrNode::Unsupported { .. }));
     }

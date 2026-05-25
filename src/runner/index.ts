@@ -1,10 +1,11 @@
 import type { WorkerMessage } from '../types'
+import type { EditorInstance } from '../editor/index'
 import { appendLog, clearLog } from './log'
+import { getValue } from '../editor/index'
 
-export function initRunner(): void {
+export function initRunner(editor: EditorInstance): void {
   const runBtn = document.getElementById('runBtn') as HTMLButtonElement
   const clearLogBtn = document.getElementById('clearLogBtn') as HTMLButtonElement
-  const codeEditor = document.getElementById('codeEditor') as HTMLTextAreaElement
 
   const pyodideWorker = new Worker(
     new URL('../pyodide.worker.ts', import.meta.url),
@@ -33,7 +34,7 @@ export function initRunner(): void {
   }
 
   runBtn.addEventListener('click', () => {
-    const code = codeEditor.value.trim()
+    const code = getValue(editor).trim()
     if (!code) return
 
     runBtn.disabled = true

@@ -3,6 +3,7 @@ import tailwindcss from '@tailwindcss/vite'
 import wasm from 'vite-plugin-wasm'
 import topLevelAwait from 'vite-plugin-top-level-await'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
+import monacoEditorPlugin from 'vite-plugin-monaco-editor'
 
 export default defineConfig({
   plugins: [
@@ -18,6 +19,8 @@ export default defineConfig({
         },
       ],
     }),
+    // Monaco のワーカーを同一オリジンからバンドル配信（COEP 対応）
+    monacoEditorPlugin({ languageWorkers: ['editorWorkerService'] }),
   ],
 
   server: {

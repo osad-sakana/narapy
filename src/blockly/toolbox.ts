@@ -84,7 +84,6 @@ export const TOOLBOX_CONFIG: utils.toolbox.ToolboxDefinition = {
       name: 'for ループ',
       colour: '#5BA55B',
       contents: [
-        { kind: 'block', type: 'controls_repeat' },
         { kind: 'block', type: 'controls_for_range' },
         { kind: 'block', type: 'controls_forEach' },
         { kind: 'block', type: 'controls_repeat_ext' },

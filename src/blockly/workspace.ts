@@ -15,6 +15,15 @@ export function isSyncingFromPython(): boolean {
   return syncingFromPython
 }
 
+// Blocklyのpython generatorが生成する「varname = None」宣言はPythonでは不要なので削除する。
+// init()の後にdefinitions_.variablesをクリアすることで抑制する。
+const _origInit = pythonGenerator.init.bind(pythonGenerator)
+pythonGenerator.init = function (ws: WorkspaceSvg) {
+  _origInit(ws)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(this as any).definitions_['variables'] = ''
+}
+
 export function createWorkspace(onCodeChange: (code: string) => void): WorkspaceSvg {
   const workspace: WorkspaceSvg = inject('blocklyDiv', {
     // COEP 制約により外部 CDN をブロックされるためローカル配信パスを指定

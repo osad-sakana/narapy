@@ -1,20 +1,38 @@
 import { applyBlocklyMessages } from './blockly/messages'
-import { createWorkspace } from './blockly/workspace'
+import { createWorkspace, isSyncingFromPython } from './blockly/workspace'
 import { setTooltipsEnabled, isTooltipsEnabled } from './blockly/tooltips'
 import { loadWasm, triggerValidation } from './runner/validator'
 import { initRunner } from './runner/index'
+import { applyPythonToWorkspace } from './converter/index'
+import { createDebounced } from './converter/debounce'
 
 applyBlocklyMessages()
 
 const codeEditor = document.getElementById('codeEditor') as HTMLTextAreaElement
 
-createWorkspace((code) => {
-  codeEditor.value = code
-  void triggerValidation(code)
+const workspace = createWorkspace((code) => {
+  // エディタにフォーカス中（入力中）はBlockly側からの上書きを行わない
+  if (document.activeElement !== codeEditor) {
+    codeEditor.value = code
+    void triggerValidation(code)
+  }
 })
+
+// Python→Blockly変換（300msデバウンス）
+const debouncedConvert = createDebounced((source: string) => {
+  void applyPythonToWorkspace(source, workspace)
+}, 300)
 
 codeEditor.addEventListener('input', () => {
   void triggerValidation(codeEditor.value)
+  debouncedConvert.call(codeEditor.value)
+})
+
+// ユーザーによるBlockly操作時（同期中でない場合のみ）にpendingの変換をキャンセル
+workspace.addChangeListener((event) => {
+  if (!event.isUiEvent && !isSyncingFromPython()) {
+    debouncedConvert.cancel()
+  }
 })
 
 // ヒントトグルボタン

@@ -4,6 +4,17 @@ import type { WorkspaceSvg } from 'blockly'
 import { TOOLBOX_CONFIG } from './toolbox'
 import { initBlockTooltips } from './tooltips'
 
+// Python→Blockly同期中はBlockly→Pythonのコールバックを抑制するフラグ
+let syncingFromPython = false
+
+export function setSyncingFromPython(value: boolean): void {
+  syncingFromPython = value
+}
+
+export function isSyncingFromPython(): boolean {
+  return syncingFromPython
+}
+
 export function createWorkspace(onCodeChange: (code: string) => void): WorkspaceSvg {
   const workspace: WorkspaceSvg = inject('blocklyDiv', {
     // COEP 制約により外部 CDN をブロックされるためローカル配信パスを指定
@@ -37,7 +48,9 @@ export function createWorkspace(onCodeChange: (code: string) => void): Workspace
     scrollbars: true,
   })
 
-  workspace.addChangeListener(() => {
+  workspace.addChangeListener((event) => {
+    // UIイベント（スクロール等）や、Python→Blockly同期中は無視
+    if (event.isUiEvent || syncingFromPython) return
     onCodeChange(pythonGenerator.workspaceToCode(workspace))
   })
 

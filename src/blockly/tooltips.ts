@@ -263,6 +263,38 @@ const BLOCK_TOOLTIPS: Partial<Record<string, TooltipData>> = {
     output: '1\n2\n3\n4',
   },
 
+  // ── 関数 ─────────────────────────────────────────────
+  procedures_defnoreturn: {
+    title: 'def 関数名(引数):',
+    description: '値を返さない関数を定義します。処理をまとめて名前を付けることで再利用できます。',
+    example: 'def greet(name):\n    print("こんにちは、" + name)\n\ngreet("太郎")\ngreet("花子")',
+    output: 'こんにちは、太郎\nこんにちは、花子',
+  },
+  procedures_defreturn: {
+    title: 'def 関数名(引数): ... return 値',
+    description: '値を返す関数を定義します。return で計算結果を呼び出し元に渡せます。',
+    example: 'def double(n):\n    return n * 2\n\nprint(double(5))\nprint(double(7))',
+    output: '10\n14',
+  },
+  procedures_callnoreturn: {
+    title: '関数名(引数)（呼び出し）',
+    description: '定義済みの関数を呼び出します。引数の数は定義と合わせてください。',
+    example: 'def greet(name):\n    print("Hello, " + name)\n\ngreet("World")',
+    output: 'Hello, World',
+  },
+  procedures_callreturn: {
+    title: '関数名(引数)（戻り値あり）',
+    description: '値を返す関数を呼び出します。戻り値を変数に代入したり式に使えます。',
+    example: 'def square(n):\n    return n * n\n\nresult = square(4)\nprint(result)',
+    output: '16',
+  },
+  procedures_ifreturn: {
+    title: 'if 条件: return 値',
+    description: '条件が True のとき関数を途中で終了し値を返します。ガード節として使います。',
+    example: 'def safe_div(a, b):\n    if b == 0:\n        return 0\n    return a / b\n\nprint(safe_div(10, 2))\nprint(safe_div(10, 0))',
+    output: '5.0\n0',
+  },
+
   // ── 条件分岐 ─────────────────────────────────────────
   controls_if: {
     title: 'if / elif / else',

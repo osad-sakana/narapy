@@ -58,7 +58,7 @@ function collectVarsNode(node: IrNode, reg: (n: string) => string): void {
       reg(node.name)
       break
     case 'ForRange':
-      reg(node.var_name)
+      if (node.var_name !== '_') reg(node.var_name)
       collectVars(node.body, reg)
       break
     case 'ForEach':

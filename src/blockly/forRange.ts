@@ -13,7 +13,6 @@ export function registerForRangeBlock(): void {
       this.appendDummyInput()
         .appendField(')')
       this.appendStatementInput('DO')
-        .appendField('do')
       this.setPreviousStatement(true, null)
       this.setNextStatement(true, null)
       this.setColour(120)

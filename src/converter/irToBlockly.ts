@@ -78,14 +78,21 @@ function stmtToBlock(node: IrNode, getVarId: VarFn): BlockJson | undefined {
       return buildIfBlock(node, getVarId)
 
     case 'ForRange': {
-      const varId = getVarId(node.var_name)
       const bodyChain = stmtsToChain(node.body, getVarId)
+      // `_` はスロー変数なので変数不要の controls_repeat ブロックを使用
+      if (node.var_name === '_') {
+        const block: BlockJson = {
+          type: 'controls_repeat',
+          inputs: { TIMES: { block: exprToBlock(node.to, getVarId) } },
+        }
+        if (bodyChain) block.inputs = { ...block.inputs, DO: { block: bodyChain } }
+        return block
+      }
+      const varId = getVarId(node.var_name)
       const block: BlockJson = {
         type: 'controls_for_range',
         fields: { VAR: { id: varId } },
-        inputs: {
-          TO: { block: exprToBlock(node.to, getVarId) },
-        },
+        inputs: { TO: { block: exprToBlock(node.to, getVarId) } },
       }
       if (bodyChain) block.inputs = { ...block.inputs, DO: { block: bodyChain } }
       return block

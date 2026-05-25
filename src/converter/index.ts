@@ -4,6 +4,7 @@ import type { IrNode } from './types'
 import { irToWorkspaceJson } from './irToBlockly'
 import { buildVariableRegistry } from './variableRegistry'
 import { setSyncingFromPython, setHasUnsupportedCode } from '../blockly/workspace'
+import { setBlocklyUnsupportedBanner } from '../blockly/unsupported'
 import { getPythonToIr } from '../runner/validator'
 import { setBadge } from '../runner/badge'
 
@@ -18,6 +19,7 @@ export async function applyPythonToWorkspace(
   const pythonToIr = getPythonToIr()
   if (!pythonToIr || source.trim() === '') {
     setHasUnsupportedCode(false)
+    setBlocklyUnsupportedBanner(false)
     return
   }
 
@@ -29,6 +31,7 @@ export async function applyPythonToWorkspace(
     const message = err instanceof Error ? err.message : String(err)
     setBadge(`エラー: ${message}`, 'error')
     setHasUnsupportedCode(false)
+    setBlocklyUnsupportedBanner(false)
     return
   }
 
@@ -43,6 +46,7 @@ export async function applyPythonToWorkspace(
 
   const hasUnsupported = containsUnsupported(irJson)
   setHasUnsupportedCode(hasUnsupported)
+  setBlocklyUnsupportedBanner(hasUnsupported)
 
   // 変数レジストリ構築（ワークスペースに変数を登録しながらIDを割り当てる）
   const registry = buildVariableRegistry(root.body, workspace)
@@ -53,11 +57,6 @@ export async function applyPythonToWorkspace(
   try {
     workspace.clear()
     serialization.workspaces.load(workspaceJson, workspace, { recordUndo: false })
-    if (hasUnsupported) {
-      setBadge('⚠ 未対応構文あり', 'warn')
-    } else {
-      setBadge('構文OK', 'success')
-    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
     setBadge(`変換エラー: ${message}`, 'error')

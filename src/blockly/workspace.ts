@@ -84,6 +84,19 @@ export function createWorkspace(onCodeChange: (code: string) => void): Workspace
     }
   })
 
+  // unsupported_code ブロックが生成されたら必ずロックを強制適用する
+  // （JSON シリアライザが movable/deletable を読まないため init() だけでは不十分な場合の保険）
+  workspace.addChangeListener((event) => {
+    if (event.type !== Events.BLOCK_CREATE) return
+    const blockId = (event as unknown as { blockId?: string }).blockId
+    if (!blockId) return
+    const block = workspace.getBlockById(blockId)
+    if (block?.type === 'unsupported_code') {
+      block.setMovable(false)
+      block.setDeletable(false)
+    }
+  })
+
   const blocklyDiv = document.getElementById('blocklyDiv') as HTMLElement
   initBlockTooltips(blocklyDiv, workspace)
 

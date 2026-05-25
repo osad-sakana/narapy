@@ -47,6 +47,11 @@
             </svg>
             <span class="text-xs font-bold text-sky-300 uppercase tracking-widest">ブロックエディタ</span>
           </div>
+          <div class="flex items-center gap-2">
+          <span
+            id="blocklyUnsupportedBanner"
+            class="hidden text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30"
+          >⚠ 未対応構文あり（編集不可）</span>
           <button
             id="hintToggleBtn"
             title="ブロックのヒント表示をオン/オフ"
@@ -57,6 +62,7 @@
             </svg>
             ヒント
           </button>
+          </div>
         </div>
         <div id="blocklyDiv" class="flex-1 w-full bg-[#060d16]"></div>
       </section>
@@ -77,14 +83,7 @@
               待機中
             </span>
           </div>
-          <textarea
-            id="codeEditor"
-            spellcheck="false"
-            autocomplete="off"
-            autocorrect="off"
-            class="flex-1 w-full resize-none bg-[#0c0818] text-slate-100 font-mono text-sm p-4 outline-none placeholder-violet-900 leading-relaxed"
-            placeholder="# ここにPythonコードを入力…&#10;print('Hello, Atmospya!')"
-          ></textarea>
+          <div id="codeEditor" class="flex-1 w-full min-h-0"></div>
         </div>
 
         <!-- 実行ログ（アクセント: emerald） -->

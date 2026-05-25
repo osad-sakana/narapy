@@ -1,4 +1,4 @@
-import { inject, Theme, Themes, Events, svgResize } from 'blockly'
+import { inject, Theme, Themes, Events, svgResize, Names } from 'blockly'
 import { pythonGenerator } from 'blockly/python'
 import type { WorkspaceSvg } from 'blockly'
 import { TOOLBOX_CONFIG } from './toolbox'
@@ -30,12 +30,24 @@ export function isHasUnsupportedCode(): boolean {
 }
 
 // Blocklyのpython generatorが生成する「varname = None」宣言はPythonでは不要なので削除する。
-// init()の後にdefinitions_.variablesをクリアすることで抑制する。
 const _origInit = pythonGenerator.init.bind(pythonGenerator)
 pythonGenerator.init = function (ws: WorkspaceSvg) {
   _origInit(ws)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(this as any).definitions_['variables'] = ''
+}
+
+// controls_for: range(stop) のみサポートするため TO の値だけを使って出力する。
+// デフォルト実装は range(FROM, TO, BY) を出力してしまうため上書き。
+pythonGenerator.forBlock['controls_for'] = (block, generator) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const loopVar = (generator as any).nameDB_.getName(
+    block.getFieldValue('VAR'),
+    Names.NameType.VARIABLE,
+  )
+  const to = generator.valueToCode(block, 'TO', 0) || '0'
+  const branch = generator.statementToCode(block, 'DO') || generator.INDENT + 'pass\n'
+  return `for ${loopVar} in range(${to}):\n${branch}`
 }
 
 export function createWorkspace(onCodeChange: (code: string) => void): WorkspaceSvg {

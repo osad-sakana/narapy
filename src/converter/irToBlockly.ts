@@ -80,13 +80,12 @@ function stmtToBlock(node: IrNode, getVarId: VarFn): BlockJson | undefined {
     case 'ForRange': {
       const varId = getVarId(node.var_name)
       const bodyChain = stmtsToChain(node.body, getVarId)
+      // range(stop) のみサポート。FROM=0、BY=1 はデフォルト値なのでシャドウに任せる。
       const block: BlockJson = {
         type: 'controls_for',
         fields: { VAR: { id: varId } },
         inputs: {
-          FROM: { block: exprToBlock(node.from, getVarId) },
           TO: { block: exprToBlock(node.to, getVarId) },
-          BY: { block: exprToBlock(node.step, getVarId) },
         },
       }
       if (bodyChain) block.inputs = { ...block.inputs, DO: { block: bodyChain } }

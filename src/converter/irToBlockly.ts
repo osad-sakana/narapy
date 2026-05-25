@@ -141,6 +141,12 @@ function stmtToBlock(node: IrNode, getVarId: VarFn): BlockJson | undefined {
       }
     }
 
+    case 'Unsupported':
+      return {
+        type: 'unsupported_code',
+        fields: { CODE: node.code },
+      }
+
     // 式文（変数参照など）は無視
     default:
       return undefined
@@ -264,8 +270,7 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
     }
 
     case 'Unsupported':
-      // フォールバック: 空の文字列リテラル
-      return { type: 'text', fields: { TEXT: `(${node.node_type})` } }
+      return { type: 'text', fields: { TEXT: node.code || `(${node.node_type})` } }
 
     default:
       return { type: 'text', fields: { TEXT: '' } }

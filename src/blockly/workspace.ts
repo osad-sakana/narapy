@@ -3,6 +3,9 @@ import { pythonGenerator } from 'blockly/python'
 import type { WorkspaceSvg } from 'blockly'
 import { TOOLBOX_CONFIG } from './toolbox'
 import { initBlockTooltips } from './tooltips'
+import { registerUnsupportedBlock } from './unsupported'
+
+registerUnsupportedBlock()
 
 // Python→Blockly同期中はBlockly→Pythonのコールバックを抑制するフラグ
 let syncingFromPython = false
@@ -13,6 +16,17 @@ export function setSyncingFromPython(value: boolean): void {
 
 export function isSyncingFromPython(): boolean {
   return syncingFromPython
+}
+
+// 未対応構文が存在する間はBlockly→Python同期を停止するフラグ
+let hasUnsupportedCode = false
+
+export function setHasUnsupportedCode(value: boolean): void {
+  hasUnsupportedCode = value
+}
+
+export function isHasUnsupportedCode(): boolean {
+  return hasUnsupportedCode
 }
 
 // Blocklyのpython generatorが生成する「varname = None」宣言はPythonでは不要なので削除する。
@@ -58,8 +72,8 @@ export function createWorkspace(onCodeChange: (code: string) => void): Workspace
   })
 
   workspace.addChangeListener((event) => {
-    // UIイベント（スクロール等）や、Python→Blockly同期中は無視
-    if (event.isUiEvent || syncingFromPython) return
+    // UIイベント・Python→Blockly同期中・未対応構文あり の場合は無視
+    if (event.isUiEvent || syncingFromPython || hasUnsupportedCode) return
     onCodeChange(pythonGenerator.workspaceToCode(workspace))
   })
 

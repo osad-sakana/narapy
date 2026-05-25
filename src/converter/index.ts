@@ -3,16 +3,23 @@ import type { WorkspaceSvg } from 'blockly'
 import type { IrNode } from './types'
 import { irToWorkspaceJson } from './irToBlockly'
 import { buildVariableRegistry } from './variableRegistry'
-import { setSyncingFromPython } from '../blockly/workspace'
+import { setSyncingFromPython, setHasUnsupportedCode } from '../blockly/workspace'
 import { getPythonToIr } from '../runner/validator'
 import { setBadge } from '../runner/badge'
+
+function containsUnsupported(irJson: string): boolean {
+  return irJson.includes('"type":"Unsupported"')
+}
 
 export async function applyPythonToWorkspace(
   source: string,
   workspace: WorkspaceSvg
 ): Promise<void> {
   const pythonToIr = getPythonToIr()
-  if (!pythonToIr || source.trim() === '') return
+  if (!pythonToIr || source.trim() === '') {
+    setHasUnsupportedCode(false)
+    return
+  }
 
   let irJson: string
   try {
@@ -21,6 +28,7 @@ export async function applyPythonToWorkspace(
     // 構文エラー: Blocklyは変更しない
     const message = err instanceof Error ? err.message : String(err)
     setBadge(`エラー: ${message}`, 'error')
+    setHasUnsupportedCode(false)
     return
   }
 
@@ -33,6 +41,9 @@ export async function applyPythonToWorkspace(
 
   if (root.type !== 'Program') return
 
+  const hasUnsupported = containsUnsupported(irJson)
+  setHasUnsupportedCode(hasUnsupported)
+
   // 変数レジストリ構築（ワークスペースに変数を登録しながらIDを割り当てる）
   const registry = buildVariableRegistry(root.body, workspace)
 
@@ -42,14 +53,16 @@ export async function applyPythonToWorkspace(
   try {
     workspace.clear()
     serialization.workspaces.load(workspaceJson, workspace, { recordUndo: false })
-    setBadge('構文OK', 'success')
+    if (hasUnsupported) {
+      setBadge('⚠ 未対応構文あり', 'warn')
+    } else {
+      setBadge('構文OK', 'success')
+    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
     setBadge(`変換エラー: ${message}`, 'error')
     setSyncingFromPython(false)
     return
   }
-  // workspace.clear() / load() が発火させる非同期changeイベントが
-  // 全て届いた後にフラグをリセットする（1フレーム待機）
   requestAnimationFrame(() => setSyncingFromPython(false))
 }

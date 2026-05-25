@@ -95,6 +95,7 @@ pub enum IrNode {
     },
     Unsupported {
         node_type: String,
+        code: String,
     },
 }
 

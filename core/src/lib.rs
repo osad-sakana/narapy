@@ -13,7 +13,7 @@ use ir::IrNode;
 pub fn python_to_ir(source: &str) -> Result<String, JsError> {
     let suite = parse_program(source, "<input>")
         .map_err(|e| JsError::new(&e.to_string()))?;
-    let body = convert_stmts(&suite);
+    let body = convert_stmts(&suite, source);
     let root = IrNode::Program { body };
     serde_json::to_string(&root).map_err(|e| JsError::new(&e.to_string()))
 }

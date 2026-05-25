@@ -3,6 +3,9 @@ import { Msg, defineBlocksWithJsonArray } from 'blockly'
 export function applyBlocklyMessages(): void {
   // Python 構文はそのまま、英語の説明ラベルを日本語化
   Object.assign(Msg, {
+    // カスタムツールチップで代替するため Blockly 組み込みを抑制
+    TEXT_PRINT_TOOLTIP: '',
+
     // --- 真偽値 ---
     LOGIC_BOOLEAN_TRUE:  'True',
     LOGIC_BOOLEAN_FALSE: 'False',

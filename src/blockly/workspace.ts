@@ -2,6 +2,7 @@ import { inject, Theme, Themes, Events, svgResize } from 'blockly'
 import { pythonGenerator } from 'blockly/python'
 import type { WorkspaceSvg } from 'blockly'
 import { TOOLBOX_CONFIG } from './toolbox'
+import { initBlockTooltips } from './tooltips'
 
 export function createWorkspace(onCodeChange: (code: string) => void): WorkspaceSvg {
   const workspace: WorkspaceSvg = inject('blocklyDiv', {
@@ -46,6 +47,9 @@ export function createWorkspace(onCodeChange: (code: string) => void): Workspace
       requestAnimationFrame(() => svgResize(workspace))
     }
   })
+
+  const blocklyDiv = document.getElementById('blocklyDiv') as HTMLElement
+  initBlockTooltips(blocklyDiv, workspace)
 
   return workspace
 }

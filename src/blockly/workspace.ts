@@ -1,11 +1,13 @@
-import { inject, Theme, Themes, Events, svgResize, Names } from 'blockly'
+import { inject, Theme, Themes, Events, svgResize } from 'blockly'
 import { pythonGenerator } from 'blockly/python'
 import type { WorkspaceSvg } from 'blockly'
 import { TOOLBOX_CONFIG } from './toolbox'
 import { initBlockTooltips } from './tooltips'
 import { registerUnsupportedBlock } from './unsupported'
+import { registerForRangeBlock } from './forRange'
 
 registerUnsupportedBlock()
+registerForRangeBlock()
 
 // Python→Blockly同期中はBlockly→Pythonのコールバックを抑制するフラグ
 let syncingFromPython = false
@@ -37,18 +39,6 @@ pythonGenerator.init = function (ws: WorkspaceSvg) {
   ;(this as any).definitions_['variables'] = ''
 }
 
-// controls_for: range(stop) のみサポートするため TO の値だけを使って出力する。
-// デフォルト実装は range(FROM, TO, BY) を出力してしまうため上書き。
-pythonGenerator.forBlock['controls_for'] = (block, generator) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const loopVar = (generator as any).nameDB_.getName(
-    block.getFieldValue('VAR'),
-    Names.NameType.VARIABLE,
-  )
-  const to = generator.valueToCode(block, 'TO', 0) || '0'
-  const branch = generator.statementToCode(block, 'DO') || generator.INDENT + 'pass\n'
-  return `for ${loopVar} in range(${to}):\n${branch}`
-}
 
 export function createWorkspace(onCodeChange: (code: string) => void): WorkspaceSvg {
   const workspace: WorkspaceSvg = inject('blocklyDiv', {

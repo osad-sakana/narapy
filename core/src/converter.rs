@@ -61,8 +61,15 @@ fn convert_stmt(stmt: &Stmt, source: &str) -> Option<IrNode> {
             let body = convert_stmts(&s.body, source);
             if let Expr::Name(target) = s.target.as_ref() {
                 let var_name = target.id.to_string();
-                if let Some(range_node) = try_convert_range(&s.iter, &var_name, body.clone(), source) {
-                    return Some(range_node);
+                if is_range_call(&s.iter) {
+                    // range() 呼び出しだが引数が1つでない場合は未対応
+                    return Some(
+                        try_convert_range(&s.iter, &var_name, body, source)
+                            .unwrap_or_else(|| IrNode::Unsupported {
+                                node_type: "ForRange(multi-arg)".to_string(),
+                                code: extract_source(source, s),
+                            }),
+                    );
                 }
                 let iter = convert_expr(&s.iter, source);
                 Some(IrNode::ForEach {
@@ -145,38 +152,30 @@ fn convert_if(s: &StmtIf, source: &str) -> IrNode {
     IrNode::If { condition: Box::new(condition), body, elif_clauses, else_body }
 }
 
-/// `range(stop)` / `range(start, stop)` / `range(start, stop, step)` を ForRange に変換
+/// iter が `range(...)` 呼び出しかどうかだけを判定する
+fn is_range_call(iter: &Expr) -> bool {
+    if let Expr::Call(call) = iter {
+        if let Expr::Name(fname) = call.func.as_ref() {
+            return fname.id.as_str() == "range";
+        }
+    }
+    false
+}
+
+/// `range(stop)` （1引数のみ）を ForRange に変換。
+/// 引数が1つでない場合は None を返す。
 fn try_convert_range(iter: &Expr, var_name: &str, body: Vec<IrNode>, source: &str) -> Option<IrNode> {
     if let Expr::Call(call) = iter {
         if let Expr::Name(fname) = call.func.as_ref() {
-            if fname.id.as_str() != "range" {
-                return None;
+            if fname.id.as_str() == "range" && call.args.len() == 1 {
+                return Some(IrNode::ForRange {
+                    var_name: var_name.to_string(),
+                    from: Box::new(IrNode::NumLit { value: 0.0 }),
+                    to: Box::new(convert_expr(&call.args[0], source)),
+                    step: Box::new(IrNode::NumLit { value: 1.0 }),
+                    body,
+                });
             }
-            let (from, to, step) = match call.args.len() {
-                1 => (
-                    IrNode::NumLit { value: 0.0 },
-                    convert_expr(&call.args[0], source),
-                    IrNode::NumLit { value: 1.0 },
-                ),
-                2 => (
-                    convert_expr(&call.args[0], source),
-                    convert_expr(&call.args[1], source),
-                    IrNode::NumLit { value: 1.0 },
-                ),
-                3 => (
-                    convert_expr(&call.args[0], source),
-                    convert_expr(&call.args[1], source),
-                    convert_expr(&call.args[2], source),
-                ),
-                _ => return None,
-            };
-            return Some(IrNode::ForRange {
-                var_name: var_name.to_string(),
-                from: Box::new(from),
-                to: Box::new(to),
-                step: Box::new(step),
-                body,
-            });
         }
     }
     None
@@ -390,5 +389,12 @@ mod tests {
         let src = "import os";
         let nodes = parse_ir(src);
         assert!(matches!(&nodes[0], IrNode::Unsupported { code, .. } if code == "import os"));
+    }
+
+    #[test]
+    fn test_for_range_multi_arg_unsupported() {
+        let src = "for i in range(0, 10):\n  pass";
+        let nodes = parse_ir(src);
+        assert!(matches!(&nodes[0], IrNode::Unsupported { .. }));
     }
 }

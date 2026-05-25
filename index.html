@@ -64,7 +64,10 @@
           </button>
           </div>
         </div>
-        <div id="blocklyDiv" class="flex-1 w-full bg-[#060d16]"></div>
+        <div class="relative flex-1 min-h-0">
+          <div id="blocklyDiv" class="w-full h-full bg-[#060d16]"></div>
+          <div id="blocklyOverlay" class="hidden absolute inset-0 z-10 cursor-not-allowed"></div>
+        </div>
       </section>
 
       <!-- 右カラム: テキストエディタ + 実行ログ -->

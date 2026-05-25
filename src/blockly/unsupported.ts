@@ -25,8 +25,16 @@ export function registerUnsupportedBlock(): void {
 
 export function setBlocklyUnsupportedBanner(show: boolean): void {
   const banner = document.getElementById('blocklyUnsupportedBanner')
-  if (!banner) return
-  banner.className = show
-    ? 'text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30'
-    : 'hidden'
+  const overlay = document.getElementById('blocklyOverlay')
+
+  if (banner) {
+    banner.className = show
+      ? 'text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30'
+      : 'hidden'
+  }
+
+  // ワークスペース全体を覆うオーバーレイでブロック操作を禁止
+  if (overlay) {
+    overlay.className = show ? 'absolute inset-0 z-10 cursor-not-allowed' : 'hidden'
+  }
 }

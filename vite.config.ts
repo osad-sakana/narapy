@@ -3,7 +3,8 @@ import tailwindcss from '@tailwindcss/vite'
 import wasm from 'vite-plugin-wasm'
 import topLevelAwait from 'vite-plugin-top-level-await'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
-import monacoEditorPlugin from 'vite-plugin-monaco-editor'
+import monacoEditorPluginModule from 'vite-plugin-monaco-editor'
+const monacoEditorPlugin = (monacoEditorPluginModule as unknown as { default: typeof monacoEditorPluginModule }).default ?? monacoEditorPluginModule
 
 export default defineConfig({
   plugins: [

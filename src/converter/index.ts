@@ -63,5 +63,6 @@ export async function applyPythonToWorkspace(
     setSyncingFromPython(false)
     return
   }
-  requestAnimationFrame(() => setSyncingFromPython(false))
+  // 二重rAFでBlocklyのバッチイベントが全て落ち着いてからフラグを解除する
+  requestAnimationFrame(() => requestAnimationFrame(() => setSyncingFromPython(false)))
 }

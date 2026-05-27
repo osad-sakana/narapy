@@ -31,6 +31,8 @@ export function isHasUnsupportedCode(): boolean {
   return hasUnsupportedCode
 }
 
+pythonGenerator.INDENT = '    '
+
 // Blocklyのpython generatorが生成する「varname = None」宣言はPythonでは不要なので削除する。
 const _origInit = pythonGenerator.init.bind(pythonGenerator)
 pythonGenerator.init = function (ws: WorkspaceSvg) {

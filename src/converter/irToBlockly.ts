@@ -214,6 +214,17 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
     }
 
     case 'BinOp':
+      // math_arithmetic は ADD/MINUS/MULTIPLY/DIVIDE/POWER のみ対応。
+      // MODULO は専用の math_modulo ブロックを使う。
+      if (node.op === 'MODULO') {
+        return {
+          type: 'math_modulo',
+          inputs: {
+            DIVIDEND: { block: exprToBlock(node.left, getVarId) },
+            DIVISOR: { block: exprToBlock(node.right, getVarId) },
+          },
+        }
+      }
       return {
         type: 'math_arithmetic',
         fields: { OP: node.op },

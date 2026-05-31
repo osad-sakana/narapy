@@ -8,7 +8,7 @@ export function downloadPythonFile(code: string, filename = 'main.py'): void {
   URL.revokeObjectURL(url)
 }
 
-export function openFilePicker(onLoad: (code: string) => void): void {
+export function openFilePicker(onLoad: (code: string, filename: string) => void): void {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = '.py'
@@ -18,7 +18,7 @@ export function openFilePicker(onLoad: (code: string) => void): void {
     const reader = new FileReader()
     reader.onload = (e) => {
       const result = e.target?.result
-      if (typeof result === 'string') onLoad(result)
+      if (typeof result === 'string') onLoad(result, file.name)
     }
     reader.readAsText(file, 'utf-8')
   })

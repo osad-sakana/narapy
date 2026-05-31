@@ -151,8 +151,8 @@ export function applyBlocklyMessages(): void {
     // --- 関数 (def) ---
     PROCEDURES_DEFNORETURN_TITLE:      'def',
     PROCEDURES_DEFRETURN_TITLE:        'def',
-    PROCEDURES_DEFNORETURN_PROCEDURE:  '関数名',
-    PROCEDURES_DEFRETURN_PROCEDURE:    '関数名',
+    PROCEDURES_DEFNORETURN_PROCEDURE:  'myFunction',
+    PROCEDURES_DEFRETURN_PROCEDURE:    'myFunction',
     PROCEDURES_DEFRETURN_RETURN:       'return',
     PROCEDURES_DEFNORETURN_COMMENT:    '関数の説明...',
     PROCEDURES_DEFRETURN_COMMENT:      '関数の説明...',

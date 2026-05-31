@@ -1,4 +1,4 @@
-import { inject, Theme, Themes, Events, svgResize, Names } from 'blockly'
+import { inject, Theme, Themes, Events, svgResize, Names, ShortcutRegistry } from 'blockly'
 import { pythonGenerator, Order } from 'blockly/python'
 import type { WorkspaceSvg } from 'blockly'
 import { TOOLBOX_CONFIG } from './toolbox'
@@ -10,6 +10,9 @@ import { registerFStringBlock } from './fstring'
 registerUnsupportedBlock()
 registerForRangeBlock()
 registerFStringBlock()
+
+// Backspace / Delete キーによるブロック誤削除を防ぐ
+ShortcutRegistry.registry.unregister('delete')
 
 // Python→Blockly同期中はBlockly→Pythonのコールバックを抑制するフラグ
 let syncingFromPython = false

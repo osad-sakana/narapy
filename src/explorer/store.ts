@@ -80,6 +80,13 @@ export function deleteFile(name: string): boolean {
   return true
 }
 
+export function resetFiles(files: FileEntry[]): void {
+  if (files.length === 0) return
+  const activeFile = files.find(f => f.name === 'main.py')?.name ?? files[0].name
+  state = { files, activeFile }
+  persist(state)
+}
+
 export function getAllFilesAsRecord(): Record<string, string> {
   return Object.fromEntries(state.files.map(f => [f.name, f.content]))
 }

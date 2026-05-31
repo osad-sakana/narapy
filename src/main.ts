@@ -7,7 +7,7 @@ import { initRunner } from './runner/index'
 import { applyPythonToWorkspace } from './converter/index'
 import { createDebounced } from './converter/debounce'
 import { createEditor, getValue, setValue } from './editor/index'
-import { downloadPythonFile, openFilePicker } from './fileio/index'
+import { exportProjectAsNarapy, openFilePicker } from './fileio/index'
 import { createExplorer } from './explorer/ui'
 import {
   getActiveFile,
@@ -16,6 +16,7 @@ import {
   setActiveFile,
   getAllFilesAsRecord,
   upsertFile,
+  resetFiles,
 } from './explorer/store'
 
 applyBlocklyMessages()
@@ -155,23 +156,32 @@ setValue(editor, getActiveContent())
 editorFileName.textContent = getActiveFile()
 isSyncingEditor = false
 
-// --- ファイル開く ---
+// --- ファイル開く (.py / .narapy) ---
 const uploadBtn = document.getElementById('uploadBtn') as HTMLButtonElement
 uploadBtn.addEventListener('click', () => {
-  openFilePicker((code, filename) => {
-    const name = filename ?? 'main.py'
-    upsertFile(name, code)
-    switchToFile(name)
-    refreshExplorer()
-  })
+  openFilePicker(
+    (code, filename) => {
+      const name = filename ?? 'main.py'
+      upsertFile(name, code)
+      switchToFile(name)
+      refreshExplorer()
+    },
+    (files) => {
+      // .narapy インポート: プロジェクト全体を置き換え
+      const entries = Object.entries(files).map(([name, content]) => ({ name, content }))
+      resetFiles(entries)
+      const first = files['main.py'] !== undefined ? 'main.py' : Object.keys(files)[0]
+      switchToFile(first)
+      refreshExplorer()
+    },
+  )
 })
 
-// --- ファイル保存 ---
+// --- プロジェクト保存 (.narapy) ---
 const downloadBtn = document.getElementById('downloadBtn') as HTMLButtonElement
 downloadBtn.addEventListener('click', () => {
-  // 保存前に最新の内容をストアへ反映
   updateFileContent(getActiveFile(), getValue(editor))
-  downloadPythonFile(getValue(editor), getActiveFile())
+  exportProjectAsNarapy(getAllFilesAsRecord())
 })
 
 initRunner(editor, () => {

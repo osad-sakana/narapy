@@ -1,4 +1,4 @@
-# Atmospya — Claude Code ガイド
+# Narapy — Claude Code ガイド
 
 Python学習向けWebアプリのプロトタイプ。フロントエンド完結型アーキテクチャ（サーバー不要）。
 
@@ -16,7 +16,7 @@ Python学習向けWebアプリのプロトタイプ。フロントエンド完�
 ## ディレクトリ構造
 
 ```
-atmospya/
+narapy/
 ├── core/                  # Rust製パーサー/バリデーターエンジン
 │   ├── Cargo.toml         # wasm-bindgen / rustpython-parser / serde
 │   └── src/lib.rs         # parse_and_validate() — JS から呼び出す WASM API
@@ -78,7 +78,7 @@ Blockly 12 は CJS モジュールのため `optimizeDeps.include` に追加し�
 ### WASM モジュールの利用パターン
 
 ```typescript
-import init, { parse_and_validate } from './wasm/atmospya_core.js'
+import init, { parse_and_validate } from './wasm/narapy_core.js'
 await init()
 const result = parse_and_validate(code) // Ok("{"status":"success"}") or throws
 ```

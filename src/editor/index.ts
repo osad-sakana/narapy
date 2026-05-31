@@ -3,7 +3,7 @@ import * as monaco from 'monaco-editor'
 export type EditorInstance = monaco.editor.IStandaloneCodeEditor
 
 export function createEditor(container: HTMLElement): EditorInstance {
-  monaco.editor.defineTheme('atmospya-dark', {
+  monaco.editor.defineTheme('narapy-dark', {
     base: 'vs-dark',
     inherit: true,
     rules: [
@@ -34,7 +34,7 @@ export function createEditor(container: HTMLElement): EditorInstance {
   const editor = monaco.editor.create(container, {
     value: '',
     language: 'python',
-    theme: 'atmospya-dark',
+    theme: 'narapy-dark',
     fontSize: 13,
     fontFamily: '"0xProto", "Fira Code", "Cascadia Code", monospace',
     fontLigatures: true,

@@ -126,8 +126,8 @@ export function createWorkspace(onCodeChange: (code: string) => void): Workspace
     // COEP 制約により外部 CDN をブロックされるためローカル配信パスを指定
     media: '/blockly-media/',
     toolbox: TOOLBOX_CONFIG,
-    theme: Theme.defineTheme('atmospya', {
-      name: 'atmospya',
+    theme: Theme.defineTheme('narapy', {
+      name: 'narapy',
       base: Themes.Classic,
       componentStyles: {
         workspaceBackgroundColour: '#060d16',

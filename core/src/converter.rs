@@ -107,6 +107,22 @@ fn convert_stmt(stmt: &Stmt, source: &str) -> Option<IrNode> {
                 has_return,
             })
         }
+        Stmt::AugAssign(s) => {
+            if let Expr::Name(target) = s.target.as_ref() {
+                let op = binop_to_str(&s.op);
+                let value = convert_expr(&s.value, source);
+                Some(IrNode::AugAssign {
+                    var_name: target.id.to_string(),
+                    op,
+                    value: Box::new(value),
+                })
+            } else {
+                Some(IrNode::Unsupported {
+                    node_type: "AugAssignComplexTarget".to_string(),
+                    code: extract_source(source, s),
+                })
+            }
+        }
         Stmt::Pass(_) => None,
         _ => Some(IrNode::Unsupported {
             node_type: stmt_type_name(stmt).to_string(),
@@ -310,7 +326,6 @@ fn stmt_type_name(s: &Stmt) -> &'static str {
         Stmt::Import(_) => "Import",
         Stmt::ImportFrom(_) => "ImportFrom",
         Stmt::ClassDef(_) => "ClassDef",
-        Stmt::AugAssign(_) => "AugAssign",
         Stmt::AnnAssign(_) => "AnnAssign",
         Stmt::AsyncFunctionDef(_) => "AsyncFunctionDef",
         Stmt::AsyncFor(_) => "AsyncFor",

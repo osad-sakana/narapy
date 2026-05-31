@@ -4,6 +4,7 @@ export type IrNode =
   | { type: 'Program'; body: IrNode[] }
   | { type: 'PrintStmt'; value: IrNode }
   | { type: 'Assign'; var_name: string; value: IrNode }
+  | { type: 'AugAssign'; var_name: string; op: string; value: IrNode }
   | { type: 'Return'; value: IrNode | null }
   | { type: 'Break' }
   | { type: 'Continue' }

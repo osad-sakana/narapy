@@ -1,5 +1,5 @@
-import { inject, Theme, Themes, Events, svgResize } from 'blockly'
-import { pythonGenerator } from 'blockly/python'
+import { inject, Theme, Themes, Events, svgResize, Names } from 'blockly'
+import { pythonGenerator, Order } from 'blockly/python'
 import type { WorkspaceSvg } from 'blockly'
 import { TOOLBOX_CONFIG } from './toolbox'
 import { initBlockTooltips } from './tooltips'
@@ -32,6 +32,16 @@ export function isHasUnsupportedCode(): boolean {
 }
 
 pythonGenerator.INDENT = '    '
+
+// math_change を `varName += delta` 形式で生成する
+pythonGenerator.forBlock['math_change'] = function (block) {
+  const varName = pythonGenerator.nameDB_?.getName(
+    block.getFieldValue('VAR'),
+    Names.NameType.VARIABLE,
+  ) ?? block.getFieldValue('VAR')
+  const delta = pythonGenerator.valueToCode(block, 'DELTA', Order.ADDITIVE) || '0'
+  return `${varName} += ${delta}\n`
+}
 
 // Blocklyのpython generatorが生成する「varname = None」宣言はPythonでは不要なので削除する。
 const _origInit = pythonGenerator.init.bind(pythonGenerator)

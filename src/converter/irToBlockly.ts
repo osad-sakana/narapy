@@ -58,6 +58,15 @@ function stmtToBlock(node: IrNode, getVarId: VarFn): BlockJson | undefined {
       }
     }
 
+    case 'AugAssign': {
+      const varId = getVarId(node.var_name)
+      return {
+        type: 'math_change',
+        fields: { VAR: { id: varId } },
+        inputs: { DELTA: { block: exprToBlock(node.value, getVarId) } },
+      }
+    }
+
     case 'Return':
       if (!node.value) return undefined
       return {

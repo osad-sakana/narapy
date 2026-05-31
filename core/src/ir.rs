@@ -16,6 +16,11 @@ pub enum IrNode {
         var_name: String,
         value: Box<IrNode>,
     },
+    AugAssign {
+        var_name: String,
+        op: String,
+        value: Box<IrNode>,
+    },
     Return {
         value: Option<Box<IrNode>>,
     },

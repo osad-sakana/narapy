@@ -1,14 +1,15 @@
 /// <reference lib="webworker" />
 
-interface RunMessage {
-  type: 'run'
-  code: string
-}
+import type { RunPayload } from './types'
 
 type OutMessage =
   | { type: 'stdout' | 'result' | 'error'; payload: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
   | { type: 'input_request'; prompt: string }
+
+interface PyFS {
+  writeFile: (path: string, data: string) => void
+}
 
 interface PyodideInterface {
   runPythonAsync: (code: string) => Promise<unknown>
@@ -17,6 +18,7 @@ interface PyodideInterface {
     get: (key: string) => unknown
     set: (key: string, value: unknown) => void
   }
+  FS: PyFS
 }
 
 interface PyodideModule {
@@ -28,6 +30,7 @@ interface PyodideModule {
 }
 
 const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/'
+const WORK_DIR = '/home/pyodide'
 
 // SharedArrayBuffer で stdin の同期通信を行う
 // [0..3] Int32: 0=idle, N>0=入力データのバイト数
@@ -81,10 +84,32 @@ async function initPyodide(): Promise<void> {
 
 const initPromise = initPyodide()
 
-self.onmessage = async (event: MessageEvent<RunMessage>) => {
+async function cleanupUserModules(files: Record<string, string>): Promise<void> {
+  if (!pyodide) return
+  const moduleNames = Object.keys(files)
+    .filter(name => name.endsWith('.py'))
+    .map(name => name.slice(0, -3))
+  if (moduleNames.length === 0) return
+  await pyodide.runPythonAsync(`
+import sys, importlib as _il
+for _m in ${JSON.stringify(moduleNames)}:
+    sys.modules.pop(_m, None)
+_il.invalidate_caches()
+del _m, _il
+`)
+}
+
+function writeFilesToFS(files: Record<string, string>): void {
+  if (!pyodide) return
+  for (const [name, content] of Object.entries(files)) {
+    pyodide.FS.writeFile(`${WORK_DIR}/${name}`, content)
+  }
+}
+
+self.onmessage = async (event: MessageEvent<RunPayload>) => {
   if (event.data.type !== 'run') return
 
-  const { code } = event.data
+  const { code, files } = event.data
 
   try {
     await initPromise
@@ -93,6 +118,9 @@ self.onmessage = async (event: MessageEvent<RunMessage>) => {
       self.postMessage({ type: 'error', payload: 'Pyodide の初期化が完了していません' } satisfies OutMessage)
       return
     }
+
+    await cleanupUserModules(files)
+    writeFilesToFS(files)
 
     const result = await pyodide.runPythonAsync(code)
 

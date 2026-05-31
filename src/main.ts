@@ -156,6 +156,15 @@ setValue(editor, getActiveContent())
 editorFileName.textContent = getActiveFile()
 isSyncingEditor = false
 
+// --- 新規プロジェクト ---
+const newProjectBtn = document.getElementById('newProjectBtn') as HTMLButtonElement
+newProjectBtn.addEventListener('click', () => {
+  if (!window.confirm('現在のプロジェクトを破棄して新規作成しますか？')) return
+  resetFiles([{ name: 'main.py', content: '' }])
+  switchToFile('main.py')
+  refreshExplorer()
+})
+
 // --- ファイル開く (.py / .narapy) ---
 const uploadBtn = document.getElementById('uploadBtn') as HTMLButtonElement
 uploadBtn.addEventListener('click', () => {

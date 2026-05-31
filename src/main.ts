@@ -161,7 +161,12 @@ const newProjectBtn = document.getElementById('newProjectBtn') as HTMLButtonElem
 newProjectBtn.addEventListener('click', () => {
   if (!window.confirm('現在のプロジェクトを破棄して新規作成しますか？')) return
   resetFiles([{ name: 'main.py', content: '' }])
-  switchToFile('main.py')
+  // switchToFile は先頭でエディタ内容を保存するため使わず直接リセット
+  isSyncingEditor = true
+  setValue(editor, '')
+  isSyncingEditor = false
+  editorFileName.textContent = 'main.py'
+  void triggerValidation('')
   refreshExplorer()
 })
 

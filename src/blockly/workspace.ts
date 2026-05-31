@@ -51,6 +51,57 @@ pythonGenerator.forBlock['text_prompt_ext'] = (block, generator) => {
   return [`input(${msg})`, Order.FUNCTION_CALL]
 }
 
+// math_arithmetic に MODULO を追加対応する（標準ジェネレーターは MODULO を知らないため）
+pythonGenerator.forBlock['math_arithmetic'] = (block, generator) => {
+  const ops: Record<string, [string, number]> = {
+    ADD:      [' + ',  Order.ADDITIVE],
+    MINUS:    [' - ',  Order.ADDITIVE],
+    MULTIPLY: [' * ',  Order.MULTIPLICATIVE],
+    DIVIDE:   [' / ',  Order.MULTIPLICATIVE],
+    POWER:    [' ** ', Order.EXPONENTIATION],
+    MODULO:   [' % ',  Order.MULTIPLICATIVE],
+  }
+  const [symbol, order] = ops[block.getFieldValue('OP')] ?? [' + ', Order.ADDITIVE]
+  const a = generator.valueToCode(block, 'A', order) || '0'
+  const b = generator.valueToCode(block, 'B', order) || '0'
+  return [`${a}${symbol}${b}`, order]
+}
+
+// lists_getIndex を Python 0ベースインデックスで動作させる（標準は1ベース変換あり）
+pythonGenerator.forBlock['lists_getIndex'] = (block, generator) => {
+  const mode  = block.getFieldValue('MODE')  || 'GET'
+  const where = block.getFieldValue('WHERE') || 'FROM_START'
+  const list  = generator.valueToCode(block, 'VALUE', Order.MEMBER) || '[]'
+
+  switch (where) {
+    case 'FIRST':
+      if (mode === 'GET')        return [`${list}[0]`,       Order.MEMBER]
+      if (mode === 'GET_REMOVE') return [`${list}.pop(0)`,   Order.FUNCTION_CALL]
+      if (mode === 'REMOVE')     return `${list}.pop(0)\n`
+      break
+    case 'LAST':
+      if (mode === 'GET')        return [`${list}[-1]`,      Order.MEMBER]
+      if (mode === 'GET_REMOVE') return [`${list}.pop()`,    Order.FUNCTION_CALL]
+      if (mode === 'REMOVE')     return `${list}.pop()\n`
+      break
+    case 'FROM_START': {
+      const at = generator.valueToCode(block, 'AT', Order.MEMBER) || '0'
+      if (mode === 'GET')        return [`${list}[${at}]`,       Order.MEMBER]
+      if (mode === 'GET_REMOVE') return [`${list}.pop(${at})`,   Order.FUNCTION_CALL]
+      if (mode === 'REMOVE')     return `${list}.pop(${at})\n`
+      break
+    }
+    case 'FROM_END': {
+      const at = generator.valueToCode(block, 'AT', Order.MEMBER) || '1'
+      if (mode === 'GET')        return [`${list}[-${at}]`,      Order.MEMBER]
+      if (mode === 'GET_REMOVE') return [`${list}.pop(-${at})`,  Order.FUNCTION_CALL]
+      if (mode === 'REMOVE')     return `${list}.pop(-${at})\n`
+      break
+    }
+  }
+  throw new Error('Unhandled combination (lists_getIndex)')
+}
+
 // math_change を `varName += delta` 形式で生成する
 pythonGenerator.forBlock['math_change'] = function (block) {
   const varName = pythonGenerator.nameDB_?.getName(

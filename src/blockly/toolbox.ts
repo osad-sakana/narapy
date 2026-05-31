@@ -27,9 +27,7 @@ export const TOOLBOX_CONFIG: utils.toolbox.ToolboxDefinition = {
         { kind: 'block', type: 'math_arithmetic' },
         { kind: 'block', type: 'math_single' },
         { kind: 'block', type: 'math_round' },
-        { kind: 'block', type: 'math_modulo' },
         { kind: 'block', type: 'math_random_int' },
-        { kind: 'block', type: 'math_number_property' },
       ],
     },
     {

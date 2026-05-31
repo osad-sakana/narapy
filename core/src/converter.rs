@@ -268,6 +268,10 @@ fn convert_expr(expr: &Expr, source: &str) -> IrNode {
             let items = l.elts.iter().map(|e| convert_expr(e, source)).collect();
             IrNode::ListLit { items }
         }
+        Expr::Subscript(s) => IrNode::Subscript {
+            value: Box::new(convert_expr(&s.value, source)),
+            index: Box::new(convert_expr(&s.slice, source)),
+        },
         Expr::JoinedStr(s) => {
             let parts: Vec<IrNode> = s.values.iter()
                 .filter_map(|v| match v {

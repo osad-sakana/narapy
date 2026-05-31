@@ -164,6 +164,33 @@ export function applyBlocklyMessages(): void {
     PROCEDURES_ALLOW_STATEMENTS:       '処理を含める',
   })
 
+  // math_arithmetic に % (MODULO) を追加し、演算子表記を Python 準拠に統一する
+  defineBlocksWithJsonArray([
+    {
+      type: 'math_arithmetic',
+      message0: '%1 %2 %3',
+      args0: [
+        { type: 'input_value', name: 'A', check: 'Number' },
+        {
+          type: 'field_dropdown',
+          name: 'OP',
+          options: [
+            ['+',  'ADD'],
+            ['-',  'MINUS'],
+            ['*',  'MULTIPLY'],
+            ['/',  'DIVIDE'],
+            ['**', 'POWER'],
+            ['%',  'MODULO'],
+          ],
+        },
+        { type: 'input_value', name: 'B', check: 'Number' },
+      ],
+      inputsInline: true,
+      output: 'Number',
+      style: 'math_blocks',
+    },
+  ])
+
   // logic_compare のドロップダウンを Python 演算子に差し替え（Blockly デフォルトは =/≠/≤/≥）
   defineBlocksWithJsonArray([{
     type: 'logic_compare',

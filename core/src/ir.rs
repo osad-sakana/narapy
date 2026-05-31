@@ -101,6 +101,10 @@ pub enum IrNode {
     FStringLit {
         parts: Vec<IrNode>,
     },
+    Subscript {
+        value: Box<IrNode>,
+        index: Box<IrNode>,
+    },
     Unsupported {
         node_type: String,
         code: String,

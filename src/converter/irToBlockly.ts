@@ -222,19 +222,18 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
       return { type: 'lists_create_with', extraState, inputs }
     }
 
-    case 'BinOp':
-      // MODULO は専用の math_modulo ブロックを使う。
-      if (node.op === 'MODULO') {
-        return {
-          type: 'math_modulo',
-          inputs: {
-            DIVIDEND: { block: exprToBlock(node.left, getVarId) },
-            DIVISOR: { block: exprToBlock(node.right, getVarId) },
-          },
-        }
+    case 'Subscript':
+      return {
+        type: 'lists_getIndex',
+        fields: { MODE: 'GET', WHERE: 'FROM_START' },
+        inputs: {
+          VALUE: { block: exprToBlock(node.value, getVarId) },
+          AT: { block: exprToBlock(node.index, getVarId) },
+        },
       }
+
+    case 'BinOp':
       // ADD で一方以上が StrLit の場合は文字列連結ブロック（text_join）を使う。
-      // math_arithmetic は数値型のみ受け付けるため、StrLit を渡すと型エラーでデフォルト値0になってしまう。
       if (node.op === 'ADD' && (node.left.type === 'StrLit' || node.right.type === 'StrLit')) {
         return {
           type: 'text_join',

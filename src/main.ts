@@ -7,7 +7,7 @@ import { initRunner } from './runner/index'
 import { applyPythonToWorkspace } from './converter/index'
 import { createDebounced } from './converter/debounce'
 import { createEditor, getValue, setValue } from './editor/index'
-import { downloadPythonFile, openFilePicker } from './fileio/index'
+import { exportProjectAsNarapy, openFilePicker } from './fileio/index'
 import { createExplorer } from './explorer/ui'
 import {
   getActiveFile,
@@ -16,6 +16,7 @@ import {
   setActiveFile,
   getAllFilesAsRecord,
   upsertFile,
+  resetFiles,
 } from './explorer/store'
 
 applyBlocklyMessages()
@@ -58,24 +59,26 @@ function codeEqual(a: string, b: string): boolean {
   return a.trimEnd() === b.trimEnd()
 }
 
-// --- ファイル切替 ---
-function switchToFile(name: string): void {
-  // 現在の内容を保存
-  updateFileContent(getActiveFile(), getValue(editor))
-  // ストアを切替
+// --- ファイルロード（保存なし）---
+// ストアの内容をそのままエディタに反映する。インポートや新規など
+// 「ストア側がすでに正しい状態」のときに使う。
+function loadFileIntoEditor(name: string): void {
   setActiveFile(name)
-  // エディタに新しい内容をロード（変更ハンドラを抑制）
   isSyncingEditor = true
   const content = getActiveContent()
   setValue(editor, content)
   isSyncingEditor = false
-  // ファイル名表示を更新
   editorFileName.textContent = name
-  // バリデーションと Blockly 変換
   void triggerValidation(content)
   if (activeSource === 'editor') {
     debouncedConvert.call(content)
   }
+}
+
+// --- ファイル切替（現在の内容を保存してから切替）---
+function switchToFile(name: string): void {
+  updateFileContent(getActiveFile(), getValue(editor))
+  loadFileIntoEditor(name)
 }
 
 // --- Blockly ワークスペース ---
@@ -155,23 +158,43 @@ setValue(editor, getActiveContent())
 editorFileName.textContent = getActiveFile()
 isSyncingEditor = false
 
-// --- ファイル開く ---
-const uploadBtn = document.getElementById('uploadBtn') as HTMLButtonElement
-uploadBtn.addEventListener('click', () => {
-  openFilePicker((code, filename) => {
-    const name = filename ?? 'main.py'
-    upsertFile(name, code)
-    switchToFile(name)
-    refreshExplorer()
-  })
+// --- 新規プロジェクト ---
+const newProjectBtn = document.getElementById('newProjectBtn') as HTMLButtonElement
+newProjectBtn.addEventListener('click', () => {
+  if (!window.confirm('現在のプロジェクトを破棄して新規作成しますか？')) return
+  resetFiles([{ name: 'main.py', content: '' }])
+  loadFileIntoEditor('main.py')
+  refreshExplorer()
 })
 
-// --- ファイル保存 ---
+// --- ファイル開く (.py / .narapy) ---
+const uploadBtn = document.getElementById('uploadBtn') as HTMLButtonElement
+uploadBtn.addEventListener('click', () => {
+  openFilePicker(
+    (code, filename) => {
+      const name = filename ?? 'main.py'
+      if (name !== getActiveFile()) {
+        updateFileContent(getActiveFile(), getValue(editor))
+      }
+      upsertFile(name, code)
+      loadFileIntoEditor(name)
+      refreshExplorer()
+    },
+    (files) => {
+      const entries = Object.entries(files).map(([name, content]) => ({ name, content }))
+      resetFiles(entries)
+      const first = files['main.py'] !== undefined ? 'main.py' : Object.keys(files)[0]
+      loadFileIntoEditor(first)
+      refreshExplorer()
+    },
+  )
+})
+
+// --- プロジェクト保存 (.narapy) ---
 const downloadBtn = document.getElementById('downloadBtn') as HTMLButtonElement
 downloadBtn.addEventListener('click', () => {
-  // 保存前に最新の内容をストアへ反映
   updateFileContent(getActiveFile(), getValue(editor))
-  downloadPythonFile(getValue(editor), getActiveFile())
+  exportProjectAsNarapy(getAllFilesAsRecord())
 })
 
 initRunner(editor, () => {

@@ -285,6 +285,17 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
       }
 
     case 'FuncCallExpr': {
+      // input() は text_prompt_ext ブロックにマッピング
+      if (node.name === 'input') {
+        const promptBlock = node.args[0]
+          ? exprToBlock(node.args[0], getVarId)
+          : { type: 'text', fields: { TEXT: '' } }
+        return {
+          type: 'text_prompt_ext',
+          fields: { TYPE: 'TEXT' },
+          inputs: { TEXT: { block: promptBlock } },
+        }
+      }
       const argInputs = buildArgInputs(node.args, getVarId)
       return {
         type: 'procedures_callreturn',

@@ -8,7 +8,7 @@ interface RunMessage {
 type OutMessage =
   | { type: 'stdout' | 'result' | 'error'; payload: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
-  | { type: 'input_request' }
+  | { type: 'input_request'; prompt: string }
 
 interface PyodideInterface {
   runPythonAsync: (code: string) => Promise<unknown>
@@ -22,7 +22,6 @@ interface PyodideInterface {
 interface PyodideModule {
   loadPyodide: (options: {
     indexURL: string
-    stdin?: () => string | null
     stdout?: (text: string) => void
     stderr?: (text: string) => void
   }) => Promise<PyodideInterface>
@@ -40,15 +39,19 @@ const inputData = new Uint8Array(INPUT_SAB, 4)
 // 起動直後にSABをメインスレッドへ送り、input_request の受け取り準備をさせる
 self.postMessage({ type: 'input_sab', sab: INPUT_SAB } satisfies OutMessage)
 
-function stdinCallback(): string | null {
+// Python の input(prompt) を直接置き換える関数。
+// stdin オプションではなく globals.set を使うことで：
+// (1) stdout にプロンプトが流れないためログが汚れない
+// (2) prompt 引数を直接受け取れる
+function customInput(prompt: unknown): string {
+  const promptStr = String(prompt ?? '')
   Atomics.store(inputStatus, 0, 0)
-  self.postMessage({ type: 'input_request' } satisfies OutMessage)
-  // メインスレッドが入力をSABに書き込んで notify するまで待機
+  self.postMessage({ type: 'input_request', prompt: promptStr } satisfies OutMessage)
   Atomics.wait(inputStatus, 0, 0)
   const len = Atomics.load(inputStatus, 0)
-  if (len < 0) return null // キャンセル → EOF
+  if (len < 0) return '' // キャンセル
   const bytes = inputData.slice(0, len)
-  return new TextDecoder().decode(bytes) + '\n'
+  return new TextDecoder().decode(bytes)
 }
 
 let pyodide: PyodideInterface | null = null
@@ -62,7 +65,6 @@ async function initPyodide(): Promise<void> {
 
   pyodide = await loadPyodide({
     indexURL: PYODIDE_CDN,
-    stdin: stdinCallback,
     stdout: (text: string) => {
       self.postMessage({ type: 'stdout', payload: text } satisfies OutMessage)
     },
@@ -70,6 +72,9 @@ async function initPyodide(): Promise<void> {
       self.postMessage({ type: 'error', payload: text } satisfies OutMessage)
     },
   })
+
+  // builtins.input を上書きして prompt 引数を直接受け取る
+  pyodide.globals.set('input', customInput)
 
   isReady = true
 }

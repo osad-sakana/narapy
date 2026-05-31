@@ -24,13 +24,10 @@ export function initRunner(editor: EditorInstance): void {
   // Worker ごとに SAB が変わるのでクロージャで管理
   let inputStatus: Int32Array | null = null
   let inputData: Uint8Array | null = null
-  // input() の直前に stdout で出力されたプロンプト文字列を追跡
-  let lastStdout = ''
 
   function setRunning(state: boolean): void {
     running = state
     if (state) {
-      lastStdout = ''
       runBtn.className = STOP_STYLE
       runBtn.textContent = '■ 停止'
     } else {
@@ -50,13 +47,9 @@ export function initRunner(editor: EditorInstance): void {
       }
 
       if (msg.type === 'input_request') {
-        // input("プロンプト") の文字列は直前の stdout に出ているので lastStdout を使う
-        const prompt = lastStdout.trimEnd() || 'input()'
-        lastStdout = ''
-        const value = window.prompt(prompt)
+        const value = window.prompt(msg.prompt || 'input()')
         if (inputStatus && inputData) {
           if (value === null) {
-            // キャンセル → EOF (-1)
             Atomics.store(inputStatus, 0, -1)
           } else {
             const encoded = new TextEncoder().encode(value)
@@ -70,7 +63,6 @@ export function initRunner(editor: EditorInstance): void {
 
       if (msg.type === 'stdout') {
         appendLog(msg.payload, 'output')
-        lastStdout = msg.payload
       } else if (msg.type === 'result') {
         appendLog(`=> ${msg.payload}`, 'result')
         setRunning(false)

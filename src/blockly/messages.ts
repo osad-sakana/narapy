@@ -61,7 +61,7 @@ export function applyBlocklyMessages(): void {
     MATH_ROUND_OPERATOR_ROUNDDOWN:   '切り捨て floor()',
     MATH_RANDOM_INT_TITLE:           '%1 〜 %2 のランダムな整数',
     MATH_RANDOM_FLOAT_TITLE_RANDOM:  'ランダムな小数（0〜1）',
-    MATH_CHANGE_TITLE:               '%1 に %2 を加える',
+    MATH_CHANGE_TITLE:               '%1 += %2',
     MATH_CHANGE_TITLE_ITEM:          '変数',
 
     // --- 文字列 ---
@@ -143,6 +143,10 @@ export function applyBlocklyMessages(): void {
     LISTS_SPLIT_WITH_DELIMITER:            '区切り文字:',
     LISTS_REVERSE_MESSAGE0:                '%1 を逆順に',
     LISTS_REPEAT_TITLE:                    '%1 を %2 回繰り返したリスト',
+
+    // --- 変数 ---
+    VARIABLES_SET:          '%1 = %2',
+    VARIABLES_DEFAULT_NAME: '変数',
 
     // --- 関数 (def) ---
     PROCEDURES_DEFNORETURN_TITLE:      'def',

@@ -72,11 +72,6 @@ editor.onDidChangeModelContent(() => {
   debouncedConvert.call(source)
 })
 
-// エディタへのフォーカスでアクティブを確定（クリック以外のフォーカス手段も捕捉）
-editor.onDidFocusEditorWidget(() => {
-  setActiveSource('editor')
-})
-
 // --- Blockly 操作 ---
 // capture: true でBlockly内部のstopPropagationを回避して確実に捕捉する
 const blocklyDiv = document.getElementById('blocklyDiv') as HTMLElement

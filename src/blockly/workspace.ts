@@ -35,6 +35,13 @@ export function isHasUnsupportedCode(): boolean {
 
 pythonGenerator.INDENT = '    '
 
+// text_prompt_ext の標準ジェネレーターは raw_input/input ヘルパーを出力してしまうため
+// シンプルに input(msg) を返すよう上書きする
+pythonGenerator.forBlock['text_prompt_ext'] = (block, generator) => {
+  const msg = generator.valueToCode(block, 'TEXT', Order.NONE) || "''"
+  return [`input(${msg})`, Order.FUNCTION_CALL]
+}
+
 // math_change を `varName += delta` 形式で生成する
 pythonGenerator.forBlock['math_change'] = function (block) {
   const varName = pythonGenerator.nameDB_?.getName(

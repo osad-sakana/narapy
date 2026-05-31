@@ -98,6 +98,9 @@ pub enum IrNode {
         name: String,
         args: Vec<IrNode>,
     },
+    FStringLit {
+        parts: Vec<IrNode>,
+    },
     Unsupported {
         node_type: String,
         code: String,

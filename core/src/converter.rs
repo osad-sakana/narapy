@@ -268,6 +268,22 @@ fn convert_expr(expr: &Expr, source: &str) -> IrNode {
             let items = l.elts.iter().map(|e| convert_expr(e, source)).collect();
             IrNode::ListLit { items }
         }
+        Expr::JoinedStr(s) => {
+            let parts: Vec<IrNode> = s.values.iter()
+                .filter_map(|v| match v {
+                    Expr::Constant(c) => {
+                        if let Constant::Str(text) = &c.value {
+                            if text.is_empty() { None } else { Some(IrNode::StrLit { value: text.clone() }) }
+                        } else {
+                            None
+                        }
+                    }
+                    Expr::FormattedValue(fv) => Some(convert_expr(&fv.value, source)),
+                    _ => None,
+                })
+                .collect();
+            IrNode::FStringLit { parts }
+        }
         _ => IrNode::Unsupported {
             node_type: expr_type_name(expr).to_string(),
             code: extract_source(source, expr),

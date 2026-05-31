@@ -24,6 +24,7 @@ export type IrNode =
   | { type: 'BoolOp'; op: string; values: IrNode[] }
   | { type: 'Not'; operand: IrNode }
   | { type: 'FuncCallExpr'; name: string; args: IrNode[] }
+  | { type: 'FStringLit'; parts: IrNode[] }
   | { type: 'Unsupported'; node_type: string; code: string }
 
 export interface ElifClause {

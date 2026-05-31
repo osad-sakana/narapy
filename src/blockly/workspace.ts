@@ -5,9 +5,11 @@ import { TOOLBOX_CONFIG } from './toolbox'
 import { initBlockTooltips } from './tooltips'
 import { registerUnsupportedBlock } from './unsupported'
 import { registerForRangeBlock } from './forRange'
+import { registerFStringBlock } from './fstring'
 
 registerUnsupportedBlock()
 registerForRangeBlock()
+registerFStringBlock()
 
 // Python→Blockly同期中はBlockly→Pythonのコールバックを抑制するフラグ
 let syncingFromPython = false

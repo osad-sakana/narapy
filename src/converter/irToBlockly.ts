@@ -307,6 +307,18 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
       }
     }
 
+    case 'FStringLit': {
+      const inputs: Record<string, InputJson> = {}
+      node.parts.forEach((part, i) => {
+        inputs[`ADD${i}`] = { block: exprToBlock(part, getVarId) }
+      })
+      return {
+        type: 'text_fstring',
+        extraState: { itemCount: node.parts.length },
+        inputs,
+      }
+    }
+
     case 'Unsupported':
       return { type: 'text', fields: { TEXT: node.code || `(${node.node_type})` } }
 

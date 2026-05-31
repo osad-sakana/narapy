@@ -35,6 +35,12 @@ export function isHasUnsupportedCode(): boolean {
 
 pythonGenerator.INDENT = '    '
 
+// 文字列リテラルをシングルクォートではなくダブルクォートで出力する
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+;(pythonGenerator as any).quote_ = (str: string): string => {
+  return '"' + str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n') + '"'
+}
+
 // text_prompt_ext の標準ジェネレーターは raw_input/input ヘルパーを出力してしまうため
 // シンプルに input(msg) を返すよう上書きする
 pythonGenerator.forBlock['text_prompt_ext'] = (block, generator) => {

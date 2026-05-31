@@ -84,9 +84,10 @@ blocklyDiv.addEventListener('touchstart', () => {
   debouncedConvert.cancel()
 }, { capture: true, passive: true })
 
-// Blockly変更時: エディタ→Blockly変換をキャンセル
+// Blocklyの実際の変更（値変更・移動・追加・削除）でアクティブを確定してデバウンスをキャンセル
 workspace.addChangeListener((event) => {
   if (!event.isUiEvent && !isSyncingFromPython()) {
+    setActiveSource('blockly')
     debouncedConvert.cancel()
   }
 })

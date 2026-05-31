@@ -7,6 +7,7 @@ import { initRunner } from './runner/index'
 import { applyPythonToWorkspace } from './converter/index'
 import { createDebounced } from './converter/debounce'
 import { createEditor, getValue, setValue } from './editor/index'
+import { downloadPythonFile, openFilePicker } from './fileio/index'
 
 applyBlocklyMessages()
 
@@ -14,20 +15,42 @@ applyBlocklyMessages()
 const editorContainer = document.getElementById('codeEditor') as HTMLElement
 const editor = createEditor(editorContainer)
 
-// どちらが最後にユーザー操作したか
-type EditSource = 'editor' | 'blockly'
-let lastTouched: EditSource = 'blockly'
-// Blockly→Editor のプログラム的書き込み中フラグ（onDidChangeModelContent で誤検知しないため）
+// --- アクティブパネル管理 ---
+type ActiveSource = 'blockly' | 'editor'
+let activeSource: ActiveSource = 'blockly'
+
+// Blockly→Editor のプログラム的書き込み中フラグ
 let isSettingFromBlockly = false
+
+const blocklyHeader   = document.getElementById('blocklyHeader')   as HTMLElement
+const editorHeader    = document.getElementById('editorHeader')    as HTMLElement
+const blocklyActiveDot = document.getElementById('blocklyActiveDot') as HTMLElement
+const editorActiveDot  = document.getElementById('editorActiveDot')  as HTMLElement
+
+function setActiveSource(source: ActiveSource): void {
+  if (activeSource === source) return
+  activeSource = source
+
+  if (source === 'blockly') {
+    blocklyHeader.classList.remove('opacity-50')
+    editorHeader.classList.add('opacity-50')
+    blocklyActiveDot.className = 'w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse shrink-0'
+    editorActiveDot.className  = 'w-1.5 h-1.5 rounded-full bg-slate-600 shrink-0'
+  } else {
+    editorHeader.classList.remove('opacity-50')
+    blocklyHeader.classList.add('opacity-50')
+    editorActiveDot.className  = 'w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse shrink-0'
+    blocklyActiveDot.className = 'w-1.5 h-1.5 rounded-full bg-slate-600 shrink-0'
+  }
+}
 
 function codeEqual(a: string, b: string): boolean {
   return a.trimEnd() === b.trimEnd()
 }
 
+// --- Blockly ワークスペース ---
 const workspace = createWorkspace((code) => {
-  // エディタ側が主導権を持っている間はBlocklyからの上書きを行わない
-  if (lastTouched === 'editor') return
-  // 内容が実質同じなら書き込みをスキップ
+  if (activeSource === 'editor') return
   if (codeEqual(getValue(editor), code)) return
   isSettingFromBlockly = true
   setValue(editor, code)
@@ -40,41 +63,70 @@ const debouncedConvert = createDebounced((source: string) => {
   void applyPythonToWorkspace(source, workspace)
 }, 300)
 
+// --- エディタ変更 ---
 editor.onDidChangeModelContent(() => {
-  // プログラム的な書き込みは無視
   if (isSettingFromBlockly) return
-  lastTouched = 'editor'
+  setActiveSource('editor')
   const source = getValue(editor)
   void triggerValidation(source)
   debouncedConvert.call(source)
 })
 
-// ユーザーのBlockly操作はマウス/タッチで始まる（プログラム的なload()では発火しない）
-const blocklyDiv = document.getElementById('blocklyDiv') as HTMLElement
-blocklyDiv.addEventListener('mousedown', () => { lastTouched = 'blockly'; debouncedConvert.cancel() })
-blocklyDiv.addEventListener('touchstart', () => { lastTouched = 'blockly'; debouncedConvert.cancel() }, { passive: true })
+// エディタへのフォーカスでアクティブを確定（クリック以外のフォーカス手段も捕捉）
+editor.onDidFocusEditorWidget(() => {
+  setActiveSource('editor')
+})
 
-// Blockly変更時はエディタ→Blockly変換をキャンセル（ユーザー操作が主導権を持つ）
+// --- Blockly 操作 ---
+// capture: true でBlockly内部のstopPropagationを回避して確実に捕捉する
+const blocklyDiv = document.getElementById('blocklyDiv') as HTMLElement
+blocklyDiv.addEventListener('mousedown', () => {
+  setActiveSource('blockly')
+  debouncedConvert.cancel()
+}, { capture: true })
+blocklyDiv.addEventListener('touchstart', () => {
+  setActiveSource('blockly')
+  debouncedConvert.cancel()
+}, { capture: true, passive: true })
+
+// Blockly変更時: エディタ→Blockly変換をキャンセル
 workspace.addChangeListener((event) => {
   if (!event.isUiEvent && !isSyncingFromPython()) {
     debouncedConvert.cancel()
   }
 })
 
-// Ctrl+Enter / Cmd+Enter でコード実行
+// --- キーボードショートカット ---
 editor.addCommand(
   KeyMod.CtrlCmd | KeyCode.Enter,
   () => document.getElementById('runBtn')?.click(),
 )
 
-// ヒントトグルボタン
+// --- ヒントトグル ---
 const hintToggleBtn = document.getElementById('hintToggleBtn') as HTMLButtonElement
 hintToggleBtn.addEventListener('click', () => {
   const next = !isTooltipsEnabled()
   setTooltipsEnabled(next)
   hintToggleBtn.className = next
-    ? 'flex items-center gap-1 text-xs text-sky-400 hover:text-sky-200 transition-colors'
-    : 'flex items-center gap-1 text-xs text-sky-800 hover:text-sky-600 transition-colors'
+    ? 'flex items-center gap-1 text-xs text-sky-400 hover:text-sky-200 transition-colors cursor-pointer'
+    : 'flex items-center gap-1 text-xs text-sky-800 hover:text-sky-600 transition-colors cursor-pointer'
+})
+
+// --- ファイル開く ---
+const uploadBtn = document.getElementById('uploadBtn') as HTMLButtonElement
+uploadBtn.addEventListener('click', () => {
+  openFilePicker((code) => {
+    setActiveSource('editor')
+    setValue(editor, code)
+    void triggerValidation(code)
+    debouncedConvert.call(code)
+  })
+})
+
+// --- ファイル保存 ---
+const downloadBtn = document.getElementById('downloadBtn') as HTMLButtonElement
+downloadBtn.addEventListener('click', () => {
+  downloadPythonFile(getValue(editor))
 })
 
 initRunner(editor)

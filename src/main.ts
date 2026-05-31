@@ -59,24 +59,26 @@ function codeEqual(a: string, b: string): boolean {
   return a.trimEnd() === b.trimEnd()
 }
 
-// --- ファイル切替 ---
-function switchToFile(name: string): void {
-  // 現在の内容を保存
-  updateFileContent(getActiveFile(), getValue(editor))
-  // ストアを切替
+// --- ファイルロード（保存なし）---
+// ストアの内容をそのままエディタに反映する。インポートや新規など
+// 「ストア側がすでに正しい状態」のときに使う。
+function loadFileIntoEditor(name: string): void {
   setActiveFile(name)
-  // エディタに新しい内容をロード（変更ハンドラを抑制）
   isSyncingEditor = true
   const content = getActiveContent()
   setValue(editor, content)
   isSyncingEditor = false
-  // ファイル名表示を更新
   editorFileName.textContent = name
-  // バリデーションと Blockly 変換
   void triggerValidation(content)
   if (activeSource === 'editor') {
     debouncedConvert.call(content)
   }
+}
+
+// --- ファイル切替（現在の内容を保存してから切替）---
+function switchToFile(name: string): void {
+  updateFileContent(getActiveFile(), getValue(editor))
+  loadFileIntoEditor(name)
 }
 
 // --- Blockly ワークスペース ---
@@ -161,12 +163,7 @@ const newProjectBtn = document.getElementById('newProjectBtn') as HTMLButtonElem
 newProjectBtn.addEventListener('click', () => {
   if (!window.confirm('現在のプロジェクトを破棄して新規作成しますか？')) return
   resetFiles([{ name: 'main.py', content: '' }])
-  // switchToFile は先頭でエディタ内容を保存するため使わず直接リセット
-  isSyncingEditor = true
-  setValue(editor, '')
-  isSyncingEditor = false
-  editorFileName.textContent = 'main.py'
-  void triggerValidation('')
+  loadFileIntoEditor('main.py')
   refreshExplorer()
 })
 
@@ -176,16 +173,18 @@ uploadBtn.addEventListener('click', () => {
   openFilePicker(
     (code, filename) => {
       const name = filename ?? 'main.py'
+      if (name !== getActiveFile()) {
+        updateFileContent(getActiveFile(), getValue(editor))
+      }
       upsertFile(name, code)
-      switchToFile(name)
+      loadFileIntoEditor(name)
       refreshExplorer()
     },
     (files) => {
-      // .narapy インポート: プロジェクト全体を置き換え
       const entries = Object.entries(files).map(([name, content]) => ({ name, content }))
       resetFiles(entries)
       const first = files['main.py'] !== undefined ? 'main.py' : Object.keys(files)[0]
-      switchToFile(first)
+      loadFileIntoEditor(first)
       refreshExplorer()
     },
   )

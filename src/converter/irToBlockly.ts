@@ -223,7 +223,6 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
     }
 
     case 'BinOp':
-      // math_arithmetic は ADD/MINUS/MULTIPLY/DIVIDE/POWER のみ対応。
       // MODULO は専用の math_modulo ブロックを使う。
       if (node.op === 'MODULO') {
         return {
@@ -231,6 +230,18 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
           inputs: {
             DIVIDEND: { block: exprToBlock(node.left, getVarId) },
             DIVISOR: { block: exprToBlock(node.right, getVarId) },
+          },
+        }
+      }
+      // ADD で一方以上が StrLit の場合は文字列連結ブロック（text_join）を使う。
+      // math_arithmetic は数値型のみ受け付けるため、StrLit を渡すと型エラーでデフォルト値0になってしまう。
+      if (node.op === 'ADD' && (node.left.type === 'StrLit' || node.right.type === 'StrLit')) {
+        return {
+          type: 'text_join',
+          extraState: { itemCount: 2 },
+          inputs: {
+            ADD0: { block: exprToBlock(node.left, getVarId) },
+            ADD1: { block: exprToBlock(node.right, getVarId) },
           },
         }
       }

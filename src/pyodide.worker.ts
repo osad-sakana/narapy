@@ -5,10 +5,10 @@ interface RunMessage {
   code: string
 }
 
-interface OutMessage {
-  type: 'stdout' | 'result' | 'error'
-  payload: string
-}
+type OutMessage =
+  | { type: 'stdout' | 'result' | 'error'; payload: string }
+  | { type: 'input_sab'; sab: SharedArrayBuffer }
+  | { type: 'input_request' }
 
 interface PyodideInterface {
   runPythonAsync: (code: string) => Promise<unknown>
@@ -22,12 +22,34 @@ interface PyodideInterface {
 interface PyodideModule {
   loadPyodide: (options: {
     indexURL: string
+    stdin?: () => string | null
     stdout?: (text: string) => void
     stderr?: (text: string) => void
   }) => Promise<PyodideInterface>
 }
 
 const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/'
+
+// SharedArrayBuffer で stdin の同期通信を行う
+// [0..3] Int32: 0=idle, N>0=入力データのバイト数
+// [4..]  Uint8: UTF-8 エンコードされた入力データ（最大 4092 バイト）
+const INPUT_SAB = new SharedArrayBuffer(4 + 4092)
+const inputStatus = new Int32Array(INPUT_SAB, 0, 1)
+const inputData = new Uint8Array(INPUT_SAB, 4)
+
+// 起動直後にSABをメインスレッドへ送り、input_request の受け取り準備をさせる
+self.postMessage({ type: 'input_sab', sab: INPUT_SAB } satisfies OutMessage)
+
+function stdinCallback(): string | null {
+  Atomics.store(inputStatus, 0, 0)
+  self.postMessage({ type: 'input_request' } satisfies OutMessage)
+  // メインスレッドが入力をSABに書き込んで notify するまで待機
+  Atomics.wait(inputStatus, 0, 0)
+  const len = Atomics.load(inputStatus, 0)
+  if (len < 0) return null // キャンセル → EOF
+  const bytes = inputData.slice(0, len)
+  return new TextDecoder().decode(bytes) + '\n'
+}
 
 let pyodide: PyodideInterface | null = null
 let isReady = false
@@ -40,13 +62,12 @@ async function initPyodide(): Promise<void> {
 
   pyodide = await loadPyodide({
     indexURL: PYODIDE_CDN,
+    stdin: stdinCallback,
     stdout: (text: string) => {
-      const msg: OutMessage = { type: 'stdout', payload: text }
-      self.postMessage(msg)
+      self.postMessage({ type: 'stdout', payload: text } satisfies OutMessage)
     },
     stderr: (text: string) => {
-      const msg: OutMessage = { type: 'error', payload: text }
-      self.postMessage(msg)
+      self.postMessage({ type: 'error', payload: text } satisfies OutMessage)
     },
   })
 
@@ -64,21 +85,18 @@ self.onmessage = async (event: MessageEvent<RunMessage>) => {
     await initPromise
 
     if (!pyodide || !isReady) {
-      const msg: OutMessage = { type: 'error', payload: 'Pyodide の初期化が完了していません' }
-      self.postMessage(msg)
+      self.postMessage({ type: 'error', payload: 'Pyodide の初期化が完了していません' } satisfies OutMessage)
       return
     }
 
     const result = await pyodide.runPythonAsync(code)
 
-    const msg: OutMessage = {
+    self.postMessage({
       type: 'result',
       payload: result === undefined || result === null ? '(None)' : String(result),
-    }
-    self.postMessage(msg)
+    } satisfies OutMessage)
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
-    const msg: OutMessage = { type: 'error', payload: message }
-    self.postMessage(msg)
+    self.postMessage({ type: 'error', payload: message } satisfies OutMessage)
   }
 }

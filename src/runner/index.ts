@@ -21,9 +21,16 @@ export function initRunner(editor: EditorInstance): void {
   let worker  = createWorker()
   let running = false
 
+  // Worker ごとに SAB が変わるのでクロージャで管理
+  let inputStatus: Int32Array | null = null
+  let inputData: Uint8Array | null = null
+  // input() の直前に stdout で出力されたプロンプト文字列を追跡
+  let lastStdout = ''
+
   function setRunning(state: boolean): void {
     running = state
     if (state) {
+      lastStdout = ''
       runBtn.className = STOP_STYLE
       runBtn.textContent = '■ 停止'
     } else {
@@ -34,18 +41,45 @@ export function initRunner(editor: EditorInstance): void {
 
   function attachWorkerHandlers(): void {
     worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
-      const { type, payload } = event.data
-      if (type === 'stdout') {
-        appendLog(payload, 'output')
-      } else if (type === 'result') {
-        appendLog(`=> ${payload}`, 'result')
+      const msg = event.data
+
+      if (msg.type === 'input_sab') {
+        inputStatus = new Int32Array(msg.sab, 0, 1)
+        inputData   = new Uint8Array(msg.sab, 4)
+        return
+      }
+
+      if (msg.type === 'input_request') {
+        // input("プロンプト") の文字列は直前の stdout に出ているので lastStdout を使う
+        const prompt = lastStdout.trimEnd() || 'input()'
+        lastStdout = ''
+        const value = window.prompt(prompt)
+        if (inputStatus && inputData) {
+          if (value === null) {
+            // キャンセル → EOF (-1)
+            Atomics.store(inputStatus, 0, -1)
+          } else {
+            const encoded = new TextEncoder().encode(value)
+            inputData.set(encoded)
+            Atomics.store(inputStatus, 0, encoded.length)
+          }
+          Atomics.notify(inputStatus, 0)
+        }
+        return
+      }
+
+      if (msg.type === 'stdout') {
+        appendLog(msg.payload, 'output')
+        lastStdout = msg.payload
+      } else if (msg.type === 'result') {
+        appendLog(`=> ${msg.payload}`, 'result')
         setRunning(false)
-      } else if (type === 'error') {
-        const translated = translatePythonError(payload)
+      } else if (msg.type === 'error') {
+        const translated = translatePythonError(msg.payload)
         if (translated) {
-          appendErrorBlock({ ...translated, raw: payload })
+          appendErrorBlock({ ...translated, raw: msg.payload })
         } else {
-          appendLog(`[エラー] ${payload}`, 'error')
+          appendLog(`[エラー] ${msg.payload}`, 'error')
         }
         setRunning(false)
       }
@@ -61,8 +95,11 @@ export function initRunner(editor: EditorInstance): void {
 
   runBtn.addEventListener('click', () => {
     if (running) {
+      // 強制停止: Worker を破棄して新規作成
       worker.terminate()
       worker = createWorker()
+      inputStatus = null
+      inputData   = null
       attachWorkerHandlers()
       appendLog('--- 実行を停止しました ---', 'info')
       setRunning(false)

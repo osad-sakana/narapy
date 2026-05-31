@@ -18,6 +18,12 @@
   display: none !important;
 }
 
+/* Pyodide 実行エラー行のハイライト（Monaco デコレーション） */
+.error-line-highlight {
+  background-color: rgba(239, 68, 68, 0.12);
+  border-left: 2px solid rgba(239, 68, 68, 0.7);
+}
+
 /* スクロールバーをパープルテーマに合わせる */
 ::-webkit-scrollbar {
   width: 6px;

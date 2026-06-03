@@ -18,6 +18,36 @@
   display: none !important;
 }
 
+/* ─── split.js リサイズハンドル ─────────────────────────────── */
+.gutter {
+  background-color: #14112a;
+  flex-shrink: 0;
+  transition: background-color 0.15s;
+  position: relative;
+}
+
+.gutter::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(109, 40, 217, 0);
+  transition: background 0.15s;
+}
+
+.gutter:hover::after {
+  background: rgba(109, 40, 217, 0.45);
+}
+
+.gutter.gutter-horizontal {
+  cursor: col-resize;
+  width: 6px !important;
+}
+
+.gutter.gutter-vertical {
+  cursor: row-resize;
+  height: 6px !important;
+}
+
 /* スクロールバーをパープルテーマに合わせる */
 ::-webkit-scrollbar {
   width: 6px;

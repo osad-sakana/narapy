@@ -1,4 +1,5 @@
 import { KeyMod, KeyCode } from 'monaco-editor'
+import { initLayout } from './layout/index'
 import { applyBlocklyMessages } from './blockly/messages'
 import { createWorkspace, isSyncingFromPython } from './blockly/workspace'
 import { setTooltipsEnabled, isTooltipsEnabled } from './blockly/tooltips'
@@ -19,6 +20,7 @@ import {
 } from './explorer/store'
 
 applyBlocklyMessages()
+initLayout()
 
 // Monaco Editor を初期化
 const editorContainer = document.getElementById('codeEditor') as HTMLElement

@@ -24,6 +24,22 @@
         <span class="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
           Python Learning
         </span>
+        <div class="w-px h-4 bg-purple-800/60 mx-1"></div>
+        <!-- パネル表示トグル -->
+        <div class="flex items-center gap-1">
+          <button
+            id="panelToggleBlockly"
+            class="text-xs px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer bg-sky-500/15 text-sky-300 border border-sky-600/40"
+          >ブロック</button>
+          <button
+            id="panelTogglePython"
+            class="text-xs px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer bg-violet-500/15 text-violet-300 border border-violet-600/40"
+          >Python</button>
+          <button
+            id="panelToggleLog"
+            class="text-xs px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer bg-emerald-500/15 text-emerald-300 border border-emerald-600/40"
+          >実行</button>
+        </div>
       </div>
       <div class="flex items-center gap-2">
         <button
@@ -56,10 +72,15 @@
     </header>
 
     <!-- メインエリア（2カラム） -->
-    <main class="flex flex-1 overflow-hidden">
+    <main class="flex flex-1 overflow-hidden relative">
+
+      <!-- 全パネル非表示時のメッセージ -->
+      <div id="emptyMessage" class="hidden absolute inset-0 z-10 flex-col items-center justify-center bg-[#08080d]">
+        <span class="text-slate-700 text-sm select-none">何もありません</span>
+      </div>
 
       <!-- 左カラム: Blockly ワークスペース（アクセント: sky-blue） -->
-      <section class="flex flex-col w-1/2 border-r border-sky-700/50 bg-[#060d16]">
+      <section id="blocklyPanel" class="flex flex-col overflow-hidden border-sky-700/50 bg-[#060d16]">
         <div id="blocklyHeader" class="flex items-center justify-between px-4 py-2.5 bg-[#0c1e30] border-b border-sky-700/50 border-l-4 border-l-sky-400 shrink-0 transition-opacity duration-200">
           <div class="flex items-center gap-2.5">
             <span id="blocklyActiveDot" class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse shrink-0"></span>
@@ -92,16 +113,16 @@
       </section>
 
       <!-- 右カラム: ファイルエクスプローラー + テキストエディタ + 実行ログ -->
-      <section class="flex w-1/2">
+      <section id="rightPanel" class="flex overflow-hidden min-w-0">
 
         <!-- ファイルエクスプローラー -->
         <aside id="fileExplorer" class="flex flex-col w-44 shrink-0 border-r border-violet-700/50 bg-[#0c0818]"></aside>
 
-        <!-- エディタ + ログ -->
+        <!-- エディタ + ログ（split.js 縦分割対象） -->
         <div class="flex flex-col flex-1 min-w-0">
 
           <!-- テキストエディタ（アクセント: violet） -->
-          <div class="flex flex-col flex-1 border-b border-violet-700/50 bg-[#0c0818]">
+          <div id="editorPanel" class="flex flex-col overflow-hidden border-b border-violet-700/50 bg-[#0c0818]">
             <div id="editorHeader" class="flex items-center justify-between px-4 py-2.5 bg-[#180a2e] border-b border-violet-700/50 border-l-4 border-l-violet-400 shrink-0 transition-opacity duration-200 opacity-50">
               <div class="flex items-center gap-2.5">
                 <span id="editorActiveDot" class="w-1.5 h-1.5 rounded-full bg-slate-600 shrink-0"></span>
@@ -119,7 +140,7 @@
           </div>
 
           <!-- 実行ログ（アクセント: emerald） -->
-          <div class="flex flex-col flex-1 min-h-0 bg-[#060f0b]">
+          <div id="logPanel" class="flex flex-col overflow-hidden bg-[#060f0b]">
             <div class="flex items-center justify-between px-4 py-2.5 bg-[#091c12] border-b border-emerald-700/50 border-l-4 border-l-emerald-400 shrink-0">
               <div class="flex items-center gap-2.5">
                 <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">

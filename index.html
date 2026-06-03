@@ -59,7 +59,7 @@
     <main class="flex flex-1 overflow-hidden">
 
       <!-- 左カラム: Blockly ワークスペース（アクセント: sky-blue） -->
-      <section class="flex flex-col w-1/2 border-r border-sky-700/50 bg-[#060d16]">
+      <section id="blocklyPanel" class="flex flex-col overflow-hidden border-sky-700/50 bg-[#060d16]">
         <div id="blocklyHeader" class="flex items-center justify-between px-4 py-2.5 bg-[#0c1e30] border-b border-sky-700/50 border-l-4 border-l-sky-400 shrink-0 transition-opacity duration-200">
           <div class="flex items-center gap-2.5">
             <span id="blocklyActiveDot" class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse shrink-0"></span>
@@ -83,6 +83,15 @@
             </svg>
             ヒント
           </button>
+          <button
+            id="blocklyCollapseBtn"
+            title="ブロックエディタを折りたたむ"
+            class="flex items-center gap-1 text-xs text-sky-600 hover:text-sky-300 transition-colors cursor-pointer"
+          >
+            <svg class="w-3.5 h-3.5 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/>
+            </svg>
+          </button>
           </div>
         </div>
         <div class="relative flex-1 min-h-0">
@@ -92,10 +101,10 @@
       </section>
 
       <!-- 右カラム: テキストエディタ + 実行ログ -->
-      <section class="flex flex-col w-1/2">
+      <section id="rightPanel" class="flex flex-col overflow-hidden min-w-0">
 
         <!-- テキストエディタ（アクセント: violet） -->
-        <div class="flex flex-col flex-1 border-b border-violet-700/50 bg-[#0c0818]">
+        <div id="editorPanel" class="flex flex-col overflow-hidden border-b border-violet-700/50 bg-[#0c0818]">
           <div id="editorHeader" class="flex items-center justify-between px-4 py-2.5 bg-[#180a2e] border-b border-violet-700/50 border-l-4 border-l-violet-400 shrink-0 transition-opacity duration-200 opacity-50">
             <div class="flex items-center gap-2.5">
               <span id="editorActiveDot" class="w-1.5 h-1.5 rounded-full bg-slate-600 shrink-0"></span>
@@ -112,7 +121,7 @@
         </div>
 
         <!-- 実行ログ（アクセント: emerald） -->
-        <div class="flex flex-col flex-1 min-h-0 bg-[#060f0b]">
+        <div id="logPanel" class="flex flex-col overflow-hidden bg-[#060f0b]">
           <div class="flex items-center justify-between px-4 py-2.5 bg-[#091c12] border-b border-emerald-700/50 border-l-4 border-l-emerald-400 shrink-0">
             <div class="flex items-center gap-2.5">
               <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">

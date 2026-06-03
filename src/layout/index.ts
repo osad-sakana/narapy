@@ -18,6 +18,13 @@ const DEFAULT_STATE: LayoutState = {
   logCollapsed: false,
 }
 
+const BTN_ACTIVE: Record<'blockly' | 'python' | 'log', string> = {
+  blockly: 'text-xs px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer bg-sky-500/15 text-sky-300 border border-sky-600/40',
+  python:  'text-xs px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer bg-violet-500/15 text-violet-300 border border-violet-600/40',
+  log:     'text-xs px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer bg-emerald-500/15 text-emerald-300 border border-emerald-600/40',
+}
+const BTN_INACTIVE = 'text-xs px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer text-slate-600 border border-transparent hover:text-slate-400'
+
 function load(): LayoutState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -31,11 +38,6 @@ function load(): LayoutState {
 function save(patch: Partial<LayoutState>): void {
   const current = load()
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, ...patch }))
-}
-
-function setCollapseIcon(btn: HTMLElement, collapsed: boolean): void {
-  const svg = btn.querySelector('svg')
-  if (svg) svg.style.transform = collapsed ? 'rotate(180deg)' : 'rotate(0deg)'
 }
 
 export function initLayout(): void {
@@ -57,7 +59,7 @@ export function initLayout(): void {
     onDragEnd: (sizes) => {
       blocklyCollapsed = sizes[0] < 5
       save({ horizontal: [sizes[0], sizes[1]], blocklyCollapsed })
-      updateVisibility()
+      updateAll()
       window.dispatchEvent(new Event('resize'))
     },
   })
@@ -73,7 +75,7 @@ export function initLayout(): void {
       editorCollapsed = sizes[0] < 5
       logCollapsed    = sizes[1] < 5
       save({ vertical: [sizes[0], sizes[1]], editorCollapsed, logCollapsed })
-      updateVisibility()
+      updateAll()
     },
   })
 
@@ -81,7 +83,17 @@ export function initLayout(): void {
 
   let { blocklyCollapsed, editorCollapsed, logCollapsed } = state
 
-  function updateVisibility(): void {
+  const blocklyBtn = document.getElementById('panelToggleBlockly') as HTMLElement
+  const pythonBtn  = document.getElementById('panelTogglePython')  as HTMLElement
+  const logBtn     = document.getElementById('panelToggleLog')      as HTMLElement
+
+  function updateBtnStyles(): void {
+    blocklyBtn.className = blocklyCollapsed ? BTN_INACTIVE : BTN_ACTIVE.blockly
+    pythonBtn.className  = editorCollapsed  ? BTN_INACTIVE : BTN_ACTIVE.python
+    logBtn.className     = logCollapsed     ? BTN_INACTIVE : BTN_ACTIVE.log
+  }
+
+  function updateEmptyMessage(): void {
     const allGone = blocklyCollapsed && editorCollapsed && logCollapsed
     if (allGone) {
       blocklyPanel.style.visibility = 'hidden'
@@ -96,9 +108,8 @@ export function initLayout(): void {
     }
   }
 
-  // エディタとログの collapse/expand を同期する
-  // 片方だけ折りたたまれている場合は collapse(index) で対応
-  // 両方折りたたまれている場合は visibility で対応（split.js は触らない）
+  // エディタ/ログの縦分割状態を同期する
+  // 両方 collapsed の場合は visibility で対応し、split.js には触れない
   function syncVSplit(): void {
     if (editorCollapsed && logCollapsed) return
     if (editorCollapsed) {
@@ -111,95 +122,46 @@ export function initLayout(): void {
     }
   }
 
-  // --- Blockly トグル ---
-  const blocklyBtn = document.getElementById('blocklyCollapseBtn') as HTMLElement | null
-  if (blocklyBtn) {
-    setCollapseIcon(blocklyBtn, blocklyCollapsed)
-    blocklyBtn.title = blocklyCollapsed ? 'ブロックエディタを展開' : 'ブロックエディタを折りたたむ'
+  function updateAll(): void {
+    updateBtnStyles()
+    updateEmptyMessage()
+  }
 
+  // --- ブロックトグル ---
+  blocklyBtn.addEventListener('click', () => {
+    blocklyCollapsed = !blocklyCollapsed
     if (blocklyCollapsed) {
       hSplit.collapse(0)
-      window.dispatchEvent(new Event('resize'))
+    } else {
+      const saved = load()
+      hSplit.setSizes(saved.horizontal[0] < 5 ? DEFAULT_STATE.horizontal : saved.horizontal)
     }
+    save({ blocklyCollapsed })
+    updateAll()
+    window.dispatchEvent(new Event('resize'))
+  })
 
-    blocklyBtn.addEventListener('click', () => {
-      blocklyCollapsed = !blocklyCollapsed
-      if (blocklyCollapsed) {
-        hSplit.collapse(0)
-      } else {
-        const saved = load()
-        hSplit.setSizes(saved.horizontal[0] < 5 ? DEFAULT_STATE.horizontal : saved.horizontal)
-      }
-      setCollapseIcon(blocklyBtn, blocklyCollapsed)
-      blocklyBtn.title = blocklyCollapsed ? 'ブロックエディタを展開' : 'ブロックエディタを折りたたむ'
-      save({ blocklyCollapsed })
-      updateVisibility()
-      window.dispatchEvent(new Event('resize'))
-    })
+  // --- Python エディタトグル ---
+  pythonBtn.addEventListener('click', () => {
+    editorCollapsed = !editorCollapsed
+    syncVSplit()
+    save({ editorCollapsed })
+    updateAll()
+  })
+
+  // --- 実行ログトグル ---
+  logBtn.addEventListener('click', () => {
+    logCollapsed = !logCollapsed
+    syncVSplit()
+    save({ logCollapsed })
+    updateAll()
+  })
+
+  // 初期状態を適用
+  if (blocklyCollapsed) {
+    hSplit.collapse(0)
+    window.dispatchEvent(new Event('resize'))
   }
-
-  // --- エディタ トグル ---
-  const editorBtn = document.getElementById('editorCollapseBtn') as HTMLElement | null
-  if (editorBtn) {
-    setCollapseIcon(editorBtn, editorCollapsed)
-    editorBtn.title = editorCollapsed ? 'Pythonエディタを展開' : 'Pythonエディタを折りたたむ'
-
-    if (editorCollapsed) syncVSplit()
-
-    editorBtn.addEventListener('click', () => {
-      editorCollapsed = !editorCollapsed
-      syncVSplit()
-      setCollapseIcon(editorBtn, editorCollapsed)
-      editorBtn.title = editorCollapsed ? 'Pythonエディタを展開' : 'Pythonエディタを折りたたむ'
-      save({ editorCollapsed })
-      updateVisibility()
-    })
-  }
-
-  // --- ログ トグル ---
-  const logBtn = document.getElementById('logCollapseBtn') as HTMLElement | null
-  if (logBtn) {
-    setCollapseIcon(logBtn, logCollapsed)
-    logBtn.title = logCollapsed ? '実行ログを展開' : '実行ログを折りたたむ'
-
-    if (logCollapsed) syncVSplit()
-
-    logBtn.addEventListener('click', () => {
-      logCollapsed = !logCollapsed
-      syncVSplit()
-      setCollapseIcon(logBtn, logCollapsed)
-      logBtn.title = logCollapsed ? '実行ログを展開' : '実行ログを折りたたむ'
-      save({ logCollapsed })
-      updateVisibility()
-    })
-  }
-
-  // --- 全パネル復元ボタン ---
-  const restoreBtn = document.getElementById('restoreAllBtn') as HTMLElement | null
-  if (restoreBtn) {
-    restoreBtn.addEventListener('click', () => {
-      blocklyCollapsed = false
-      editorCollapsed  = false
-      logCollapsed     = false
-      hSplit.setSizes(DEFAULT_STATE.horizontal)
-      vSplit.setSizes(DEFAULT_STATE.vertical)
-      if (blocklyBtn) {
-        setCollapseIcon(blocklyBtn, false)
-        blocklyBtn.title = 'ブロックエディタを折りたたむ'
-      }
-      if (editorBtn) {
-        setCollapseIcon(editorBtn, false)
-        editorBtn.title = 'Pythonエディタを折りたたむ'
-      }
-      if (logBtn) {
-        setCollapseIcon(logBtn, false)
-        logBtn.title = '実行ログを折りたたむ'
-      }
-      save({ blocklyCollapsed: false, editorCollapsed: false, logCollapsed: false })
-      updateVisibility()
-      window.dispatchEvent(new Event('resize'))
-    })
-  }
-
-  updateVisibility()
+  syncVSplit()
+  updateAll()
 }

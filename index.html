@@ -24,6 +24,22 @@
         <span class="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
           Python Learning
         </span>
+        <div class="w-px h-4 bg-purple-800/60 mx-1"></div>
+        <!-- パネル表示トグル -->
+        <div class="flex items-center gap-1">
+          <button
+            id="panelToggleBlockly"
+            class="text-xs px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer bg-sky-500/15 text-sky-300 border border-sky-600/40"
+          >ブロック</button>
+          <button
+            id="panelTogglePython"
+            class="text-xs px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer bg-violet-500/15 text-violet-300 border border-violet-600/40"
+          >Python</button>
+          <button
+            id="panelToggleLog"
+            class="text-xs px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer bg-emerald-500/15 text-emerald-300 border border-emerald-600/40"
+          >実行</button>
+        </div>
       </div>
       <div class="flex items-center gap-2">
         <button
@@ -59,14 +75,8 @@
     <main class="flex flex-1 overflow-hidden relative">
 
       <!-- 全パネル非表示時のメッセージ -->
-      <div id="emptyMessage" class="hidden absolute inset-0 z-10 flex-col items-center justify-center gap-3 bg-[#08080d]">
+      <div id="emptyMessage" class="hidden absolute inset-0 z-10 flex-col items-center justify-center bg-[#08080d]">
         <span class="text-slate-700 text-sm select-none">何もありません</span>
-        <button
-          id="restoreAllBtn"
-          class="text-xs px-3 py-1.5 rounded-lg text-violet-500 hover:text-violet-300 hover:bg-violet-500/10 border border-violet-800/50 transition-colors cursor-pointer"
-        >
-          全てのパネルを表示
-        </button>
       </div>
 
       <!-- 左カラム: Blockly ワークスペース（アクセント: sky-blue） -->
@@ -109,35 +119,15 @@
         <div id="editorPanel" class="flex flex-col overflow-hidden border-b border-violet-700/50 bg-[#0c0818]">
           <div id="editorHeader" class="flex items-center justify-between px-4 py-2.5 bg-[#180a2e] border-b border-violet-700/50 border-l-4 border-l-violet-400 shrink-0 transition-opacity duration-200 opacity-50">
             <div class="flex items-center gap-2.5">
-              <button
-                id="blocklyCollapseBtn"
-                title="ブロックエディタを折りたたむ"
-                class="flex items-center p-0.5 text-violet-600 hover:text-violet-300 transition-colors cursor-pointer shrink-0"
-              >
-                <svg class="w-3.5 h-3.5 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/>
-                </svg>
-              </button>
               <span id="editorActiveDot" class="w-1.5 h-1.5 rounded-full bg-slate-600 shrink-0"></span>
               <svg class="w-3.5 h-3.5 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                 <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
               </svg>
               <span class="text-xs font-bold text-violet-300 uppercase tracking-widest">Python エディタ</span>
             </div>
-            <div class="flex items-center gap-2">
-              <span id="validationBadge" class="text-xs px-2 py-0.5 rounded-full bg-violet-900/50 text-violet-300 transition-all">
-                待機中
-              </span>
-              <button
-                id="editorCollapseBtn"
-                title="Pythonエディタを折りたたむ"
-                class="flex items-center p-0.5 text-violet-600 hover:text-violet-300 transition-colors cursor-pointer shrink-0"
-              >
-                <svg class="w-3.5 h-3.5 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5"/>
-                </svg>
-              </button>
-            </div>
+            <span id="validationBadge" class="text-xs px-2 py-0.5 rounded-full bg-violet-900/50 text-violet-300 transition-all">
+              待機中
+            </span>
           </div>
           <div id="codeEditor" class="flex-1 w-full min-h-0"></div>
         </div>
@@ -151,23 +141,12 @@
               </svg>
               <span class="text-xs font-bold text-emerald-300 uppercase tracking-widest">実行ログ</span>
             </div>
-            <div class="flex items-center gap-2">
-              <button
-                id="clearLogBtn"
-                class="text-xs text-emerald-600 hover:text-emerald-300 transition-colors cursor-pointer"
-              >
-                クリア
-              </button>
-              <button
-                id="logCollapseBtn"
-                title="実行ログを折りたたむ"
-                class="flex items-center p-0.5 text-emerald-700 hover:text-emerald-300 transition-colors cursor-pointer shrink-0"
-              >
-                <svg class="w-3.5 h-3.5 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/>
-                </svg>
-              </button>
-            </div>
+            <button
+              id="clearLogBtn"
+              class="text-xs text-emerald-600 hover:text-emerald-300 transition-colors cursor-pointer"
+            >
+              クリア
+            </button>
           </div>
           <div
             id="outputLog"

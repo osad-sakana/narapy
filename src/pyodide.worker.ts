@@ -3,7 +3,7 @@
 import type { RunPayload } from './types'
 
 type OutMessage =
-  | { type: 'stdout' | 'result' | 'error'; payload: string }
+  | { type: 'stdout' | 'result' | 'error' | 'loading'; payload: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
   | { type: 'input_request'; prompt: string }
 
@@ -14,6 +14,7 @@ interface PyFS {
 interface PyodideInterface {
   runPythonAsync: (code: string) => Promise<unknown>
   loadPackage: (names: string | string[]) => Promise<void>
+  loadPackagesFromImports: (code: string) => Promise<void>
   globals: {
     get: (key: string) => unknown
     set: (key: string, value: unknown) => void
@@ -84,6 +85,57 @@ async function initPyodide(): Promise<void> {
 
 const initPromise = initPyodide()
 
+function extractTopLevelImports(code: string): string[] {
+  const names = new Set<string>()
+  for (const line of code.split('\n')) {
+    const trimmed = line.trim()
+    const importMatch = trimmed.match(/^import\s+([\w.]+)/)
+    if (importMatch) {
+      names.add(importMatch[1].split('.')[0])
+    }
+    const fromMatch = trimmed.match(/^from\s+([\w.]+)\s+import/)
+    if (fromMatch) {
+      names.add(fromMatch[1].split('.')[0])
+    }
+  }
+  return [...names]
+}
+
+async function loadExternalPackages(code: string): Promise<void> {
+  if (!pyodide) return
+
+  const pkgNames = extractTopLevelImports(code)
+  if (pkgNames.length === 0) return
+
+  self.postMessage({
+    type: 'loading',
+    payload: `パッケージをロード中: ${pkgNames.join(', ')} ...`,
+  } satisfies OutMessage)
+
+  // Pyodide バンドル済みパッケージ（numpy, pandas 等）を自動ロード
+  try {
+    await pyodide.loadPackagesFromImports(code)
+  } catch {
+    // バンドル外は micropip にフォールバック
+  }
+
+  // バンドルにないパッケージを micropip でインストール
+  try {
+    await pyodide.runPythonAsync(`
+import micropip as _mp
+_pkgs = ${JSON.stringify(pkgNames)}
+for _p in _pkgs:
+    try:
+        __import__(_p)
+    except ImportError:
+        await _mp.install(_p)
+del _mp, _pkgs, _p
+`)
+  } catch {
+    // micropip 失敗は実行時エラーとして表面化する
+  }
+}
+
 async function cleanupUserModules(files: Record<string, string>): Promise<void> {
   if (!pyodide) return
   const moduleNames = Object.keys(files)
@@ -121,6 +173,7 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
 
     await cleanupUserModules(files)
     writeFilesToFS(files)
+    await loadExternalPackages(code)
 
     const result = await pyodide.runPythonAsync(code)
 

@@ -1,5 +1,5 @@
 export type WorkerMessage =
-  | { type: 'stdout' | 'result' | 'error'; payload: string }
+  | { type: 'stdout' | 'result' | 'error' | 'loading'; payload: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
   | { type: 'input_request'; prompt: string }
 

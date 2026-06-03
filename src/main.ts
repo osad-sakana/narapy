@@ -9,6 +9,15 @@ import { applyPythonToWorkspace } from './converter/index'
 import { createDebounced } from './converter/debounce'
 import { createEditor, getValue, setValue } from './editor/index'
 import { downloadPythonFile, openFilePicker } from './fileio/index'
+import { createExplorer } from './explorer/ui'
+import {
+  getActiveFile,
+  getActiveContent,
+  updateFileContent,
+  setActiveFile,
+  getAllFilesAsRecord,
+  upsertFile,
+} from './explorer/store'
 
 applyBlocklyMessages()
 initLayout()
@@ -21,13 +30,14 @@ const editor = createEditor(editorContainer)
 type ActiveSource = 'blockly' | 'editor'
 let activeSource: ActiveSource = 'blockly'
 
-// Blockly→Editor のプログラム的書き込み中フラグ
-let isSettingFromBlockly = false
+// プログラム的なエディタ書き込み中フラグ（Blocklyやファイル切替など）
+let isSyncingEditor = false
 
-const blocklyHeader   = document.getElementById('blocklyHeader')   as HTMLElement
-const editorHeader    = document.getElementById('editorHeader')    as HTMLElement
+const blocklyHeader    = document.getElementById('blocklyHeader')    as HTMLElement
+const editorHeader     = document.getElementById('editorHeader')     as HTMLElement
 const blocklyActiveDot = document.getElementById('blocklyActiveDot') as HTMLElement
 const editorActiveDot  = document.getElementById('editorActiveDot')  as HTMLElement
+const editorFileName   = document.getElementById('editorFileName')   as HTMLElement
 
 function setActiveSource(source: ActiveSource): void {
   if (activeSource === source) return
@@ -50,13 +60,35 @@ function codeEqual(a: string, b: string): boolean {
   return a.trimEnd() === b.trimEnd()
 }
 
+// --- ファイル切替 ---
+function switchToFile(name: string): void {
+  // 現在の内容を保存
+  updateFileContent(getActiveFile(), getValue(editor))
+  // ストアを切替
+  setActiveFile(name)
+  // エディタに新しい内容をロード（変更ハンドラを抑制）
+  isSyncingEditor = true
+  const content = getActiveContent()
+  setValue(editor, content)
+  isSyncingEditor = false
+  // ファイル名表示を更新
+  editorFileName.textContent = name
+  // バリデーションと Blockly 変換
+  void triggerValidation(content)
+  if (activeSource === 'editor') {
+    debouncedConvert.call(content)
+  }
+}
+
 // --- Blockly ワークスペース ---
 const workspace = createWorkspace((code) => {
   if (activeSource === 'editor') return
   if (codeEqual(getValue(editor), code)) return
-  isSettingFromBlockly = true
+  isSyncingEditor = true
   setValue(editor, code)
-  isSettingFromBlockly = false
+  isSyncingEditor = false
+  // Blockly 生成コードをストアにも反映
+  updateFileContent(getActiveFile(), code)
   void triggerValidation(code)
 })
 
@@ -67,9 +99,11 @@ const debouncedConvert = createDebounced((source: string) => {
 
 // --- エディタ変更 ---
 editor.onDidChangeModelContent(() => {
-  if (isSettingFromBlockly) return
+  if (isSyncingEditor) return
   setActiveSource('editor')
   const source = getValue(editor)
+  // 変更をストアに保存
+  updateFileContent(getActiveFile(), source)
   void triggerValidation(source)
   debouncedConvert.call(source)
 })
@@ -110,22 +144,41 @@ hintToggleBtn.addEventListener('click', () => {
     : 'flex items-center gap-1 text-xs text-sky-800 hover:text-sky-600 transition-colors cursor-pointer'
 })
 
+// --- ファイルエクスプローラー初期化 ---
+const explorerContainer = document.getElementById('fileExplorer') as HTMLElement
+const { refresh: refreshExplorer } = createExplorer(explorerContainer, (name) => {
+  switchToFile(name)
+  refreshExplorer()
+})
+
+// エディタを localStorage の内容で初期化
+isSyncingEditor = true
+setValue(editor, getActiveContent())
+editorFileName.textContent = getActiveFile()
+isSyncingEditor = false
+
 // --- ファイル開く ---
 const uploadBtn = document.getElementById('uploadBtn') as HTMLButtonElement
 uploadBtn.addEventListener('click', () => {
-  openFilePicker((code) => {
-    setActiveSource('editor')
-    setValue(editor, code)
-    void triggerValidation(code)
-    debouncedConvert.call(code)
+  openFilePicker((code, filename) => {
+    const name = filename ?? 'main.py'
+    upsertFile(name, code)
+    switchToFile(name)
+    refreshExplorer()
   })
 })
 
 // --- ファイル保存 ---
 const downloadBtn = document.getElementById('downloadBtn') as HTMLButtonElement
 downloadBtn.addEventListener('click', () => {
-  downloadPythonFile(getValue(editor))
+  // 保存前に最新の内容をストアへ反映
+  updateFileContent(getActiveFile(), getValue(editor))
+  downloadPythonFile(getValue(editor), getActiveFile())
 })
 
-initRunner(editor)
+initRunner(editor, () => {
+  // 実行前に現在の内容をストアへ同期
+  updateFileContent(getActiveFile(), getValue(editor))
+  return getAllFilesAsRecord()
+})
 void loadWasm()

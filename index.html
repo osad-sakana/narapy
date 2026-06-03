@@ -83,15 +83,6 @@
             </svg>
             ヒント
           </button>
-          <button
-            id="blocklyCollapseBtn"
-            title="ブロックエディタを折りたたむ"
-            class="flex items-center gap-1 text-xs text-sky-600 hover:text-sky-300 transition-colors cursor-pointer"
-          >
-            <svg class="w-3.5 h-3.5 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/>
-            </svg>
-          </button>
           </div>
         </div>
         <div class="relative flex-1 min-h-0">
@@ -107,6 +98,15 @@
         <div id="editorPanel" class="flex flex-col overflow-hidden border-b border-violet-700/50 bg-[#0c0818]">
           <div id="editorHeader" class="flex items-center justify-between px-4 py-2.5 bg-[#180a2e] border-b border-violet-700/50 border-l-4 border-l-violet-400 shrink-0 transition-opacity duration-200 opacity-50">
             <div class="flex items-center gap-2.5">
+              <button
+                id="blocklyCollapseBtn"
+                title="ブロックエディタを折りたたむ"
+                class="flex items-center p-0.5 text-violet-600 hover:text-violet-300 transition-colors cursor-pointer shrink-0"
+              >
+                <svg class="w-3.5 h-3.5 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/>
+                </svg>
+              </button>
               <span id="editorActiveDot" class="w-1.5 h-1.5 rounded-full bg-slate-600 shrink-0"></span>
               <svg class="w-3.5 h-3.5 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                 <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>

@@ -32,7 +32,8 @@ function save(patch: Partial<LayoutState>): void {
 function setCollapseIcon(btn: HTMLElement, collapsed: boolean): void {
   btn.title = collapsed ? 'ブロックエディタを展開' : 'ブロックエディタを折りたたむ'
   const svg = btn.querySelector('svg')
-  if (svg) svg.style.transform = collapsed ? 'rotate(180deg)' : ''
+  // < アイコンを 180度回転 → > になる（展開方向）
+  if (svg) svg.style.transform = collapsed ? 'rotate(180deg)' : 'rotate(0deg)'
 }
 
 export function initLayout(): void {

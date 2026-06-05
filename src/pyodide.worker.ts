@@ -89,6 +89,11 @@ async function initPyodide(): Promise<void> {
       self.postMessage({ type: 'stdout', payload: text } satisfies OutMessage)
     },
     stderr: (text: string) => {
+      // フォントキャッシュ構築・欠落グリフ警告はログに表示しない
+      if (
+        text.includes('building the font cache') ||
+        (text.includes('UserWarning') && text.includes('missing from'))
+      ) return
       self.postMessage({ type: 'error', payload: text } satisfies OutMessage)
     },
   })
@@ -136,10 +141,19 @@ async function loadExternalPackages(code: string): Promise<void> {
   }
 
   // Web Worker 内は document が存在しないため agg バックエンドを強制設定
+  // japanize-matplotlib で日本語フォントを自動設定（初回のみダウンロード）
   if (pkgNames.includes('matplotlib')) {
     try {
       await pyodide.runPythonAsync(`import matplotlib as _mpl; _mpl.use('agg'); del _mpl`)
     } catch { /* ignore */ }
+    try {
+      await pyodide.runPythonAsync(`
+import micropip as _mp
+await _mp.install('japanize-matplotlib')
+import japanize_matplotlib as _jmpl
+del _mp, _jmpl
+`)
+    } catch { /* 日本語フォントなしで続行 */ }
   }
 
   // バンドルにないパッケージを micropip でインストール

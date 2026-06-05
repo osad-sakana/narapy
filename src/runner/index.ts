@@ -64,6 +64,11 @@ export function initRunner(
         return
       }
 
+      if (msg.type === 'loading') {
+        appendLog(msg.payload, 'info')
+        return
+      }
+
       if (msg.type === 'stdout') {
         appendLog(msg.payload, 'output')
       } else if (msg.type === 'result') {

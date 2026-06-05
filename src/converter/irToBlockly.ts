@@ -101,6 +101,13 @@ function stmtToBlock(node: IrNode, getVarId: VarFn): BlockJson | undefined {
     case 'ForEach': {
       const varId = getVarId(node.var_name)
       const bodyChain = stmtsToChain(node.body, getVarId)
+      // 文字列リテラルのイテレートは Blockly で表現不可 → Unsupported にフォールバック
+      if (node.iter.type === 'StrLit') {
+        return {
+          type: 'unsupported_code',
+          fields: { CODE: `for ${node.var_name} in "${node.iter.value}": ...` },
+        }
+      }
       const block: BlockJson = {
         type: 'controls_forEach',
         fields: { VAR: { id: varId } },
@@ -223,6 +230,17 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
     }
 
     case 'Subscript':
+      // 文字列リテラルへの添字アクセスは text_charAt ブロックを使用
+      if (node.value.type === 'StrLit') {
+        return {
+          type: 'text_charAt',
+          fields: { WHERE: 'FROM_START' },
+          inputs: {
+            VALUE: { block: exprToBlock(node.value, getVarId) },
+            AT: { block: exprToBlock(node.index, getVarId) },
+          },
+        }
+      }
       return {
         type: 'lists_getIndex',
         fields: { MODE: 'GET', WHERE: 'FROM_START' },

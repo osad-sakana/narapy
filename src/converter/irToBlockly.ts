@@ -101,11 +101,11 @@ function stmtToBlock(node: IrNode, getVarId: VarFn): BlockJson | undefined {
     case 'ForEach': {
       const varId = getVarId(node.var_name)
       const bodyChain = stmtsToChain(node.body, getVarId)
-      // 文字列リテラルのイテレートは Blockly で表現不可 → Unsupported にフォールバック
-      if (node.iter.type === 'StrLit') {
+      // String 型ブロックは controls_forEach の LIST スロット（Array 期待）に繋げられない
+      if (producesStringBlock(node.iter)) {
         return {
           type: 'unsupported_code',
-          fields: { CODE: `for ${node.var_name} in "${node.iter.value}": ...` },
+          fields: { CODE: `for ${node.var_name} in ...: ...` },
         }
       }
       const block: BlockJson = {
@@ -203,6 +203,15 @@ function buildIfBlock(
   }
 }
 
+// Array スロットに接続できない String 型ブロックを生成するノードか判定
+function producesStringBlock(node: IrNode): boolean {
+  if (node.type === 'StrLit' || node.type === 'FStringLit' || node.type === 'Unsupported') return true
+  if (node.type === 'BinOp' && node.op === 'ADD') {
+    return producesStringBlock(node.left) || producesStringBlock(node.right)
+  }
+  return false
+}
+
 // 式ノード → BlockJson（value inputに入れるブロック）
 function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
   switch (node.type) {
@@ -230,15 +239,22 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
     }
 
     case 'Subscript':
-      // 文字列リテラルへの添字アクセスは text_charAt ブロックを使用
-      if (node.value.type === 'StrLit') {
+      // String 型ブロックは lists_getIndex の VALUE スロット（Array 期待）に繋げられない
+      // → 文字列系は text_charAt、それ以外は Unsupported にフォールバック
+      if (producesStringBlock(node.value)) {
+        if (node.value.type === 'StrLit' || node.value.type === 'FStringLit') {
+          return {
+            type: 'text_charAt',
+            fields: { WHERE: 'FROM_START' },
+            inputs: {
+              VALUE: { block: exprToBlock(node.value, getVarId) },
+              AT: { block: exprToBlock(node.index, getVarId) },
+            },
+          }
+        }
         return {
-          type: 'text_charAt',
-          fields: { WHERE: 'FROM_START' },
-          inputs: {
-            VALUE: { block: exprToBlock(node.value, getVarId) },
-            AT: { block: exprToBlock(node.index, getVarId) },
-          },
+          type: 'unsupported_code',
+          fields: { CODE: `...[${node.index.type === 'NumLit' ? node.index.value : '...'}]` },
         }
       }
       return {

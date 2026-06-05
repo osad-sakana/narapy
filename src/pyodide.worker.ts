@@ -135,6 +135,13 @@ async function loadExternalPackages(code: string): Promise<void> {
     // バンドル外は micropip にフォールバック
   }
 
+  // Web Worker 内は document が存在しないため agg バックエンドを強制設定
+  if (pkgNames.includes('matplotlib')) {
+    try {
+      await pyodide.runPythonAsync(`import matplotlib as _mpl; _mpl.use('agg'); del _mpl`)
+    } catch { /* ignore */ }
+  }
+
   // バンドルにないパッケージを micropip でインストール
   try {
     await pyodide.runPythonAsync(`

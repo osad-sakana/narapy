@@ -4,6 +4,7 @@ import type { RunPayload } from './types'
 
 type OutMessage =
   | { type: 'stdout' | 'result' | 'error' | 'loading'; payload: string }
+  | { type: 'image'; payload: string; title: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
   | { type: 'input_request'; prompt: string }
 
@@ -32,6 +33,21 @@ interface PyodideModule {
 
 const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/'
 const WORK_DIR = '/home/pyodide'
+
+// 実行後に matplotlib の全フィギュアを PNG base64 の JSON 配列として返す
+const EXTRACT_FIGS_CODE = `
+import sys as _sys, json as _json
+_result = []
+if 'matplotlib.pyplot' in _sys.modules:
+    import matplotlib.pyplot as _plt, io as _io, base64 as _b64
+    for _n in _plt.get_fignums():
+        _buf = _io.BytesIO()
+        _plt.figure(_n).savefig(_buf, format='png', bbox_inches='tight', dpi=100)
+        _buf.seek(0)
+        _result.append({'num': _n, 'data': _b64.b64encode(_buf.read()).decode()})
+    _plt.close('all')
+_json.dumps(_result)
+`
 
 // SharedArrayBuffer で stdin の同期通信を行う
 // [0..3] Int32: 0=idle, N>0=入力データのバイト数
@@ -176,6 +192,13 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
     await loadExternalPackages(code)
 
     const result = await pyodide.runPythonAsync(code)
+
+    // matplotlib フィギュアを PNG として送信
+    const figJson = await pyodide.runPythonAsync(EXTRACT_FIGS_CODE) as string
+    const figs = JSON.parse(figJson) as Array<{ num: number; data: string }>
+    for (const fig of figs) {
+      self.postMessage({ type: 'image', payload: fig.data, title: `Figure ${fig.num}` } satisfies OutMessage)
+    }
 
     self.postMessage({
       type: 'result',

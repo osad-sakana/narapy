@@ -88,3 +88,8 @@ export function clearLog(): void {
   const outputLog = document.getElementById('outputLog') as HTMLDivElement
   outputLog.innerHTML = PLACEHOLDER_HTML
 }
+
+export function getLogText(): string {
+  const outputLog = document.getElementById('outputLog') as HTMLDivElement
+  return outputLog.innerText.trim()
+}

@@ -1,6 +1,6 @@
 import type { WorkerMessage, RunPayload } from '../types'
 import type { EditorInstance } from '../editor/index'
-import { appendLog, appendErrorBlock, clearLog } from './log'
+import { appendLog, appendErrorBlock, clearLog, getLogText } from './log'
 import { getValue } from '../editor/index'
 import { translatePythonError } from './errorTranslator'
 import { showFigureModal } from './figureModal'
@@ -19,8 +19,8 @@ export function initRunner(
   editor: EditorInstance,
   getRunFiles: () => Record<string, string>,
 ): void {
-  const runBtn      = document.getElementById('runBtn')      as HTMLButtonElement
-  const clearLogBtn = document.getElementById('clearLogBtn') as HTMLButtonElement
+  const runBtn     = document.getElementById('runBtn')     as HTMLButtonElement
+  const copyLogBtn = document.getElementById('copyLogBtn') as HTMLButtonElement
 
   let worker  = createWorker()
   let running = false
@@ -116,10 +116,22 @@ export function initRunner(
     if (!code) return
 
     setRunning(true)
+    clearLog()
     appendLog('--- 実行開始 ---', 'info')
     const files = getRunFiles()
     worker.postMessage({ type: 'run', code, files } satisfies RunPayload)
   })
 
-  clearLogBtn.addEventListener('click', clearLog)
+  copyLogBtn.addEventListener('click', async () => {
+    const text = getLogText()
+    if (!text) return
+    await navigator.clipboard.writeText(text)
+    const originalHTML = copyLogBtn.innerHTML
+    copyLogBtn.textContent = '✓ コピーしました'
+    copyLogBtn.classList.add('text-emerald-300')
+    setTimeout(() => {
+      copyLogBtn.innerHTML = originalHTML
+      copyLogBtn.classList.remove('text-emerald-300')
+    }, 1500)
+  })
 }

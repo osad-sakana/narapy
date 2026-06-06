@@ -37,17 +37,40 @@ fn convert_stmt(stmt: &Stmt, source: &str) -> Option<IrNode> {
             }
         }
         Stmt::Assign(s) => {
-            if let Some(Expr::Name(target)) = s.targets.first() {
-                let value = convert_expr(&s.value, source);
-                Some(IrNode::Assign {
-                    var_name: target.id.to_string(),
-                    value: Box::new(value),
-                })
-            } else {
-                Some(IrNode::Unsupported {
+            let target = match s.targets.first() {
+                Some(t) => t,
+                None => return Some(IrNode::Unsupported {
+                    node_type: "AssignNoTarget".to_string(),
+                    code: extract_source(source, s),
+                }),
+            };
+            match target {
+                Expr::Name(name) => {
+                    let value = convert_expr(&s.value, source);
+                    Some(IrNode::Assign {
+                        var_name: name.id.to_string(),
+                        value: Box::new(value),
+                    })
+                }
+                Expr::Attribute(attr) => {
+                    if let Expr::Name(obj) = attr.value.as_ref() {
+                        if obj.id.as_str() == "self" {
+                            let value = convert_expr(&s.value, source);
+                            return Some(IrNode::SelfAttrAssign {
+                                attr: attr.attr.to_string(),
+                                value: Box::new(value),
+                            });
+                        }
+                    }
+                    Some(IrNode::Unsupported {
+                        node_type: "AssignComplexTarget".to_string(),
+                        code: extract_source(source, s),
+                    })
+                }
+                _ => Some(IrNode::Unsupported {
                     node_type: "AssignComplexTarget".to_string(),
                     code: extract_source(source, s),
-                })
+                }),
             }
         }
         Stmt::Return(s) => {
@@ -123,9 +146,80 @@ fn convert_stmt(stmt: &Stmt, source: &str) -> Option<IrNode> {
                 })
             }
         }
+        Stmt::ClassDef(s) => {
+            if s.bases.len() > 1 {
+                return Some(IrNode::Unsupported {
+                    node_type: "ClassDef(MultipleInheritance)".to_string(),
+                    code: extract_source(source, s),
+                });
+            }
+            if !s.decorator_list.is_empty() {
+                return Some(IrNode::Unsupported {
+                    node_type: "ClassDef(Decorator)".to_string(),
+                    code: extract_source(source, s),
+                });
+            }
+            let base = if let Some(base_expr) = s.bases.first() {
+                if let Expr::Name(b) = base_expr {
+                    Some(b.id.to_string())
+                } else {
+                    return Some(IrNode::Unsupported {
+                        node_type: "ClassDef(ComplexBase)".to_string(),
+                        code: extract_source(source, s),
+                    });
+                }
+            } else {
+                None
+            };
+            let body = convert_class_body(&s.body, source);
+            Some(IrNode::ClassDef {
+                name: s.name.to_string(),
+                base,
+                body,
+            })
+        }
         Stmt::Pass(_) => None,
         _ => Some(IrNode::Unsupported {
             node_type: stmt_type_name(stmt).to_string(),
+            code: extract_source(source, stmt),
+        }),
+    }
+}
+
+fn convert_class_body(stmts: &[Stmt], source: &str) -> Vec<IrNode> {
+    stmts.iter().filter_map(|s| convert_class_stmt(s, source)).collect()
+}
+
+fn convert_class_stmt(stmt: &Stmt, source: &str) -> Option<IrNode> {
+    match stmt {
+        Stmt::FunctionDef(s) => {
+            if !s.decorator_list.is_empty() {
+                return Some(IrNode::Unsupported {
+                    node_type: "MethodDef(Decorator)".to_string(),
+                    code: extract_source(source, s),
+                });
+            }
+            // selfを除いたパラメータリスト
+            let params: Vec<String> = s.args.args.iter()
+                .skip(1)
+                .map(|a| a.def.arg.to_string())
+                .collect();
+            let body = convert_stmts(&s.body, source);
+            let has_return = body_has_return(&s.body);
+            if s.name.as_str() == "__init__" {
+                Some(IrNode::InitDef { params, body })
+            } else {
+                Some(IrNode::MethodDef {
+                    name: s.name.to_string(),
+                    params,
+                    body,
+                    has_return,
+                })
+            }
+        }
+        Stmt::Pass(_) => None,
+        _ => Some(IrNode::Unsupported {
+            node_type: "ClassBody(NonMethod)".to_string(),
             code: extract_source(source, stmt),
         }),
     }
@@ -255,13 +349,29 @@ fn convert_expr(expr: &Expr, source: &str) -> IrNode {
         },
         Expr::Call(c) => {
             if let Expr::Name(fname) = c.func.as_ref() {
+                let name = fname.id.as_str();
                 let args = c.args.iter().map(|a| convert_expr(a, source)).collect();
-                IrNode::FuncCallExpr { name: fname.id.to_string(), args }
+                // 先頭が大文字はクラスのインスタンス生成とみなす（Python慣習）
+                if name.chars().next().map(|ch| ch.is_uppercase()).unwrap_or(false) {
+                    return IrNode::InstanceCreate { class_name: name.to_string(), args };
+                }
+                IrNode::FuncCallExpr { name: name.to_string(), args }
             } else {
                 IrNode::Unsupported {
                     node_type: "ComplexCall".to_string(),
                     code: extract_source(source, c),
                 }
+            }
+        }
+        Expr::Attribute(a) => {
+            if let Expr::Name(obj) = a.value.as_ref() {
+                if obj.id.as_str() == "self" {
+                    return IrNode::SelfAttrRef { attr: a.attr.to_string() };
+                }
+            }
+            IrNode::Unsupported {
+                node_type: "Attribute".to_string(),
+                code: extract_source(source, a),
             }
         }
         Expr::List(l) => {
@@ -363,7 +473,6 @@ fn expr_type_name(e: &Expr) -> &'static str {
         Expr::Dict(_) => "Dict",
         Expr::Set(_) => "Set",
         Expr::ListComp(_) => "ListComp",
-        Expr::Attribute(_) => "Attribute",
         Expr::Subscript(_) => "Subscript",
         Expr::Starred(_) => "Starred",
         Expr::Tuple(_) => "Tuple",
@@ -436,6 +545,74 @@ mod tests {
     #[test]
     fn test_for_underscore_range_unsupported() {
         let src = "for _ in range(10):\n  pass";
+        let nodes = parse_ir(src);
+        assert!(matches!(&nodes[0], IrNode::Unsupported { .. }));
+    }
+
+    #[test]
+    fn test_class_def_no_base() {
+        let src = "class MyClass:\n  pass";
+        let nodes = parse_ir(src);
+        assert!(matches!(&nodes[0], IrNode::ClassDef { name, base: None, .. } if name == "MyClass"));
+    }
+
+    #[test]
+    fn test_class_def_with_base() {
+        let src = "class Dog(Animal):\n  pass";
+        let nodes = parse_ir(src);
+        assert!(matches!(&nodes[0], IrNode::ClassDef { name, base: Some(b), .. } if name == "Dog" && b == "Animal"));
+    }
+
+    #[test]
+    fn test_class_init_def() {
+        let src = "class MyClass:\n  def __init__(self, x):\n    self.x = x";
+        let nodes = parse_ir(src);
+        if let IrNode::ClassDef { body, .. } = &nodes[0] {
+            assert!(matches!(&body[0], IrNode::InitDef { params, .. } if params == &["x"]));
+            if let IrNode::InitDef { body: init_body, .. } = &body[0] {
+                assert!(matches!(&init_body[0], IrNode::SelfAttrAssign { attr, .. } if attr == "x"));
+            }
+        } else {
+            panic!("expected ClassDef");
+        }
+    }
+
+    #[test]
+    fn test_class_method_def() {
+        let src = "class MyClass:\n  def greet(self):\n    return self.name";
+        let nodes = parse_ir(src);
+        if let IrNode::ClassDef { body, .. } = &nodes[0] {
+            assert!(matches!(&body[0], IrNode::MethodDef { name, .. } if name == "greet"));
+        } else {
+            panic!("expected ClassDef");
+        }
+    }
+
+    #[test]
+    fn test_self_attr_ref() {
+        let src = "class MyClass:\n  def get_x(self):\n    return self.x";
+        let nodes = parse_ir(src);
+        if let IrNode::ClassDef { body, .. } = &nodes[0] {
+            if let IrNode::MethodDef { body: method_body, .. } = &body[0] {
+                assert!(matches!(&method_body[0], IrNode::Return { value: Some(v), .. } if matches!(v.as_ref(), IrNode::SelfAttrRef { attr } if attr == "x")));
+            }
+        }
+    }
+
+    #[test]
+    fn test_instance_create() {
+        let src = "obj = MyClass(1, 2)";
+        let nodes = parse_ir(src);
+        if let IrNode::Assign { value, .. } = &nodes[0] {
+            assert!(matches!(value.as_ref(), IrNode::InstanceCreate { class_name, .. } if class_name == "MyClass"));
+        } else {
+            panic!("expected Assign");
+        }
+    }
+
+    #[test]
+    fn test_class_multiple_inheritance_unsupported() {
+        let src = "class MyClass(A, B):\n  pass";
         let nodes = parse_ir(src);
         assert!(matches!(&nodes[0], IrNode::Unsupported { .. }));
     }

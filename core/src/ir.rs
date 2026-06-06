@@ -105,6 +105,33 @@ pub enum IrNode {
         value: Box<IrNode>,
         index: Box<IrNode>,
     },
+    // --- クラス ---
+    ClassDef {
+        name: String,
+        base: Option<String>,
+        body: Vec<IrNode>,
+    },
+    InitDef {
+        params: Vec<String>,
+        body: Vec<IrNode>,
+    },
+    MethodDef {
+        name: String,
+        params: Vec<String>,
+        body: Vec<IrNode>,
+        has_return: bool,
+    },
+    SelfAttrAssign {
+        attr: String,
+        value: Box<IrNode>,
+    },
+    SelfAttrRef {
+        attr: String,
+    },
+    InstanceCreate {
+        class_name: String,
+        args: Vec<IrNode>,
+    },
     Unsupported {
         node_type: String,
         code: String,

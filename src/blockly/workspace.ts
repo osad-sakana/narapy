@@ -6,10 +6,12 @@ import { initBlockTooltips } from './tooltips'
 import { registerUnsupportedBlock } from './unsupported'
 import { registerForRangeBlock } from './forRange'
 import { registerFStringBlock } from './fstring'
+import { registerClassBlocks } from './classBlocks'
 
 registerUnsupportedBlock()
 registerForRangeBlock()
 registerFStringBlock()
+registerClassBlocks()
 
 // Backspace / Delete キーによるブロック誤削除を防ぐ
 ShortcutRegistry.registry.unregister('delete')

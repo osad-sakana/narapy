@@ -153,6 +153,50 @@ function stmtToBlock(node: IrNode, getVarId: VarFn): BlockJson | undefined {
       }
     }
 
+    case 'ClassDef': {
+      const methodsChain = stmtsToChain(node.body, getVarId)
+      const block: BlockJson = {
+        type: 'class_def',
+        fields: {
+          CLASS_NAME: node.name,
+          BASE_CLASS: node.base ?? '',
+        },
+      }
+      if (methodsChain) block.inputs = { METHODS: { block: methodsChain } }
+      return block
+    }
+
+    case 'InitDef': {
+      const bodyChain = stmtsToChain(node.body, getVarId)
+      const block: BlockJson = {
+        type: 'class_constructor',
+        fields: { PARAMS: node.params.join(', ') },
+      }
+      if (bodyChain) block.inputs = { BODY: { block: bodyChain } }
+      return block
+    }
+
+    case 'MethodDef': {
+      const bodyChain = stmtsToChain(node.body, getVarId)
+      const block: BlockJson = {
+        type: 'class_method',
+        fields: {
+          METHOD_NAME: node.name,
+          PARAMS: node.params.join(', '),
+        },
+      }
+      if (bodyChain) block.inputs = { BODY: { block: bodyChain } }
+      return block
+    }
+
+    case 'SelfAttrAssign': {
+      return {
+        type: 'class_self_attr_set',
+        fields: { ATTR: node.attr },
+        inputs: { VALUE: { block: exprToBlock(node.value, getVarId) } },
+      }
+    }
+
     case 'Unsupported':
       return {
         type: 'unsupported_code',
@@ -349,6 +393,25 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
         type: 'text_fstring',
         extraState: { itemCount: node.parts.length },
         inputs,
+      }
+    }
+
+    case 'SelfAttrRef':
+      return {
+        type: 'class_self_attr_get',
+        fields: { ATTR: node.attr },
+      }
+
+    case 'InstanceCreate': {
+      const argInputs: Record<string, InputJson> = {}
+      node.args.forEach((arg, i) => {
+        argInputs[`ARG${i}`] = { block: exprToBlock(arg, getVarId) }
+      })
+      return {
+        type: 'class_instance_create',
+        fields: { CLASS_NAME: node.class_name },
+        extraState: { argCount: node.args.length },
+        inputs: argInputs,
       }
     }
 

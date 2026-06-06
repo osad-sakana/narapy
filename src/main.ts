@@ -10,6 +10,7 @@ import { createDebounced } from './converter/debounce'
 import { createEditor, getValue, setValue } from './editor/index'
 import { downloadPythonFile, openFilePicker } from './fileio/index'
 import { createExplorer } from './explorer/ui'
+import { initAbout } from './about/index'
 import {
   getActiveFile,
   getActiveContent,
@@ -182,3 +183,4 @@ initRunner(editor, () => {
   return getAllFilesAsRecord()
 })
 void loadWasm()
+initAbout()

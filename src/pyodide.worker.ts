@@ -7,6 +7,7 @@ type OutMessage =
   | { type: 'image'; payload: string; title: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
   | { type: 'input_request'; prompt: string }
+  | { type: 'interrupt_sab'; sab: SharedArrayBuffer }
 
 interface PyFS {
   writeFile: (path: string, data: string) => void
@@ -16,6 +17,7 @@ interface PyodideInterface {
   runPythonAsync: (code: string) => Promise<unknown>
   loadPackage: (names: string | string[]) => Promise<void>
   loadPackagesFromImports: (code: string) => Promise<void>
+  setInterruptBuffer: (buffer: Uint8Array) => void
   globals: {
     get: (key: string) => unknown
     set: (key: string, value: unknown) => void
@@ -32,7 +34,34 @@ interface PyodideModule {
 }
 
 const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/'
+const PYODIDE_MJS_HASH = 'sha384-99NUXWQ/+GiMxiBXXMq7KS8/e2HFz84pdM4eSR3j9E5Nmqxwv8jiOmm36bKkIGTL'
 const WORK_DIR = '/home/pyodide'
+
+// CDN ファイルを取得して SHA-384 ハッシュを検証し、Blob URL 経由でインポートする。
+// 標準 SRI は Workers の dynamic import() に適用されないため手動で検証する。
+async function verifiedImport(url: string, expectedHash: string): Promise<unknown> {
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`fetch failed: ${url} (${response.status})`)
+
+  const buffer = await response.arrayBuffer()
+  const hashBuffer = await crypto.subtle.digest('SHA-384', buffer)
+  const hashBase64 = btoa(
+    Array.from(new Uint8Array(hashBuffer), (b) => String.fromCharCode(b)).join(''),
+  )
+  const actual = `sha384-${hashBase64}`
+
+  if (actual !== expectedHash) {
+    throw new Error(`SRI mismatch: expected ${expectedHash}, got ${actual}`)
+  }
+
+  const blob = new Blob([buffer], { type: 'text/javascript' })
+  const blobUrl = URL.createObjectURL(blob)
+  try {
+    return await import(/* @vite-ignore */ blobUrl)
+  } finally {
+    URL.revokeObjectURL(blobUrl)
+  }
+}
 
 // 実行後に matplotlib の全フィギュアを PNG base64 の JSON 配列として返す
 const EXTRACT_FIGS_CODE = `
@@ -48,6 +77,11 @@ if 'matplotlib.pyplot' in _sys.modules:
     _plt.close('all')
 _json.dumps(_result)
 `
+
+// Pyodide への KeyboardInterrupt 注入用バッファ
+// buffer[0] に 2（SIGINT）を書き込むと Python が KeyboardInterrupt を発生させる
+const INTERRUPT_SAB = new SharedArrayBuffer(1)
+const interruptBuffer = new Uint8Array(INTERRUPT_SAB)
 
 // SharedArrayBuffer で stdin の同期通信を行う
 // [0..3] Int32: 0=idle, N>0=入力データのバイト数
@@ -79,8 +113,10 @@ let isReady = false
 
 async function initPyodide(): Promise<void> {
   // module worker では importScripts() が禁止のため dynamic import() を使用
-  const { loadPyodide } = await import(
-    /* @vite-ignore */ `${PYODIDE_CDN}pyodide.mjs`
+  // SRI 検証（SHA-384）を経由して Blob URL からロードする
+  const { loadPyodide } = await verifiedImport(
+    `${PYODIDE_CDN}pyodide.mjs`,
+    PYODIDE_MJS_HASH,
   ) as PyodideModule
 
   pyodide = await loadPyodide({
@@ -100,6 +136,10 @@ async function initPyodide(): Promise<void> {
 
   // builtins.input を上書きして prompt 引数を直接受け取る
   pyodide.globals.set('input', customInput)
+
+  // 停止シグナル用バッファを登録し、メインスレッドへ共有
+  pyodide.setInterruptBuffer(interruptBuffer)
+  self.postMessage({ type: 'interrupt_sab', sab: INTERRUPT_SAB } satisfies OutMessage)
 
   isReady = true
 }
@@ -208,6 +248,7 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
       return
     }
 
+    interruptBuffer[0] = 0 // 前回の停止シグナルをクリア
     await cleanupUserModules(files)
     writeFilesToFS(files)
     await loadExternalPackages(code)

@@ -8,6 +8,11 @@ import { showFigureModal } from './figureModal'
 const RUN_STYLE  = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-bold transition-colors shadow-md shadow-violet-900/50 cursor-pointer'
 const STOP_STYLE = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 text-white text-sm font-bold transition-colors shadow-md shadow-red-900/50 cursor-pointer'
 
+// 60 秒間応答がなければ Worker を強制終了する
+const EXECUTION_TIMEOUT_MS = 60_000
+// KeyboardInterrupt 後、800ms 以内に完了しなければ強制終了にフォールバック
+const INTERRUPT_FALLBACK_MS = 800
+
 function createWorker(): Worker {
   return new Worker(
     new URL('../pyodide.worker.ts', import.meta.url),
@@ -28,16 +33,53 @@ export function initRunner(
   // Worker ごとに SAB が変わるのでクロージャで管理
   let inputStatus: Int32Array | null = null
   let inputData: Uint8Array | null = null
+  let interruptBuffer: Uint8Array | null = null
+  let executionTimeoutId: ReturnType<typeof setTimeout> | null = null
+
+  function clearExecutionTimeout(): void {
+    if (executionTimeoutId !== null) {
+      clearTimeout(executionTimeoutId)
+      executionTimeoutId = null
+    }
+  }
 
   function setRunning(state: boolean): void {
     running = state
     if (state) {
       runBtn.className = STOP_STYLE
       runBtn.textContent = '■ 停止'
+      executionTimeoutId = setTimeout(() => {
+        if (!running) return
+        hardStop()
+        appendLog(`--- タイムアウト（${EXECUTION_TIMEOUT_MS / 1000}秒）で強制停止しました ---`, 'warn')
+      }, EXECUTION_TIMEOUT_MS)
     } else {
       runBtn.className = RUN_STYLE
       runBtn.textContent = '▶ 実行'
+      clearExecutionTimeout()
     }
+  }
+
+  // Worker を終了して再生成する（メモリ枯渇・タイムアウト・フォールバック用）
+  function hardStop(): void {
+    clearExecutionTimeout()
+    worker.terminate()
+    worker = createWorker()
+    inputStatus = null
+    inputData = null
+    interruptBuffer = null
+    attachWorkerHandlers()
+    setRunning(false)
+  }
+
+  // interrupt buffer で KeyboardInterrupt を注入し、800ms 後も停止していなければ hardStop
+  function gracefulStop(): void {
+    if (interruptBuffer) {
+      interruptBuffer[0] = 2 // SIGINT → Python が KeyboardInterrupt を発生させる
+    }
+    setTimeout(() => {
+      if (running) hardStop()
+    }, INTERRUPT_FALLBACK_MS)
   }
 
   function attachWorkerHandlers(): void {
@@ -47,6 +89,11 @@ export function initRunner(
       if (msg.type === 'input_sab') {
         inputStatus = new Int32Array(msg.sab, 0, 1)
         inputData   = new Uint8Array(msg.sab, 4)
+        return
+      }
+
+      if (msg.type === 'interrupt_sab') {
+        interruptBuffer = new Uint8Array(msg.sab)
         return
       }
 
@@ -81,11 +128,16 @@ export function initRunner(
         appendLog(`=> ${msg.payload}`, 'result')
         setRunning(false)
       } else if (msg.type === 'error') {
-        const translated = translatePythonError(msg.payload)
-        if (translated) {
-          appendErrorBlock({ ...translated, raw: msg.payload })
+        // KeyboardInterrupt は停止操作によるものなので通常のエラー表示をしない
+        if (msg.payload.includes('KeyboardInterrupt')) {
+          appendLog('--- 実行を停止しました ---', 'info')
         } else {
-          appendLog(`[エラー] ${msg.payload}`, 'error')
+          const translated = translatePythonError(msg.payload)
+          if (translated) {
+            appendErrorBlock({ ...translated, raw: msg.payload })
+          } else {
+            appendLog(`[エラー] ${msg.payload}`, 'error')
+          }
         }
         setRunning(false)
       }
@@ -101,14 +153,15 @@ export function initRunner(
 
   runBtn.addEventListener('click', () => {
     if (running) {
-      // 強制停止: Worker を破棄して新規作成
-      worker.terminate()
-      worker = createWorker()
-      inputStatus = null
-      inputData   = null
-      attachWorkerHandlers()
-      appendLog('--- 実行を停止しました ---', 'info')
-      setRunning(false)
+      if (interruptBuffer) {
+        // Pyodide が準備済みであれば graceful stop を試みる
+        gracefulStop()
+        appendLog('--- 停止シグナルを送信しました ---', 'info')
+      } else {
+        // Pyodide 初期化中は interrupt buffer が未取得なので即座に強制停止
+        hardStop()
+        appendLog('--- 実行を強制停止しました ---', 'info')
+      }
       return
     }
 

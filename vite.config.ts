@@ -30,6 +30,22 @@ export default defineConfig({
       // S3/CloudFront デプロイ時も同様に設定すること
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
+      // Content Security Policy
+      // unsafe-eval: Monaco Editor / Pyodide が動的コード評価を必要とするため必須
+      // blob: / cdn.jsdelivr.net: Pyodide を CDN + Blob URL 経由でロードするため必要
+      // connect-src cdn.jsdelivr.net: Pyodide パッケージのダウンロード
+      // connect-src files.pythonhosted.org pypi.org: micropip によるパッケージインストール
+      'Content-Security-Policy': [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-eval' blob: cdn.jsdelivr.net",
+        "worker-src 'self' blob:",
+        "img-src 'self' data: blob:",
+        "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
+        "font-src 'self' fonts.gstatic.com data:",
+        "connect-src 'self' cdn.jsdelivr.net files.pythonhosted.org pypi.org",
+        "frame-src 'none'",
+        "object-src 'none'",
+      ].join('; '),
     },
   },
 

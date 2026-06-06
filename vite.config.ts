@@ -7,6 +7,9 @@ import monacoEditorPluginModule from 'vite-plugin-monaco-editor'
 const monacoEditorPlugin = (monacoEditorPluginModule as unknown as { default: typeof monacoEditorPluginModule }).default ?? monacoEditorPluginModule
 
 export default defineConfig({
+  // CI 環境（GitHub Actions）では GitHub Pages のサブパスに合わせる
+  base: process.env.CI ? '/narapy/' : '/',
+
   plugins: [
     tailwindcss(),
     wasm(),

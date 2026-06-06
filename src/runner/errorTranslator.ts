@@ -201,6 +201,24 @@ const RULES: Record<string, Rule[]> = {
     },
   ],
 
+  FileNotFoundError: [
+    {
+      pattern: /\[Errno 2\] No such file or directory: '(.*)'/,
+      description: (path) => `ファイルまたはディレクトリ "${path}" が存在しません。`,
+      hint: (path) => {
+        if (path.includes('mnt') || path.includes('outputs') || path.includes('Downloads') || path.includes('Desktop')) {
+          return `plt.savefig() でローカルパスへの保存はブラウザ上では動作しません。\nグラフはコード実行後に自動的にモーダルで表示されます。savefig() の行を削除してください。`
+        }
+        return `パスが正しいか確認してください。ブラウザ上ではローカルファイルシステムにアクセスできません。`
+      },
+    },
+    {
+      pattern: /\[Errno 44\] No such file or directory: '(.*)'/,
+      description: (path) => `ファイルまたはディレクトリ "${path}" が存在しません。`,
+      hint: () => `plt.savefig() でローカルパスへの保存はブラウザ上では動作しません。\nグラフはコード実行後に自動的にモーダルで表示されます。savefig() の行を削除してください。`,
+    },
+  ],
+
   ModuleNotFoundError: [
     {
       pattern: /No module named '(\w+)'/,

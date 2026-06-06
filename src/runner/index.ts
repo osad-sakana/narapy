@@ -1,8 +1,9 @@
 import type { WorkerMessage, RunPayload } from '../types'
 import type { EditorInstance } from '../editor/index'
-import { appendLog, appendErrorBlock, clearLog } from './log'
+import { appendLog, appendErrorBlock, clearLog, getLogText } from './log'
 import { getValue } from '../editor/index'
 import { translatePythonError } from './errorTranslator'
+import { showFigureModal } from './figureModal'
 
 const RUN_STYLE  = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-bold transition-colors shadow-md shadow-violet-900/50 cursor-pointer'
 const STOP_STYLE = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 text-white text-sm font-bold transition-colors shadow-md shadow-red-900/50 cursor-pointer'
@@ -18,8 +19,8 @@ export function initRunner(
   editor: EditorInstance,
   getRunFiles: () => Record<string, string>,
 ): void {
-  const runBtn      = document.getElementById('runBtn')      as HTMLButtonElement
-  const clearLogBtn = document.getElementById('clearLogBtn') as HTMLButtonElement
+  const runBtn     = document.getElementById('runBtn')     as HTMLButtonElement
+  const copyLogBtn = document.getElementById('copyLogBtn') as HTMLButtonElement
 
   let worker  = createWorker()
   let running = false
@@ -69,6 +70,11 @@ export function initRunner(
         return
       }
 
+      if (msg.type === 'image') {
+        showFigureModal(msg.payload, msg.title)
+        return
+      }
+
       if (msg.type === 'stdout') {
         appendLog(msg.payload, 'output')
       } else if (msg.type === 'result') {
@@ -110,10 +116,22 @@ export function initRunner(
     if (!code) return
 
     setRunning(true)
+    clearLog()
     appendLog('--- 実行開始 ---', 'info')
     const files = getRunFiles()
     worker.postMessage({ type: 'run', code, files } satisfies RunPayload)
   })
 
-  clearLogBtn.addEventListener('click', clearLog)
+  copyLogBtn.addEventListener('click', async () => {
+    const text = getLogText()
+    if (!text) return
+    await navigator.clipboard.writeText(text)
+    const originalHTML = copyLogBtn.innerHTML
+    copyLogBtn.textContent = '✓ コピーしました'
+    copyLogBtn.classList.add('text-emerald-300')
+    setTimeout(() => {
+      copyLogBtn.innerHTML = originalHTML
+      copyLogBtn.classList.remove('text-emerald-300')
+    }, 1500)
+  })
 }

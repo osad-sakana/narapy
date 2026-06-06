@@ -4,6 +4,7 @@ import type { RunPayload } from './types'
 
 type OutMessage =
   | { type: 'stdout' | 'result' | 'error' | 'loading'; payload: string }
+  | { type: 'image'; payload: string; title: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
   | { type: 'input_request'; prompt: string }
 
@@ -32,6 +33,21 @@ interface PyodideModule {
 
 const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/'
 const WORK_DIR = '/home/pyodide'
+
+// 実行後に matplotlib の全フィギュアを PNG base64 の JSON 配列として返す
+const EXTRACT_FIGS_CODE = `
+import sys as _sys, json as _json
+_result = []
+if 'matplotlib.pyplot' in _sys.modules:
+    import matplotlib.pyplot as _plt, io as _io, base64 as _b64
+    for _n in _plt.get_fignums():
+        _buf = _io.BytesIO()
+        _plt.figure(_n).savefig(_buf, format='png', bbox_inches='tight', dpi=100)
+        _buf.seek(0)
+        _result.append({'num': _n, 'data': _b64.b64encode(_buf.read()).decode()})
+    _plt.close('all')
+_json.dumps(_result)
+`
 
 // SharedArrayBuffer で stdin の同期通信を行う
 // [0..3] Int32: 0=idle, N>0=入力データのバイト数
@@ -73,6 +89,11 @@ async function initPyodide(): Promise<void> {
       self.postMessage({ type: 'stdout', payload: text } satisfies OutMessage)
     },
     stderr: (text: string) => {
+      // フォントキャッシュ構築・欠落グリフ警告はログに表示しない
+      if (
+        text.includes('building the font cache') ||
+        (text.includes('UserWarning') && text.includes('missing from'))
+      ) return
       self.postMessage({ type: 'error', payload: text } satisfies OutMessage)
     },
   })
@@ -117,6 +138,22 @@ async function loadExternalPackages(code: string): Promise<void> {
     await pyodide.loadPackagesFromImports(code)
   } catch {
     // バンドル外は micropip にフォールバック
+  }
+
+  // Web Worker 内は document が存在しないため agg バックエンドを強制設定
+  // japanize-matplotlib で日本語フォントを自動設定（初回のみダウンロード）
+  if (pkgNames.includes('matplotlib')) {
+    try {
+      await pyodide.runPythonAsync(`import matplotlib as _mpl; _mpl.use('agg'); del _mpl`)
+    } catch { /* ignore */ }
+    try {
+      await pyodide.runPythonAsync(`
+import micropip as _mp
+await _mp.install('japanize-matplotlib')
+import japanize_matplotlib as _jmpl
+del _mp, _jmpl
+`)
+    } catch { /* 日本語フォントなしで続行 */ }
   }
 
   // バンドルにないパッケージを micropip でインストール
@@ -176,6 +213,13 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
     await loadExternalPackages(code)
 
     const result = await pyodide.runPythonAsync(code)
+
+    // matplotlib フィギュアを PNG として送信
+    const figJson = await pyodide.runPythonAsync(EXTRACT_FIGS_CODE) as string
+    const figs = JSON.parse(figJson) as Array<{ num: number; data: string }>
+    for (const fig of figs) {
+      self.postMessage({ type: 'image', payload: fig.data, title: `Figure ${fig.num}` } satisfies OutMessage)
+    }
 
     self.postMessage({
       type: 'result',

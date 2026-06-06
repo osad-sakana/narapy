@@ -6,7 +6,7 @@ import { buildVariableRegistry } from './variableRegistry'
 import { setSyncingFromPython, setHasUnsupportedCode } from '../blockly/workspace'
 import { setBlocklyUnsupportedBanner } from '../blockly/unsupported'
 import { getPythonToIr } from '../runner/validator'
-import { setBadge } from '../runner/badge'
+import { setBadge, setBadgeWithDetail } from '../runner/badge'
 
 function containsUnsupported(irJson: string): boolean {
   return irJson.includes('"type":"Unsupported"')
@@ -59,7 +59,7 @@ export async function applyPythonToWorkspace(
     serialization.workspaces.load(workspaceJson, workspace, { recordUndo: false })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
-    setBadge(`変換エラー: ${message}`, 'error')
+    setBadgeWithDetail('変換エラー', 'error', message)
     setSyncingFromPython(false)
     return
   }

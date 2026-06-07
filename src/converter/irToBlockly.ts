@@ -302,12 +302,12 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
         }
       }
       // インデックスが String 型ブロックを生成する場合（辞書・DataFrame等の文字列キーアクセス）:
-      // lists_getIndex の AT スロットは Number 型必須なので接続できない → Unsupported にフォールバック
+      // lists_getIndex の AT スロットは Number 型必須なので接続できない → unsupported_value にフォールバック
       if (producesStringBlock(node.index)) {
         const varPart = node.value.type === 'VarRef' ? node.value.name : '...'
         const idxPart = node.index.type === 'StrLit' ? `"${node.index.value}"` : '...'
         return {
-          type: 'unsupported_code',
+          type: 'unsupported_value',
           fields: { CODE: `${varPart}[${idxPart}]` },
         }
       }
@@ -426,10 +426,10 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
     }
 
     case 'Unsupported':
-      return { type: 'text', fields: { TEXT: node.code || `(${node.node_type})` } }
+      return { type: 'unsupported_value', fields: { CODE: node.code || `(${node.node_type})` } }
 
     default:
-      return { type: 'text', fields: { TEXT: '' } }
+      return { type: 'unsupported_value', fields: { CODE: '' } }
   }
 }
 

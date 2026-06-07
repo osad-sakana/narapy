@@ -1,6 +1,6 @@
 import { Blocks, FieldLabel } from 'blockly'
 import type { Block } from 'blockly'
-import { pythonGenerator } from 'blockly/python'
+import { pythonGenerator, Order } from 'blockly/python'
 
 export function registerUnsupportedBlock(): void {
   Blocks['unsupported_code'] = {
@@ -17,9 +17,27 @@ export function registerUnsupportedBlock(): void {
     },
   }
 
-  // Python generator: ブロックに保持しているコードテキストをそのまま出力
   pythonGenerator.forBlock['unsupported_code'] = (block: Block): string => {
     return (block.getFieldValue('CODE') as string) + '\n'
+  }
+
+  // 式コンテキスト用の未対応ブロック: output=null（任意スロットに接続可能）
+  // Number・String どちらのスロットに置いても型不一致エラーが起きないようにする
+  Blocks['unsupported_value'] = {
+    init(this: Block) {
+      this.appendDummyInput()
+        .appendField('⚠ ')
+        .appendField(new FieldLabel(''), 'CODE')
+      this.setOutput(true, null)
+      this.setColour(0)
+      this.setMovable(false)
+      this.setDeletable(false)
+      this.setTooltip('この式はBlocklyでは表現できません。Pythonエディタで直接編集してください。')
+    },
+  }
+
+  pythonGenerator.forBlock['unsupported_value'] = (block: Block): [string, number] => {
+    return [block.getFieldValue('CODE') as string, Order.NONE]
   }
 }
 

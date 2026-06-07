@@ -106,6 +106,21 @@ function collectVarsNode(node: IrNode, reg: (n: string) => string): void {
     case 'ListLit':
       collectVars(node.items, reg)
       break
+    case 'ClassDef':
+      collectVars(node.body, reg)
+      break
+    case 'InitDef':
+      collectVars(node.body, reg)
+      break
+    case 'MethodDef':
+      collectVars(node.body, reg)
+      break
+    case 'SelfAttrAssign':
+      collectVarsNode(node.value, reg)
+      break
+    case 'InstanceCreate':
+      for (const arg of node.args) collectVarsNode(arg, reg)
+      break
     default:
       break
   }

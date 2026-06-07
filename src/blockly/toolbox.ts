@@ -111,5 +111,18 @@ export const TOOLBOX_CONFIG: utils.toolbox.ToolboxDefinition = {
       colour: '#995BA5',
       custom: 'PROCEDURE',
     },
+    {
+      kind: 'category',
+      name: 'クラス (class)',
+      colour: '#A5713B',
+      contents: [
+        { kind: 'block', type: 'class_def' },
+        { kind: 'block', type: 'class_constructor' },
+        { kind: 'block', type: 'class_method' },
+        { kind: 'block', type: 'class_self_attr_set' },
+        { kind: 'block', type: 'class_self_attr_get' },
+        { kind: 'block', type: 'class_instance_create' },
+      ],
+    },
   ],
 }

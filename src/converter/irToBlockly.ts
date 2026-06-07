@@ -153,6 +153,50 @@ function stmtToBlock(node: IrNode, getVarId: VarFn): BlockJson | undefined {
       }
     }
 
+    case 'ClassDef': {
+      const methodsChain = stmtsToChain(node.body, getVarId)
+      const block: BlockJson = {
+        type: 'class_def',
+        fields: {
+          CLASS_NAME: node.name,
+          BASE_CLASS: node.base ?? '',
+        },
+      }
+      if (methodsChain) block.inputs = { METHODS: { block: methodsChain } }
+      return block
+    }
+
+    case 'InitDef': {
+      const bodyChain = stmtsToChain(node.body, getVarId)
+      const block: BlockJson = {
+        type: 'class_constructor',
+        fields: { PARAMS: node.params.join(', ') },
+      }
+      if (bodyChain) block.inputs = { BODY: { block: bodyChain } }
+      return block
+    }
+
+    case 'MethodDef': {
+      const bodyChain = stmtsToChain(node.body, getVarId)
+      const block: BlockJson = {
+        type: 'class_method',
+        fields: {
+          METHOD_NAME: node.name,
+          PARAMS: node.params.join(', '),
+        },
+      }
+      if (bodyChain) block.inputs = { BODY: { block: bodyChain } }
+      return block
+    }
+
+    case 'SelfAttrAssign': {
+      return {
+        type: 'class_self_attr_set',
+        fields: { ATTR: node.attr },
+        inputs: { VALUE: { block: exprToBlock(node.value, getVarId) } },
+      }
+    }
+
     case 'Unsupported':
       return {
         type: 'unsupported_code',
@@ -257,6 +301,16 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
           fields: { CODE: `...[${node.index.type === 'NumLit' ? node.index.value : '...'}]` },
         }
       }
+      // インデックスが String 型ブロックを生成する場合（辞書・DataFrame等の文字列キーアクセス）:
+      // lists_getIndex の AT スロットは Number 型必須なので接続できない → unsupported_value にフォールバック
+      if (producesStringBlock(node.index)) {
+        const varPart = node.value.type === 'VarRef' ? node.value.name : '...'
+        const idxPart = node.index.type === 'StrLit' ? `"${node.index.value}"` : '...'
+        return {
+          type: 'unsupported_value',
+          fields: { CODE: `${varPart}[${idxPart}]` },
+        }
+      }
       return {
         type: 'lists_getIndex',
         fields: { MODE: 'GET', WHERE: 'FROM_START' },
@@ -352,11 +406,30 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
       }
     }
 
+    case 'SelfAttrRef':
+      return {
+        type: 'class_self_attr_get',
+        fields: { ATTR: node.attr },
+      }
+
+    case 'InstanceCreate': {
+      const argInputs: Record<string, InputJson> = {}
+      node.args.forEach((arg, i) => {
+        argInputs[`ARG${i}`] = { block: exprToBlock(arg, getVarId) }
+      })
+      return {
+        type: 'class_instance_create',
+        fields: { CLASS_NAME: node.class_name },
+        extraState: { argCount: node.args.length },
+        inputs: argInputs,
+      }
+    }
+
     case 'Unsupported':
-      return { type: 'text', fields: { TEXT: node.code || `(${node.node_type})` } }
+      return { type: 'unsupported_value', fields: { CODE: node.code || `(${node.node_type})` } }
 
     default:
-      return { type: 'text', fields: { TEXT: '' } }
+      return { type: 'unsupported_value', fields: { CODE: '' } }
   }
 }
 

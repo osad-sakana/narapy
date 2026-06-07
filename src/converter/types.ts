@@ -26,6 +26,12 @@ export type IrNode =
   | { type: 'FuncCallExpr'; name: string; args: IrNode[] }
   | { type: 'FStringLit'; parts: IrNode[] }
   | { type: 'Subscript'; value: IrNode; index: IrNode }
+  | { type: 'ClassDef'; name: string; base: string | null; body: IrNode[] }
+  | { type: 'InitDef'; params: string[]; body: IrNode[] }
+  | { type: 'MethodDef'; name: string; params: string[]; body: IrNode[]; has_return: boolean }
+  | { type: 'SelfAttrAssign'; attr: string; value: IrNode }
+  | { type: 'SelfAttrRef'; attr: string }
+  | { type: 'InstanceCreate'; class_name: string; args: IrNode[] }
   | { type: 'Unsupported'; node_type: string; code: string }
 
 export interface ElifClause {

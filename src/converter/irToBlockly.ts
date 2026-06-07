@@ -301,6 +301,16 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
           fields: { CODE: `...[${node.index.type === 'NumLit' ? node.index.value : '...'}]` },
         }
       }
+      // インデックスが String 型ブロックを生成する場合（辞書・DataFrame等の文字列キーアクセス）:
+      // lists_getIndex の AT スロットは Number 型必須なので接続できない → Unsupported にフォールバック
+      if (producesStringBlock(node.index)) {
+        const varPart = node.value.type === 'VarRef' ? node.value.name : '...'
+        const idxPart = node.index.type === 'StrLit' ? `"${node.index.value}"` : '...'
+        return {
+          type: 'unsupported_code',
+          fields: { CODE: `${varPart}[${idxPart}]` },
+        }
+      }
       return {
         type: 'lists_getIndex',
         fields: { MODE: 'GET', WHERE: 'FROM_START' },

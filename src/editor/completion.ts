@@ -8,6 +8,7 @@ type WorkerOut =
 type PendingEntry = {
   resolve: (items: monaco.languages.CompletionItem[]) => void
   range: monaco.IRange
+  timer: ReturnType<typeof setTimeout>
 }
 
 const KIND_MAP: Record<string, monaco.languages.CompletionItemKind> = {
@@ -20,12 +21,10 @@ const KIND_MAP: Record<string, monaco.languages.CompletionItemKind> = {
   param:     monaco.languages.CompletionItemKind.Field,
 }
 
-// jediが返す型文字列をMonacoのCompletionItemKindに変換
 function toKind(type: string): monaco.languages.CompletionItemKind {
   return KIND_MAP[type] ?? monaco.languages.CompletionItemKind.Text
 }
 
-// jediが未初期化の間に表示する静的フォールバック
 const STATIC_KEYWORDS = [
   'False','None','True','and','as','assert','async','await','break','class',
   'continue','def','del','elif','else','except','finally','for','from',
@@ -62,15 +61,32 @@ function buildStaticItems(range: monaco.IRange): monaco.languages.CompletionItem
   ]
 }
 
-// これを超えるコードはjedi解析をスキップして静的フォールバックを使う
-const CODE_MAX_BYTES = 200_000
-// 未解決リクエストの上限（超えたら最古を破棄してリソース枯渇を防ぐ）
+// コード長がこれを超えたらjedi解析をスキップ（DoS対策）
+const CODE_MAX_CHARS = 200_000
+// 未解決リクエストの上限（超えたら最古をフォールバック解決してリソース枯渇を防ぐ）
 const PENDING_MAX = 5
 
 let worker: Worker | null = null
 let workerReady = false
 let nextId = 0
 const pending = new Map<number, PendingEntry>()
+
+// pending エントリをタイマーごとキャンセルして静的候補で解決する
+function evictEntry(id: number): void {
+  const entry = pending.get(id)
+  if (!entry) return
+  pending.delete(id)
+  clearTimeout(entry.timer)
+  entry.resolve(buildStaticItems(entry.range))
+}
+
+// Worker クラッシュ時に全 pending を解決してワーカーを再生成可能な状態にする（HIGH-2）
+function handleWorkerFailure(): void {
+  for (const [id] of pending) evictEntry(id)
+  worker?.terminate()
+  worker = null
+  workerReady = false
+}
 
 function getOrCreateWorker(): Worker {
   if (worker) return worker
@@ -87,6 +103,7 @@ function getOrCreateWorker(): Worker {
     }
     const entry = pending.get(msg.id)
     if (!entry) return
+    clearTimeout(entry.timer)
     pending.delete(msg.id)
 
     if (msg.type === 'completions') {
@@ -96,7 +113,6 @@ function getOrCreateWorker(): Worker {
         insertText: item.name,
         range: entry.range,
       }))
-      // jediが返さなかった静的補完（キーワード・組み込み関数）を補完する
       const jediNames = new Set(msg.items.map((i) => i.name))
       const extras = buildStaticItems(entry.range).filter(
         (item) => !jediNames.has(item.label as string),
@@ -107,11 +123,19 @@ function getOrCreateWorker(): Worker {
     }
   }
 
+  worker.onerror = (event) => {
+    console.error('completion worker error:', event.message)
+    handleWorkerFailure()
+  }
+
+  worker.onmessageerror = () => {
+    handleWorkerFailure()
+  }
+
   return worker
 }
 
 export function registerPythonCompletion(): monaco.IDisposable {
-  // ページロード時にWorkerの初期化を先行して開始する
   getOrCreateWorker()
 
   return monaco.languages.registerCompletionItemProvider('python', {
@@ -129,29 +153,30 @@ export function registerPythonCompletion(): monaco.IDisposable {
       }
 
       const code = model.getValue()
-      if (code.length > CODE_MAX_BYTES) {
+      if (code.length > CODE_MAX_CHARS) {
         return { suggestions: buildStaticItems(range) }
       }
 
       const id = ++nextId
-      const line = position.lineNumber        // jedi: 1-based
-      const col = position.column - 1        // jedi: 0-based
+      const line = position.lineNumber   // jedi: 1-based
+      const col = position.column - 1   // jedi: 0-based
 
       return new Promise<monaco.languages.CompletionList>((resolve) => {
+        // 上限超えは最古エントリをタイマーごと破棄してから登録（MEDIUM-1）
+        if (pending.size >= PENDING_MAX) {
+          const [firstId] = pending.keys()
+          evictEntry(firstId)
+        }
+
         const timer = setTimeout(() => {
           pending.delete(id)
           resolve({ suggestions: buildStaticItems(range) })
         }, 2000)
 
-        if (pending.size >= PENDING_MAX) {
-          const [firstId] = pending.keys()
-          pending.delete(firstId)
-        }
-
         pending.set(id, {
           range,
+          timer,
           resolve: (items) => {
-            clearTimeout(timer)
             resolve({ suggestions: items })
           },
         })

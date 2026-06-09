@@ -165,8 +165,10 @@ export function applyBlocklyMessages(): void {
   })
 
   // 既存定義を削除してから再登録することで "overwrites previous definition" 警告を抑制する
-  delete (Blocks as Record<string, unknown>)['math_arithmetic']
-  delete (Blocks as Record<string, unknown>)['logic_compare']
+  // Blockly.Blocks は Record<string, BlockDefinition> だが型上 delete できないため as-cast する
+  const unregister = (name: string) => { delete (Blocks as Record<string, unknown>)[name] }
+  unregister('math_arithmetic')
+  unregister('logic_compare')
 
   // math_arithmetic に % (MODULO) を追加し、演算子表記を Python 準拠に統一する
   defineBlocksWithJsonArray([

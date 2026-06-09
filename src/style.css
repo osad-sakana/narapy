@@ -157,7 +157,8 @@
 }
 
 /* ─── Monaco 補完ウィジェット: ステータスバーに「Tab で確定」を表示 ──── */
-/* Monaco が描画する英語ラベル（"insert tab" 等）を非表示にして日本語に置換 */
+/* Monaco の内部クラス名 (.suggest-status-bar .right) に依存している。
+   Monaco をメジャーバージョンアップする際は目視で表示を確認すること。 */
 .monaco-editor .suggest-widget .suggest-status-bar .right > * {
   display: none !important;
 }

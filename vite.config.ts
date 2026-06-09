@@ -63,7 +63,8 @@ export default defineConfig({
   worker: {
     // iife形式にすることでViteがmodule workerにHMRクライアントを注入しなくなる
     // （module workerへのHMR注入はdocument未定義エラーを起こすため）
+    // topLevelAwaitはiife formatに非対応のためworkerには含めない（workers内でtop-level awaitは未使用）
     format: 'iife',
-    plugins: () => [wasm(), topLevelAwait()],
+    plugins: () => [wasm()],
   },
 })

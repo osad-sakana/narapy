@@ -62,6 +62,11 @@ function buildStaticItems(range: monaco.IRange): monaco.languages.CompletionItem
   ]
 }
 
+// これを超えるコードはjedi解析をスキップして静的フォールバックを使う
+const CODE_MAX_BYTES = 200_000
+// 未解決リクエストの上限（超えたら最古を破棄してリソース枯渇を防ぐ）
+const PENDING_MAX = 5
+
 let worker: Worker | null = null
 let workerReady = false
 let nextId = 0
@@ -123,8 +128,12 @@ export function registerPythonCompletion(): monaco.IDisposable {
         return { suggestions: buildStaticItems(range) }
       }
 
-      const id = ++nextId
       const code = model.getValue()
+      if (code.length > CODE_MAX_BYTES) {
+        return { suggestions: buildStaticItems(range) }
+      }
+
+      const id = ++nextId
       const line = position.lineNumber        // jedi: 1-based
       const col = position.column - 1        // jedi: 0-based
 
@@ -133,6 +142,11 @@ export function registerPythonCompletion(): monaco.IDisposable {
           pending.delete(id)
           resolve({ suggestions: buildStaticItems(range) })
         }, 2000)
+
+        if (pending.size >= PENDING_MAX) {
+          const [firstId] = pending.keys()
+          pending.delete(firstId)
+        }
 
         pending.set(id, {
           range,

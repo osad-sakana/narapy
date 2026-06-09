@@ -38,7 +38,8 @@ export default defineConfig({
       // connect-src files.pythonhosted.org pypi.org: micropip によるパッケージインストール
       'Content-Security-Policy': [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-eval' blob: cdn.jsdelivr.net",
+        // blob: はworker内部のdynamic import()にのみ使用 → worker-srcで許可済みのためscript-srcから除外
+        "script-src 'self' 'unsafe-eval' cdn.jsdelivr.net",
         "worker-src 'self' blob:",
         "img-src 'self' data: blob:",
         "style-src 'self' 'unsafe-inline' fonts.googleapis.com",

@@ -1,5 +1,7 @@
 /// <reference lib="webworker" />
 
+import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from './lib/pyodideLoader'
+
 type InMessage = { type: 'complete'; id: number; code: string; line: number; col: number }
 
 type OutMessage =
@@ -20,30 +22,6 @@ interface PyodideInterface {
 
 interface PyodideModule {
   loadPyodide: (options: { indexURL: string }) => Promise<PyodideInterface>
-}
-
-const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/'
-const PYODIDE_MJS_HASH = 'sha384-99NUXWQ/+GiMxiBXXMq7KS8/e2HFz84pdM4eSR3j9E5Nmqxwv8jiOmm36bKkIGTL'
-
-async function verifiedImport(url: string, expectedHash: string): Promise<unknown> {
-  const response = await fetch(url)
-  if (!response.ok) throw new Error(`fetch failed: ${url} (${response.status})`)
-
-  const buffer = await response.arrayBuffer()
-  const hashBuffer = await crypto.subtle.digest('SHA-384', buffer)
-  const hashBase64 = btoa(
-    Array.from(new Uint8Array(hashBuffer), (b) => String.fromCharCode(b)).join(''),
-  )
-  const actual = `sha384-${hashBase64}`
-  if (actual !== expectedHash) throw new Error(`SRI mismatch: expected ${expectedHash}, got ${actual}`)
-
-  const blob = new Blob([buffer], { type: 'text/javascript' })
-  const blobUrl = URL.createObjectURL(blob)
-  try {
-    return await import(/* @vite-ignore */ blobUrl)
-  } finally {
-    URL.revokeObjectURL(blobUrl)
-  }
 }
 
 let pyodide: PyodideInterface | null = null
@@ -74,8 +52,19 @@ def _complete(source, line, col):
 const initPromise = init()
 
 self.onmessage = async (event: MessageEvent<InMessage>) => {
-  const { type, id, code, line, col } = event.data
-  if (type !== 'complete') return
+  const msg = event.data
+
+  // ランタイムでメッセージ構造を検証することで型アサーション由来の不正入力を防ぐ
+  if (
+    !msg ||
+    msg.type !== 'complete' ||
+    typeof msg.id !== 'number' || !Number.isInteger(msg.id) ||
+    typeof msg.code !== 'string' ||
+    typeof msg.line !== 'number' || !Number.isInteger(msg.line) || msg.line < 1 ||
+    typeof msg.col !== 'number' || !Number.isInteger(msg.col) || msg.col < 0
+  ) return
+
+  const { id, code, line, col } = msg
 
   try {
     await initPromise
@@ -83,10 +72,24 @@ self.onmessage = async (event: MessageEvent<InMessage>) => {
       self.postMessage({ type: 'complete_error', id } satisfies OutMessage)
       return
     }
-    // globals.setでコードを渡すことで、コード内の引用符によるエスケープ問題を回避
+    // line/col もglobals経由で渡してテンプレート文字列への直接埋込みを廃止
     pyodide.globals.set('_src', code)
-    const json = pyodide.runPython(`_complete(_src, ${line}, ${col})`) as string
-    const items = JSON.parse(json) as Array<{ name: string; type: string }>
+    pyodide.globals.set('_line', line)
+    pyodide.globals.set('_col', col)
+    const result = pyodide.runPython('_complete(_src, _line, _col)')
+
+    // runPythonの戻り値をランタイム検証してから使う（L-3）
+    const json = typeof result === 'string' ? result : '[]'
+    const parsed: unknown = JSON.parse(json)
+    const items = Array.isArray(parsed)
+      ? parsed.filter((item): item is { name: string; type: string } =>
+          typeof item === 'object' && item !== null &&
+          typeof (item as Record<string, unknown>).name === 'string' &&
+          (item as Record<string, unknown>).name !== '' &&
+          typeof (item as Record<string, unknown>).type === 'string',
+        )
+      : []
+
     self.postMessage({ type: 'completions', id, items } satisfies OutMessage)
   } catch {
     self.postMessage({ type: 'complete_error', id } satisfies OutMessage)

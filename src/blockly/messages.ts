@@ -1,4 +1,4 @@
-import { Msg, defineBlocksWithJsonArray } from 'blockly'
+import { Msg, Blocks, defineBlocksWithJsonArray } from 'blockly'
 
 export function applyBlocklyMessages(): void {
   // Python 構文はそのまま、英語の説明ラベルを日本語化
@@ -163,6 +163,10 @@ export function applyBlocklyMessages(): void {
     PROCEDURES_CREATE_DO:              "'%1' を作成",
     PROCEDURES_ALLOW_STATEMENTS:       '処理を含める',
   })
+
+  // 既存定義を削除してから再登録することで "overwrites previous definition" 警告を抑制する
+  delete (Blocks as Record<string, unknown>)['math_arithmetic']
+  delete (Blocks as Record<string, unknown>)['logic_compare']
 
   // math_arithmetic に % (MODULO) を追加し、演算子表記を Python 準拠に統一する
   defineBlocksWithJsonArray([

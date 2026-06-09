@@ -1,4 +1,5 @@
 import * as monaco from 'monaco-editor'
+import { getFontSize } from './fontSize'
 
 export type EditorInstance = monaco.editor.IStandaloneCodeEditor
 
@@ -35,7 +36,7 @@ export function createEditor(container: HTMLElement): EditorInstance {
     value: '',
     language: 'python',
     theme: 'narapy-dark',
-    fontSize: 13,
+    fontSize: getFontSize(),
     fontFamily: '"0xProto", "Fira Code", "Cascadia Code", monospace',
     fontLigatures: true,
     lineNumbers: 'on',

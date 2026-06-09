@@ -9,7 +9,7 @@ import { applyPythonToWorkspace } from './converter/index'
 import { createDebounced } from './converter/debounce'
 import { createEditor, getValue, setValue } from './editor/index'
 import { initFontSizeControls } from './editor/fontSize'
-import { downloadPythonFile, openFilePicker, downloadNarapyProject, openNarapyFilePicker } from './fileio/index'
+import { downloadNarapyProject, openNarapyFilePicker } from './fileio/index'
 import { createExplorer } from './explorer/ui'
 import { initAbout } from './about/index'
 import {
@@ -18,7 +18,6 @@ import {
   updateFileContent,
   setActiveFile,
   getAllFilesAsRecord,
-  upsertFile,
   loadProject,
 } from './explorer/store'
 
@@ -160,24 +159,6 @@ setValue(editor, getActiveContent())
 editorFileName.textContent = getActiveFile()
 isSyncingEditor = false
 
-// --- ファイル開く ---
-const uploadBtn = document.getElementById('uploadBtn') as HTMLButtonElement
-uploadBtn.addEventListener('click', () => {
-  openFilePicker((code, filename) => {
-    const name = filename ?? 'main.py'
-    upsertFile(name, code)
-    switchToFile(name)
-    refreshExplorer()
-  })
-})
-
-// --- ファイル保存 ---
-const downloadBtn = document.getElementById('downloadBtn') as HTMLButtonElement
-downloadBtn.addEventListener('click', () => {
-  // 保存前に最新の内容をストアへ反映
-  updateFileContent(getActiveFile(), getValue(editor))
-  downloadPythonFile(getValue(editor), getActiveFile())
-})
 
 initRunner(editor, () => {
   // 実行前に現在の内容をストアへ同期

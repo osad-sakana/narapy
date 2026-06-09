@@ -1,7 +1,10 @@
 import * as monaco from 'monaco-editor'
 import { getFontSize } from './fontSize'
+import { registerPythonCompletion } from './completion'
 
 export type EditorInstance = monaco.editor.IStandaloneCodeEditor
+
+registerPythonCompletion()
 
 export function createEditor(container: HTMLElement): EditorInstance {
   monaco.editor.defineTheme('narapy-dark', {
@@ -51,8 +54,8 @@ export function createEditor(container: HTMLElement): EditorInstance {
     autoClosingBrackets: 'always',
     autoClosingQuotes: 'always',
     autoIndent: 'full',
-    suggestOnTriggerCharacters: false,
-    quickSuggestions: false,
+    suggestOnTriggerCharacters: true,
+    quickSuggestions: true,
     parameterHints: { enabled: false },
     hover: { enabled: false },
     // Ctrl+Enter / Cmd+Enter でコード実行（main.ts でハンドル）

@@ -56,6 +56,8 @@ export function createEditor(container: HTMLElement): EditorInstance {
     autoIndent: 'full',
     suggestOnTriggerCharacters: true,
     quickSuggestions: true,
+    acceptSuggestionOnEnter: 'off',
+    tabCompletion: 'on',
     parameterHints: { enabled: false },
     hover: { enabled: false },
     // Ctrl+Enter / Cmd+Enter でコード実行（main.ts でハンドル）

@@ -86,13 +86,18 @@ function getOrCreateWorker(): Worker {
     pending.delete(msg.id)
 
     if (msg.type === 'completions') {
-      const items = msg.items.map((item) => ({
+      const jediItems = msg.items.map((item) => ({
         label: item.name,
         kind: toKind(item.type),
         insertText: item.name,
         range: entry.range,
       }))
-      entry.resolve(items)
+      // jediが返さなかった静的補完（キーワード・組み込み関数）を補完する
+      const jediNames = new Set(msg.items.map((i) => i.name))
+      const extras = buildStaticItems(entry.range).filter(
+        (item) => !jediNames.has(item.label as string),
+      )
+      entry.resolve([...jediItems, ...extras])
     } else {
       entry.resolve(buildStaticItems(entry.range))
     }

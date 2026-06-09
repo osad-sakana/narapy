@@ -21,6 +21,20 @@ const LICENSES = [
     url: 'https://github.com/pyodide/pyodide',
   },
   {
+    name: 'jedi',
+    version: '0.19.1',
+    license: 'MIT',
+    copyright: 'Copyright 2013 David Halter and others',
+    url: 'https://github.com/davidhalter/jedi',
+  },
+  {
+    name: 'parso',
+    version: '0.8.4',
+    license: 'MIT',
+    copyright: 'Copyright 2013 David Halter and others',
+    url: 'https://github.com/davidhalter/parso',
+  },
+  {
     name: 'split.js',
     version: '1.6',
     license: 'MIT',

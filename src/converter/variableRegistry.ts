@@ -16,7 +16,7 @@ export function buildVariableRegistry(
   const map: VarMap = new Map()
 
   // ワークスペースの既存変数を読み込む
-  for (const v of workspace.getAllVariables()) {
+  for (const v of workspace.getVariableMap().getAllVariables()) {
     map.set(v.getName(), v.getId())
   }
 

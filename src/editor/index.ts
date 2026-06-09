@@ -1,7 +1,19 @@
 import * as monaco from 'monaco-editor'
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { getFontSize } from './fontSize'
+import { registerPythonCompletion } from './completion'
 
 export type EditorInstance = monaco.editor.IStandaloneCodeEditor
+
+// vite-plugin-monaco-editor のinlineスクリプト(CSP違反)の代わりに
+// Viteのworkerバンドルを使ってMonacoワーカーを同一オリジンから配信する
+window.MonacoEnvironment = {
+  getWorker(_moduleId: string, _label: string): Worker {
+    return new EditorWorker()
+  },
+}
+
+registerPythonCompletion()
 
 export function createEditor(container: HTMLElement): EditorInstance {
   monaco.editor.defineTheme('narapy-dark', {
@@ -51,8 +63,11 @@ export function createEditor(container: HTMLElement): EditorInstance {
     autoClosingBrackets: 'always',
     autoClosingQuotes: 'always',
     autoIndent: 'full',
-    suggestOnTriggerCharacters: false,
-    quickSuggestions: false,
+    suggestOnTriggerCharacters: true,
+    quickSuggestions: true,
+    acceptSuggestionOnEnter: 'off',
+    tabCompletion: 'on',
+    suggest: { showStatusBar: true },
     parameterHints: { enabled: false },
     hover: { enabled: false },
     // Ctrl+Enter / Cmd+Enter でコード実行（main.ts でハンドル）

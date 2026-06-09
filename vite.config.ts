@@ -3,8 +3,6 @@ import tailwindcss from '@tailwindcss/vite'
 import wasm from 'vite-plugin-wasm'
 import topLevelAwait from 'vite-plugin-top-level-await'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
-import monacoEditorPluginModule from 'vite-plugin-monaco-editor'
-const monacoEditorPlugin = (monacoEditorPluginModule as unknown as { default: typeof monacoEditorPluginModule }).default ?? monacoEditorPluginModule
 
 export default defineConfig({
   // CI 環境（GitHub Actions）では GitHub Pages のサブパスに合わせる
@@ -23,8 +21,8 @@ export default defineConfig({
         },
       ],
     }),
-    // Monaco のワーカーを同一オリジンからバンドル配信（COEP 対応）
-    monacoEditorPlugin({ languageWorkers: ['editorWorkerService'] }),
+    // Monaco ワーカーは editor/index.ts で MonacoEnvironment を直接セットして管理する
+    // (vite-plugin-monaco-editor のinlineスクリプト注入はCSPに違反するため不使用)
   ],
 
   server: {
@@ -40,7 +38,8 @@ export default defineConfig({
       // connect-src files.pythonhosted.org pypi.org: micropip によるパッケージインストール
       'Content-Security-Policy': [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-eval' blob: cdn.jsdelivr.net",
+        // blob: はworker内部のdynamic import()にのみ使用 → worker-srcで許可済みのためscript-srcから除外
+        "script-src 'self' 'unsafe-eval' cdn.jsdelivr.net",
         "worker-src 'self' blob:",
         "img-src 'self' data: blob:",
         "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
@@ -62,7 +61,10 @@ export default defineConfig({
   },
 
   worker: {
-    format: 'es',
-    plugins: () => [wasm(), topLevelAwait()],
+    // iife形式にすることでViteがmodule workerにHMRクライアントを注入しなくなる
+    // （module workerへのHMR注入はdocument未定義エラーを起こすため）
+    // topLevelAwaitはiife formatに非対応のためworkerには含めない（workers内でtop-level awaitは未使用）
+    format: 'iife',
+    plugins: () => [wasm()],
   },
 })

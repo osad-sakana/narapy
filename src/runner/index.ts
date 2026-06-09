@@ -16,7 +16,6 @@ const INTERRUPT_FALLBACK_MS = 800
 function createWorker(): Worker {
   return new Worker(
     new URL('../pyodide.worker.ts', import.meta.url),
-    { type: 'module' },
   )
 }
 

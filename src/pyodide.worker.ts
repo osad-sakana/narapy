@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import type { RunPayload } from './types'
+import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from './lib/pyodideLoader'
 
 type OutMessage =
   | { type: 'stdout' | 'result' | 'error' | 'loading'; payload: string }
@@ -33,35 +34,7 @@ interface PyodideModule {
   }) => Promise<PyodideInterface>
 }
 
-const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/'
-const PYODIDE_MJS_HASH = 'sha384-99NUXWQ/+GiMxiBXXMq7KS8/e2HFz84pdM4eSR3j9E5Nmqxwv8jiOmm36bKkIGTL'
 const WORK_DIR = '/home/pyodide'
-
-// CDN ファイルを取得して SHA-384 ハッシュを検証し、Blob URL 経由でインポートする。
-// 標準 SRI は Workers の dynamic import() に適用されないため手動で検証する。
-async function verifiedImport(url: string, expectedHash: string): Promise<unknown> {
-  const response = await fetch(url)
-  if (!response.ok) throw new Error(`fetch failed: ${url} (${response.status})`)
-
-  const buffer = await response.arrayBuffer()
-  const hashBuffer = await crypto.subtle.digest('SHA-384', buffer)
-  const hashBase64 = btoa(
-    Array.from(new Uint8Array(hashBuffer), (b) => String.fromCharCode(b)).join(''),
-  )
-  const actual = `sha384-${hashBase64}`
-
-  if (actual !== expectedHash) {
-    throw new Error(`SRI mismatch: expected ${expectedHash}, got ${actual}`)
-  }
-
-  const blob = new Blob([buffer], { type: 'text/javascript' })
-  const blobUrl = URL.createObjectURL(blob)
-  try {
-    return await import(/* @vite-ignore */ blobUrl)
-  } finally {
-    URL.revokeObjectURL(blobUrl)
-  }
-}
 
 // 実行後に matplotlib の全フィギュアを PNG base64 の JSON 配列として返す
 const EXTRACT_FIGS_CODE = `

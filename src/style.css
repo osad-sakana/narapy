@@ -155,3 +155,17 @@
   line-height: 1.75;
   white-space: pre;
 }
+
+/* ─── Monaco 補完ウィジェット: ステータスバーに「Tab で確定」を表示 ──── */
+/* Monaco の内部クラス名 (.suggest-status-bar .right) に依存している。
+   Monaco をメジャーバージョンアップする際は目視で表示を確認すること。 */
+.monaco-editor .suggest-widget .suggest-status-bar .right > * {
+  display: none !important;
+}
+.monaco-editor .suggest-widget .suggest-status-bar .right::after {
+  content: 'Tab で確定';
+  color: #94a3b8;
+  font-size: 11px;
+  padding: 0 8px;
+  white-space: nowrap;
+}

@@ -44,6 +44,20 @@
         </div>
       </div>
       <div class="flex items-center gap-2">
+        <!-- フォントサイズ制御 -->
+        <div class="flex items-center gap-0.5 border border-slate-700/60 rounded-lg overflow-hidden mr-1">
+          <button
+            id="fontDecrease"
+            title="文字を小さく"
+            class="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700/40 transition-colors cursor-pointer select-none"
+          >A-</button>
+          <span id="fontSizeLabel" class="px-1 text-xs text-slate-500 select-none tabular-nums w-6 text-center">13</span>
+          <button
+            id="fontIncrease"
+            title="文字を大きく"
+            class="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700/40 transition-colors cursor-pointer select-none"
+          >A+</button>
+        </div>
         <button
           id="uploadBtn"
           title=".pyファイルを開く"

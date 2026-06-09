@@ -8,6 +8,7 @@ import { initRunner } from './runner/index'
 import { applyPythonToWorkspace } from './converter/index'
 import { createDebounced } from './converter/debounce'
 import { createEditor, getValue, setValue } from './editor/index'
+import { initFontSizeControls } from './editor/fontSize'
 import { downloadPythonFile, openFilePicker } from './fileio/index'
 import { createExplorer } from './explorer/ui'
 import { initAbout } from './about/index'
@@ -182,5 +183,12 @@ initRunner(editor, () => {
   updateFileContent(getActiveFile(), getValue(editor))
   return getAllFilesAsRecord()
 })
+
+const outputLog = document.getElementById('outputLog') as HTMLElement
+initFontSizeControls((size) => {
+  editor.updateOptions({ fontSize: size })
+  outputLog.style.fontSize = `${size}px`
+})
+
 void loadWasm()
 initAbout()

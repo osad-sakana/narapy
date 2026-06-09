@@ -1,8 +1,17 @@
 import * as monaco from 'monaco-editor'
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { getFontSize } from './fontSize'
 import { registerPythonCompletion } from './completion'
 
 export type EditorInstance = monaco.editor.IStandaloneCodeEditor
+
+// vite-plugin-monaco-editor のinlineスクリプト(CSP違反)の代わりに
+// Viteのworkerバンドルを使ってMonacoワーカーを同一オリジンから配信する
+window.MonacoEnvironment = {
+  getWorker(_moduleId: string, _label: string): Worker {
+    return new EditorWorker()
+  },
+}
 
 registerPythonCompletion()
 

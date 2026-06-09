@@ -3,8 +3,6 @@ import tailwindcss from '@tailwindcss/vite'
 import wasm from 'vite-plugin-wasm'
 import topLevelAwait from 'vite-plugin-top-level-await'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
-import monacoEditorPluginModule from 'vite-plugin-monaco-editor'
-const monacoEditorPlugin = (monacoEditorPluginModule as unknown as { default: typeof monacoEditorPluginModule }).default ?? monacoEditorPluginModule
 
 export default defineConfig({
   // CI 環境（GitHub Actions）では GitHub Pages のサブパスに合わせる
@@ -23,8 +21,8 @@ export default defineConfig({
         },
       ],
     }),
-    // Monaco のワーカーを同一オリジンからバンドル配信（COEP 対応）
-    monacoEditorPlugin({ languageWorkers: ['editorWorkerService'] }),
+    // Monaco ワーカーは editor/index.ts で MonacoEnvironment を直接セットして管理する
+    // (vite-plugin-monaco-editor のinlineスクリプト注入はCSPに違反するため不使用)
   ],
 
   server: {

@@ -83,3 +83,10 @@ export function deleteFile(name: string): boolean {
 export function getAllFilesAsRecord(): Record<string, string> {
   return Object.fromEntries(state.files.map(f => [f.name, f.content]))
 }
+
+export function loadProject(files: FileEntry[], activeFile: string): void {
+  const hasActive = files.some(f => f.name === activeFile)
+  const resolvedActive = hasActive ? activeFile : files[0].name
+  state = { files: files.map(f => ({ ...f })), activeFile: resolvedActive }
+  persist(state)
+}

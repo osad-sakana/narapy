@@ -93,6 +93,7 @@ function getOrCreateWorker(): Worker {
 
   worker = new Worker(
     new URL('../completion.worker.ts', import.meta.url),
+    { type: 'module' },
   )
 
   worker.onmessage = (event: MessageEvent<WorkerOut>) => {

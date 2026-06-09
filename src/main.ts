@@ -9,7 +9,7 @@ import { applyPythonToWorkspace } from './converter/index'
 import { createDebounced } from './converter/debounce'
 import { createEditor, getValue, setValue } from './editor/index'
 import { initFontSizeControls } from './editor/fontSize'
-import { downloadPythonFile, openFilePicker } from './fileio/index'
+import { downloadPythonFile, openFilePicker, downloadNarapyProject, openNarapyFilePicker } from './fileio/index'
 import { createExplorer } from './explorer/ui'
 import { initAbout } from './about/index'
 import {
@@ -19,6 +19,7 @@ import {
   setActiveFile,
   getAllFilesAsRecord,
   upsertFile,
+  loadProject,
 } from './explorer/store'
 
 applyBlocklyMessages()
@@ -188,6 +189,31 @@ const outputLog = document.getElementById('outputLog') as HTMLElement
 initFontSizeControls((size) => {
   editor.updateOptions({ fontSize: size })
   outputLog.style.fontSize = `${size}px`
+})
+
+// --- プロジェクトを開く (.narapy) ---
+const importProjectBtn = document.getElementById('importProjectBtn') as HTMLButtonElement
+importProjectBtn.addEventListener('click', () => {
+  openNarapyFilePicker(
+    (project) => {
+      updateFileContent(getActiveFile(), getValue(editor))
+      loadProject(project.files, project.activeFile)
+      refreshExplorer()
+      switchToFile(getActiveFile())
+    },
+    (message) => window.alert(message),
+  )
+})
+
+// --- プロジェクトを保存 (.narapy) ---
+const exportProjectBtn = document.getElementById('exportProjectBtn') as HTMLButtonElement
+exportProjectBtn.addEventListener('click', () => {
+  updateFileContent(getActiveFile(), getValue(editor))
+  downloadNarapyProject({
+    version: 1,
+    files: Object.entries(getAllFilesAsRecord()).map(([name, content]) => ({ name, content })),
+    activeFile: getActiveFile(),
+  })
 })
 
 void loadWasm()

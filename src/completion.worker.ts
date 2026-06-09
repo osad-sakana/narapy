@@ -7,9 +7,14 @@ type OutMessage =
   | { type: 'completions'; id: number; items: Array<{ name: string; type: string }> }
   | { type: 'complete_error'; id: number }
 
+interface LoadPackageOptions {
+  messageCallback?: (msg: string) => void
+  errorCallback?: (msg: string) => void
+}
+
 interface PyodideInterface {
   runPython: (code: string) => unknown
-  loadPackage: (names: string | string[]) => Promise<void>
+  loadPackage: (names: string | string[], options?: LoadPackageOptions) => Promise<void>
   globals: { set: (key: string, value: unknown) => void }
 }
 
@@ -50,7 +55,7 @@ async function init(): Promise<void> {
   ) as PyodideModule
 
   pyodide = await loadPyodide({ indexURL: PYODIDE_CDN })
-  await pyodide.loadPackage(['jedi'])
+  await pyodide.loadPackage(['jedi'], { messageCallback: () => undefined })
 
   pyodide.runPython(`
 import jedi as _jedi, json as _json

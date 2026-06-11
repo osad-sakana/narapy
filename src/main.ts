@@ -13,16 +13,22 @@ import { downloadNarapyProject, openNarapyFilePicker } from './fileio/index'
 import { createExplorer } from './explorer/ui'
 import { initAbout } from './about/index'
 import {
+  initStore,
+  flushStore,
   getActiveFile,
   getActiveContent,
   updateFileContent,
   setActiveFile,
-  getAllFilesAsRecord,
+  getAllFilesForRun,
   loadProject,
+  getFiles,
+  getDirectories,
 } from './explorer/store'
 
 applyBlocklyMessages()
 initLayout()
+
+await initStore()
 
 // Monaco Editor を初期化
 const editorContainer = document.getElementById('codeEditor') as HTMLElement
@@ -63,18 +69,18 @@ function codeEqual(a: string, b: string): boolean {
 }
 
 // --- ファイル切替 ---
-function switchToFile(name: string): void {
+function switchToFile(path: string): void {
   // 現在の内容を保存
   updateFileContent(getActiveFile(), getValue(editor))
-  // ストアを切替
-  setActiveFile(name)
+  // ストアを切替（テキストファイルのみ）
+  if (!setActiveFile(path)) return
   // エディタに新しい内容をロード（変更ハンドラを抑制）
   isSyncingEditor = true
   const content = getActiveContent()
   setValue(editor, content)
   isSyncingEditor = false
   // ファイル名表示を更新
-  editorFileName.textContent = name
+  editorFileName.textContent = path
   // バリデーションと Blockly 変換
   void triggerValidation(content)
   if (activeSource === 'editor') {
@@ -148,12 +154,16 @@ hintToggleBtn.addEventListener('click', () => {
 
 // --- ファイルエクスプローラー初期化 ---
 const explorerContainer = document.getElementById('fileExplorer') as HTMLElement
-const { refresh: refreshExplorer } = createExplorer(explorerContainer, (name) => {
-  switchToFile(name)
-  refreshExplorer()
-})
+const { refresh: refreshExplorer } = createExplorer(
+  explorerContainer,
+  (path) => {
+    switchToFile(path)
+    refreshExplorer()
+  },
+  (message) => window.alert(message),
+)
 
-// エディタを localStorage の内容で初期化
+// エディタを永続化済みの内容で初期化
 isSyncingEditor = true
 setValue(editor, getActiveContent())
 editorFileName.textContent = getActiveFile()
@@ -163,7 +173,7 @@ isSyncingEditor = false
 initRunner(editor, () => {
   // 実行前に現在の内容をストアへ同期
   updateFileContent(getActiveFile(), getValue(editor))
-  return getAllFilesAsRecord()
+  return getAllFilesForRun()
 })
 
 const outputLog = document.getElementById('outputLog') as HTMLElement
@@ -178,7 +188,7 @@ importProjectBtn.addEventListener('click', () => {
   openNarapyFilePicker(
     (project) => {
       updateFileContent(getActiveFile(), getValue(editor))
-      loadProject(project.files, project.activeFile)
+      loadProject(project.files, project.directories, project.activeFile)
       refreshExplorer()
       switchToFile(getActiveFile())
     },
@@ -188,11 +198,18 @@ importProjectBtn.addEventListener('click', () => {
 
 // --- プロジェクトを保存 (.narapy) ---
 const exportProjectBtn = document.getElementById('exportProjectBtn') as HTMLButtonElement
-exportProjectBtn.addEventListener('click', () => {
+exportProjectBtn.addEventListener('click', async () => {
   updateFileContent(getActiveFile(), getValue(editor))
+  await flushStore()
   downloadNarapyProject({
-    version: 1,
-    files: Object.entries(getAllFilesAsRecord()).map(([name, content]) => ({ name, content })),
+    version: 2,
+    files: getFiles().map(f => ({
+      path: f.path,
+      content: f.content.kind === 'text'
+        ? { kind: 'text', data: f.content.data }
+        : { kind: 'binary', data: f.content.data, mime: f.content.mime },
+    })),
+    directories: getDirectories().map(d => ({ path: d.path })),
     activeFile: getActiveFile(),
   })
 })

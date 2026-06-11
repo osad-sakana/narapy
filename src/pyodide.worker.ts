@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import type { RunPayload } from './types'
+import type { RunFile, RunPayload } from './types'
 import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from './lib/pyodideLoader'
 
 type OutMessage =
@@ -11,7 +11,9 @@ type OutMessage =
   | { type: 'interrupt_sab'; sab: SharedArrayBuffer }
 
 interface PyFS {
-  writeFile: (path: string, data: string) => void
+  writeFile: (path: string, data: string | Uint8Array) => void
+  mkdir: (path: string) => void
+  analyzePath: (path: string) => { exists: boolean }
 }
 
 interface PyodideInterface {
@@ -186,11 +188,11 @@ del _mp, _pkgs, _p
   }
 }
 
-async function cleanupUserModules(files: Record<string, string>): Promise<void> {
+async function cleanupUserModules(files: RunFile[]): Promise<void> {
   if (!pyodide) return
-  const moduleNames = Object.keys(files)
-    .filter(name => name.endsWith('.py'))
-    .map(name => name.slice(0, -3))
+  const moduleNames = files
+    .filter(f => f.kind === 'text' && f.path.endsWith('.py') && !f.path.includes('/'))
+    .map(f => f.path.slice(0, -3))
   if (moduleNames.length === 0) return
   await pyodide.runPythonAsync(`
 import sys, importlib as _il
@@ -201,17 +203,46 @@ del _m, _il
 `)
 }
 
-function writeFilesToFS(files: Record<string, string>): void {
+function ensureDir(absPath: string): void {
   if (!pyodide) return
-  for (const [name, content] of Object.entries(files)) {
-    pyodide.FS.writeFile(`${WORK_DIR}/${name}`, content)
+  const parts = absPath.split('/').filter(Boolean)
+  let cur = ''
+  for (const p of parts) {
+    cur += '/' + p
+    if (!pyodide.FS.analyzePath(cur).exists) {
+      try { pyodide.FS.mkdir(cur) } catch { /* race / already exists */ }
+    }
+  }
+}
+
+function getDirname(path: string): string {
+  const idx = path.lastIndexOf('/')
+  if (idx < 0) return ''
+  return path.slice(0, idx)
+}
+
+function writeFilesToFS(files: RunFile[], directories: string[]): void {
+  if (!pyodide) return
+  ensureDir(WORK_DIR)
+  for (const dir of directories) {
+    ensureDir(`${WORK_DIR}/${dir}`)
+  }
+  for (const file of files) {
+    const dir = getDirname(file.path)
+    if (dir) ensureDir(`${WORK_DIR}/${dir}`)
+    const fullPath = `${WORK_DIR}/${file.path}`
+    if (file.kind === 'text') {
+      pyodide.FS.writeFile(fullPath, file.data)
+    } else {
+      pyodide.FS.writeFile(fullPath, file.data)
+    }
   }
 }
 
 self.onmessage = async (event: MessageEvent<RunPayload>) => {
   if (event.data.type !== 'run') return
 
-  const { code, files } = event.data
+  const { code, files, directories } = event.data
 
   try {
     await initPromise
@@ -223,7 +254,7 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
 
     interruptBuffer[0] = 0 // 前回の停止シグナルをクリア
     await cleanupUserModules(files)
-    writeFilesToFS(files)
+    writeFilesToFS(files, directories)
     await loadExternalPackages(code)
 
     const result = await pyodide.runPythonAsync(code)

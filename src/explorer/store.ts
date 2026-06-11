@@ -1,36 +1,55 @@
-import type { FileEntry, FileState } from './types'
-
-const STORAGE_KEY = 'narapy_files_v1'
+import type { DirectoryEntry, FileContent, FileEntry, FileState } from './types'
+import type { RunFile } from '../types'
+import { loadState, saveState } from './persistence'
+import { getAncestorDirs } from './paths'
 
 const DEFAULT_STATE: FileState = {
-  files: [{ name: 'main.py', content: '' }],
+  files: [{ path: 'main.py', content: { kind: 'text', data: '' } }],
+  directories: [],
   activeFile: 'main.py',
 }
 
-function loadFromStorage(): FileState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as FileState
-      if (Array.isArray(parsed.files) && parsed.files.length > 0 && typeof parsed.activeFile === 'string') {
-        const hasActive = parsed.files.some(f => f.name === parsed.activeFile)
-        return hasActive ? parsed : { ...parsed, activeFile: parsed.files[0].name }
-      }
-    }
-  } catch {
-    // ignore corrupt storage
+let state: FileState = cloneDefault()
+let initialized = false
+let pendingWrite: Promise<void> = Promise.resolve()
+
+function cloneDefault(): FileState {
+  return {
+    files: DEFAULT_STATE.files.map(f => ({
+      path: f.path,
+      content: { kind: 'text', data: '' },
+    })),
+    directories: [],
+    activeFile: DEFAULT_STATE.activeFile,
   }
-  return { ...DEFAULT_STATE, files: [{ ...DEFAULT_STATE.files[0] }] }
 }
 
-function persist(state: FileState): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+function persist(): void {
+  const snapshot = state
+  pendingWrite = pendingWrite
+    .catch(() => undefined)
+    .then(() => saveState(snapshot))
+    .catch(err => {
+      console.error('IndexedDB 永続化に失敗', err)
+    })
 }
 
-let state: FileState = loadFromStorage()
+export async function initStore(): Promise<void> {
+  if (initialized) return
+  state = await loadState(cloneDefault())
+  initialized = true
+}
+
+export async function flushStore(): Promise<void> {
+  await pendingWrite
+}
 
 export function getFiles(): FileEntry[] {
   return state.files
+}
+
+export function getDirectories(): DirectoryEntry[] {
+  return state.directories
 }
 
 export function getActiveFile(): string {
@@ -38,55 +57,141 @@ export function getActiveFile(): string {
 }
 
 export function getActiveContent(): string {
-  return state.files.find(f => f.name === state.activeFile)?.content ?? ''
+  const entry = state.files.find(f => f.path === state.activeFile)
+  if (!entry) return ''
+  if (entry.content.kind === 'text') return entry.content.data
+  return ''
 }
 
-export function setActiveFile(name: string): void {
-  if (!state.files.find(f => f.name === name)) return
-  state = { ...state, activeFile: name }
-  persist(state)
+export function getFile(path: string): FileEntry | undefined {
+  return state.files.find(f => f.path === path)
 }
 
-export function updateFileContent(name: string, content: string): void {
-  const files = state.files.map(f => f.name === name ? { ...f, content } : f)
-  state = { ...state, files }
-  persist(state)
-}
-
-export function createFile(name: string, content = ''): boolean {
-  if (state.files.find(f => f.name === name)) return false
-  const files = [...state.files, { name, content }]
-  state = { ...state, files }
-  persist(state)
+export function setActiveFile(path: string): boolean {
+  const entry = state.files.find(f => f.path === path)
+  if (!entry || entry.content.kind !== 'text') return false
+  if (state.activeFile === path) return true
+  state = { ...state, activeFile: path }
+  persist()
   return true
 }
 
-export function upsertFile(name: string, content: string): void {
-  if (state.files.find(f => f.name === name)) {
-    updateFileContent(name, content)
+export function updateFileContent(path: string, data: string): void {
+  const target = state.files.find(f => f.path === path)
+  if (!target || target.content.kind !== 'text') return
+  if (target.content.data === data) return
+  const files = state.files.map(f => f.path === path
+    ? { path, content: { kind: 'text' as const, data } }
+    : f)
+  state = { ...state, files }
+  persist()
+}
+
+export function createTextFile(path: string, data = ''): boolean {
+  if (state.files.find(f => f.path === path)) return false
+  const files = [...state.files, { path, content: { kind: 'text' as const, data } }]
+  state = { ...state, files }
+  ensureAncestorDirsMutating(path)
+  persist()
+  return true
+}
+
+export function upsertFile(path: string, content: FileContent): void {
+  const existing = state.files.findIndex(f => f.path === path)
+  let files: FileEntry[]
+  if (existing >= 0) {
+    files = state.files.map((f, i) => i === existing ? { path, content } : f)
   } else {
-    const files = [...state.files, { name, content }]
-    state = { ...state, files }
-    persist(state)
+    files = [...state.files, { path, content }]
+  }
+  state = { ...state, files }
+  ensureAncestorDirsMutating(path)
+  persist()
+}
+
+export function deleteFile(path: string): boolean {
+  const target = state.files.find(f => f.path === path)
+  if (!target) return false
+  const textFiles = state.files.filter(f => f.content.kind === 'text')
+  if (target.content.kind === 'text' && textFiles.length <= 1) return false
+
+  const files = state.files.filter(f => f.path !== path)
+  let activeFile = state.activeFile
+  if (path === state.activeFile) {
+    const next = files.find(f => f.content.kind === 'text')
+    activeFile = next?.path ?? files[0]?.path ?? DEFAULT_STATE.activeFile
+  }
+  state = { ...state, files, activeFile }
+  persist()
+  return true
+}
+
+export function createDirectory(path: string): boolean {
+  if (!path) return false
+  if (state.directories.some(d => d.path === path)) return false
+  const directories = [...state.directories, { path }]
+  state = { ...state, directories }
+  ensureAncestorDirsMutating(`${path}/_`)
+  persist()
+  return true
+}
+
+export function deleteDirectory(path: string): boolean {
+  const prefix = `${path}/`
+  const hasFiles = state.files.some(f => f.path === path || f.path.startsWith(prefix))
+  const hasSubdirs = state.directories.some(d => d.path !== path && d.path.startsWith(prefix))
+  if (hasFiles || hasSubdirs) return false
+  const directories = state.directories.filter(d => d.path !== path)
+  if (directories.length === state.directories.length) return false
+  state = { ...state, directories }
+  persist()
+  return true
+}
+
+function ensureAncestorDirsMutating(path: string): void {
+  const ancestors = getAncestorDirs(path)
+  if (ancestors.length === 0) return
+  const known = new Set(state.directories.map(d => d.path))
+  const additions: DirectoryEntry[] = []
+  for (const a of ancestors) {
+    if (!known.has(a)) {
+      additions.push({ path: a })
+      known.add(a)
+    }
+  }
+  if (additions.length > 0) {
+    state = { ...state, directories: [...state.directories, ...additions] }
   }
 }
 
-export function deleteFile(name: string): boolean {
-  if (state.files.length <= 1) return false
-  const files = state.files.filter(f => f.name !== name)
-  const activeFile = state.activeFile === name ? files[0].name : state.activeFile
-  state = { files, activeFile }
-  persist(state)
-  return true
+export function getAllTextFilesAsRecord(): Record<string, string> {
+  const record: Record<string, string> = {}
+  for (const f of state.files) {
+    if (f.content.kind === 'text') record[f.path] = f.content.data
+  }
+  return record
 }
 
-export function getAllFilesAsRecord(): Record<string, string> {
-  return Object.fromEntries(state.files.map(f => [f.name, f.content]))
+export function getAllFilesForRun(): { files: RunFile[]; directories: string[] } {
+  const files: RunFile[] = state.files.map(f => f.content.kind === 'text'
+    ? { kind: 'text', path: f.path, data: f.content.data }
+    : { kind: 'binary', path: f.path, data: f.content.data })
+  const directories = state.directories.map(d => d.path)
+  return { files, directories }
 }
 
-export function loadProject(files: FileEntry[], activeFile: string): void {
-  const hasActive = files.some(f => f.name === activeFile)
-  const resolvedActive = hasActive ? activeFile : files[0].name
-  state = { files: files.map(f => ({ ...f })), activeFile: resolvedActive }
-  persist(state)
+export function loadProject(files: FileEntry[], directories: DirectoryEntry[], activeFile: string): void {
+  const cloned = files.map(f => ({
+    path: f.path,
+    content: f.content.kind === 'text'
+      ? { kind: 'text' as const, data: f.content.data }
+      : { kind: 'binary' as const, data: f.content.data, mime: f.content.mime },
+  }))
+  const dirs = directories.map(d => ({ path: d.path }))
+  const resolvedActive = cloned.find(f => f.path === activeFile && f.content.kind === 'text')
+    ? activeFile
+    : (cloned.find(f => f.content.kind === 'text')?.path ?? cloned[0]?.path ?? DEFAULT_STATE.activeFile)
+  state = { files: cloned, directories: dirs, activeFile: resolvedActive }
+  persist()
 }
+

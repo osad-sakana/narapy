@@ -1,4 +1,4 @@
-import type { WorkerMessage, RunPayload } from '../types'
+import type { WorkerMessage, RunFile, RunPayload } from '../types'
 import type { EditorInstance } from '../editor/index'
 import { appendLog, appendErrorBlock, clearLog, getLogText } from './log'
 import { getValue } from '../editor/index'
@@ -22,7 +22,7 @@ function createWorker(): Worker {
 
 export function initRunner(
   editor: EditorInstance,
-  getRunFiles: () => Record<string, string>,
+  getRunFiles: () => { files: RunFile[]; directories: string[] },
 ): void {
   const runBtn     = document.getElementById('runBtn')     as HTMLButtonElement
   const copyLogBtn = document.getElementById('copyLogBtn') as HTMLButtonElement
@@ -171,8 +171,8 @@ export function initRunner(
     setRunning(true)
     clearLog()
     appendLog('--- 実行開始 ---', 'info')
-    const files = getRunFiles()
-    worker.postMessage({ type: 'run', code, files } satisfies RunPayload)
+    const { files, directories } = getRunFiles()
+    worker.postMessage({ type: 'run', code, files, directories } satisfies RunPayload)
   })
 
   copyLogBtn.addEventListener('click', async () => {

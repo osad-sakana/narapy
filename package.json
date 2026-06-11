@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "blockly": "^12.0.0",
+    "fflate": "^0.8.3",
     "monaco-editor": "^0.55.1",
     "split.js": "^1.6.5"
   },

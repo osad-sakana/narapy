@@ -53,6 +53,10 @@ export function createTurtlePlayer(
 
   function render(): void {
     ctx.clearRect(0, 0, width, height)
+    if (data.background) {
+      ctx.fillStyle = data.background
+      ctx.fillRect(0, 0, width, height)
+    }
     drawTurtleFrame(ctx, data, width, height, distance)
     onChange?.({
       playing,

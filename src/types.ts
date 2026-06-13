@@ -21,6 +21,7 @@ export interface TurtleSegment {
 export interface TurtleCommands {
   segments: TurtleSegment[]
   turtle: { x: number; y: number; heading: number; visible: boolean }
+  background?: string | null
 }
 
 export type RunFile =

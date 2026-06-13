@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   turtleToCanvas,
+  computeView,
   drawTurtleCommands,
   drawTurtleFrame,
   segmentLength,
@@ -191,6 +192,38 @@ describe('markerAt（タートル位置の補間）', () => {
     expect(m.x).toBe(100)
     expect(m.y).toBe(100)
     expect(m.heading).toBe(90)
+  })
+})
+
+describe('computeView（Canvas への自動フィット）', () => {
+  it('収まる描画は等倍・原点中心（標準 turtle と同じ）', () => {
+    const view = computeView(L_SEGMENTS, 400, 400)
+    expect(view).toEqual({ scale: 1, cx: 0, cy: 0 })
+  })
+
+  it('はみ出す描画は縮小して中央寄せ', () => {
+    // 幅 1000 の線分は 400 Canvas に収まらないため縮小される
+    const big: TurtleSegment[] = [
+      { x1: -500, y1: 0, x2: 500, y2: 0, color: 'black', width: 1 },
+    ]
+    const view = computeView(big, 400, 400)
+    expect(view.scale).toBeLessThan(1)
+    expect(view.cx).toBe(0) // 中心は線分中央
+    expect(view.cy).toBe(0)
+    // (400 - 2*24) / 1000
+    expect(view.scale).toBeCloseTo(352 / 1000)
+  })
+
+  it('オフセットした大きな描画は中心がずれる', () => {
+    const big: TurtleSegment[] = [
+      { x1: 0, y1: 0, x2: 1000, y2: 0, color: 'black', width: 1 },
+    ]
+    const view = computeView(big, 400, 400)
+    expect(view.cx).toBe(500)
+  })
+
+  it('空配列は等倍', () => {
+    expect(computeView([], 400, 400)).toEqual({ scale: 1, cx: 0, cy: 0 })
   })
 })
 

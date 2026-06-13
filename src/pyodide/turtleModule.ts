@@ -17,6 +17,7 @@ _pen_down = True
 _pen_color = 'black'
 _pen_width = 1.0
 _visible = True
+_bg_color = None        # 背景色（bgcolor 未指定なら None＝白）
 _segments = []          # {x1,y1,x2,y2,color,width} の配列（turtle 座標）
 
 
@@ -86,7 +87,23 @@ def pensize(n):
 
 def speed(n):
     # MVP では常に即時描画。速度指定は受け取るだけで無視する。
-    _num(n, 'speed')
+    if n is not None:
+        _num(n, 'speed')
+
+
+def hideturtle():
+    global _visible
+    _visible = False
+
+
+def showturtle():
+    global _visible
+    _visible = True
+
+
+def bgcolor(c):
+    global _bg_color
+    _bg_color = str(c)
 
 
 def clear():
@@ -96,7 +113,7 @@ def clear():
 
 def reset():
     """描画線を消し、タートルを初期状態に戻す。"""
-    global _x, _y, _heading, _pen_down, _pen_color, _pen_width, _visible
+    global _x, _y, _heading, _pen_down, _pen_color, _pen_width, _visible, _bg_color
     _segments.clear()
     _x = 0.0
     _y = 0.0
@@ -105,6 +122,87 @@ def reset():
     _pen_color = 'black'
     _pen_width = 1.0
     _visible = True
+    _bg_color = None
+
+
+# 画面・終了系（このプレビューでは画面制御が不要なため no-op）。
+# 標準 turtle のコードを書き換えずに動かすためのスタブ。
+def setup(*args, **kwargs):
+    pass
+
+
+def title(*args, **kwargs):
+    pass
+
+
+def mainloop(*args, **kwargs):
+    pass
+
+
+def done(*args, **kwargs):
+    pass
+
+
+def bye(*args, **kwargs):
+    pass
+
+
+def exitonclick(*args, **kwargs):
+    pass
+
+
+def tracer(*args, **kwargs):
+    pass
+
+
+def update(*args, **kwargs):
+    pass
+
+
+def colormode(*args, **kwargs):
+    pass
+
+
+class Screen:
+    """turtle.Screen() 互換のスタブ。描画は専用 Canvas で行うため大半は no-op。"""
+
+    def setup(self, *args, **kwargs):
+        pass
+
+    def bgcolor(self, c=None, *args, **kwargs):
+        if c is not None:
+            bgcolor(c)
+
+    def title(self, *args, **kwargs):
+        pass
+
+    def tracer(self, *args, **kwargs):
+        pass
+
+    def update(self, *args, **kwargs):
+        pass
+
+    def colormode(self, *args, **kwargs):
+        pass
+
+    def mainloop(self, *args, **kwargs):
+        pass
+
+    def listen(self, *args, **kwargs):
+        pass
+
+    def exitonclick(self, *args, **kwargs):
+        pass
+
+    def bye(self, *args, **kwargs):
+        pass
+
+
+_screen = Screen()
+
+
+def getscreen():
+    return _screen
 
 
 # 別名（標準 turtle 互換）
@@ -119,6 +217,8 @@ pencolor = color
 width = pensize
 setpos = goto
 setposition = goto
+ht = hideturtle
+st = showturtle
 
 
 class Turtle:
@@ -174,14 +274,28 @@ class Turtle:
     def speed(self, n):
         speed(n)
 
+    def hideturtle(self):
+        hideturtle()
+
+    ht = hideturtle
+
+    def showturtle(self):
+        showturtle()
+
+    st = showturtle
+
     def clear(self):
         clear()
 
     def reset(self):
         reset()
 
+    def getscreen(self):
+        return _screen
+
 
 Pen = Turtle
+RawTurtle = Turtle
 
 
 def _dump_commands():
@@ -189,5 +303,6 @@ def _dump_commands():
     return {
         'segments': list(_segments),
         'turtle': {'x': _x, 'y': _y, 'heading': _heading, 'visible': _visible},
+        'background': _bg_color,
     }
 `

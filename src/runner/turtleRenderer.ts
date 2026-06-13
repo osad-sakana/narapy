@@ -1,15 +1,58 @@
 import type { TurtleCommands, TurtleSegment } from '../types'
 
+// 描画を Canvas に収めるための表示変換。scale=1・cx=cy=0 が標準（原点中心・等倍）。
+export interface View {
+  scale: number
+  cx: number // 表示中心にする turtle 座標 X
+  cy: number // 表示中心にする turtle 座標 Y
+}
+
+const IDENTITY_VIEW: View = { scale: 1, cx: 0, cy: 0 }
+const FIT_PADDING = 24
+
+// 全線分のバウンディングボックスから表示変換を求める。
+// Canvas に収まる場合は標準（原点中心・等倍）、はみ出す場合のみ縮小して中央寄せする。
+export function computeView(
+  segments: TurtleSegment[],
+  width: number,
+  height: number,
+  padding: number = FIT_PADDING,
+): View {
+  if (segments.length === 0) return IDENTITY_VIEW
+
+  let minX = Infinity
+  let maxX = -Infinity
+  let minY = Infinity
+  let maxY = -Infinity
+  for (const s of segments) {
+    minX = Math.min(minX, s.x1, s.x2)
+    maxX = Math.max(maxX, s.x1, s.x2)
+    minY = Math.min(minY, s.y1, s.y2)
+    maxY = Math.max(maxY, s.y1, s.y2)
+  }
+
+  const extent = Math.max(maxX - minX, maxY - minY)
+  const avail = Math.min(width, height) - 2 * padding
+  if (extent <= avail || extent <= 0) return IDENTITY_VIEW
+
+  return {
+    scale: avail / extent,
+    cx: (minX + maxX) / 2,
+    cy: (minY + maxY) / 2,
+  }
+}
+
 // turtle 座標（中央原点・Y軸上向き）を Canvas 座標（左上原点・Y軸下向き）へ変換する。
 export function turtleToCanvas(
   x: number,
   y: number,
   width: number,
   height: number,
+  view: View = IDENTITY_VIEW,
 ): { cx: number; cy: number } {
   return {
-    cx: width / 2 + x,
-    cy: height / 2 - y,
+    cx: width / 2 + (x - view.cx) * view.scale,
+    cy: height / 2 - (y - view.cy) * view.scale,
   }
 }
 
@@ -117,14 +160,15 @@ export function drawTurtleFrame(
   distance: number,
 ): void {
   ctx.lineCap = 'round'
+  const view = computeView(data.segments, width, height)
 
   let remaining = distance
   for (const seg of data.segments) {
     if (remaining <= 0) break
     const len = segmentLength(seg)
-    const from = turtleToCanvas(seg.x1, seg.y1, width, height)
+    const from = turtleToCanvas(seg.x1, seg.y1, width, height, view)
     if (remaining >= len) {
-      const to = turtleToCanvas(seg.x2, seg.y2, width, height)
+      const to = turtleToCanvas(seg.x2, seg.y2, width, height, view)
       strokeLine(ctx, from, to, seg.color, seg.width)
       remaining -= len
     } else {
@@ -135,6 +179,7 @@ export function drawTurtleFrame(
         seg.y1 + (seg.y2 - seg.y1) * t,
         width,
         height,
+        view,
       )
       strokeLine(ctx, from, mid, seg.color, seg.width)
       remaining = 0
@@ -143,7 +188,7 @@ export function drawTurtleFrame(
 
   if (data.turtle.visible) {
     const m = markerAt(data, distance)
-    drawTurtleMarker(ctx, m.x, m.y, m.heading, width, height)
+    drawTurtleMarker(ctx, m.x, m.y, m.heading, width, height, view)
   }
 }
 
@@ -165,8 +210,9 @@ function drawTurtleMarker(
   heading: number,
   width: number,
   height: number,
+  view: View = IDENTITY_VIEW,
 ): void {
-  const center = turtleToCanvas(x, y, width, height)
+  const center = turtleToCanvas(x, y, width, height, view)
   // turtle 座標系の角度（反時計回り）を Canvas の Y 反転に合わせて符号反転する。
   const rad = (-heading * Math.PI) / 180
   const points = [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3].map((offset) => ({

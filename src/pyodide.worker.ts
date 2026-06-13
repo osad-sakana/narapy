@@ -4,7 +4,8 @@ import type { RunPayload } from './types'
 import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from './lib/pyodideLoader'
 
 type OutMessage =
-  | { type: 'stdout' | 'result' | 'error' | 'loading'; payload: string }
+  | { type: 'stdout' | 'error' | 'loading'; payload: string }
+  | { type: 'result'; payload: string | null }
   | { type: 'image'; payload: string; title: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
   | { type: 'input_request'; prompt: string }
@@ -235,9 +236,10 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
       self.postMessage({ type: 'image', payload: fig.data, title: `Figure ${fig.num}` } satisfies OutMessage)
     }
 
+    // 最後の式が None の場合は REPL 同様にエコーしない（payload: null で表示を抑制）
     self.postMessage({
       type: 'result',
-      payload: result === undefined || result === null ? '(None)' : String(result),
+      payload: result === undefined || result === null ? null : String(result),
     } satisfies OutMessage)
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)

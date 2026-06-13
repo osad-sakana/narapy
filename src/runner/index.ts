@@ -125,7 +125,10 @@ export function initRunner(
       if (msg.type === 'stdout') {
         appendLog(msg.payload, 'output')
       } else if (msg.type === 'result') {
-        appendLog(`=> ${msg.payload}`, 'result')
+        // None（payload: null）のときは実行終了の合図のみで表示しない
+        if (msg.payload !== null) {
+          appendLog(`=> ${msg.payload}`, 'result')
+        }
         setRunning(false)
       } else if (msg.type === 'error') {
         // KeyboardInterrupt は停止操作によるものなので通常のエラー表示をしない

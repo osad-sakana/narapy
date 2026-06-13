@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { turtleToCanvas, drawTurtleCommands, type DrawContext } from './turtleRenderer'
-import type { TurtleCommands } from '../types'
+import {
+  turtleToCanvas,
+  drawTurtleCommands,
+  drawTurtleFrame,
+  segmentLength,
+  totalLength,
+  cumulativeLengths,
+  nextBoundary,
+  drawnCount,
+  markerAt,
+  type DrawContext,
+} from './turtleRenderer'
+import type { TurtleCommands, TurtleSegment } from '../types'
 
 describe('turtleToCanvas', () => {
   const W = 400
@@ -100,5 +111,107 @@ describe('drawTurtleCommands', () => {
     const { ctx, calls } = createMockContext()
     drawTurtleCommands(ctx, data, W, H)
     expect(calls.filter((c) => c.method === 'stroke')).toHaveLength(2)
+  })
+})
+
+// L字（横100 + 縦100）の固定データを使う
+const L_SEGMENTS: TurtleSegment[] = [
+  { x1: 0, y1: 0, x2: 100, y2: 0, color: 'black', width: 1 },
+  { x1: 100, y1: 0, x2: 100, y2: 100, color: 'black', width: 1 },
+]
+const L_DATA: TurtleCommands = {
+  segments: L_SEGMENTS,
+  turtle: { x: 100, y: 100, heading: 90, visible: true },
+}
+
+describe('長さ計算ヘルパー', () => {
+  it('segmentLength は線分長を返す', () => {
+    expect(segmentLength(L_SEGMENTS[0])).toBe(100)
+    expect(segmentLength({ x1: 0, y1: 0, x2: 3, y2: 4, color: 'x', width: 1 })).toBe(5)
+  })
+
+  it('totalLength は合計長を返す', () => {
+    expect(totalLength(L_SEGMENTS)).toBe(200)
+    expect(totalLength([])).toBe(0)
+  })
+
+  it('cumulativeLengths は累積長を返す', () => {
+    expect(cumulativeLengths(L_SEGMENTS)).toEqual([100, 200])
+  })
+
+  it('drawnCount は描画済み本数を返す', () => {
+    expect(drawnCount([100, 200], 0)).toBe(0)
+    expect(drawnCount([100, 200], 100)).toBe(1)
+    expect(drawnCount([100, 200], 150)).toBe(1)
+    expect(drawnCount([100, 200], 200)).toBe(2)
+  })
+})
+
+describe('nextBoundary（ステップ再生の境界）', () => {
+  const cumulative = [100, 200]
+
+  it('現在地の次の境界へ進む', () => {
+    expect(nextBoundary(cumulative, 0)).toBe(100)
+    expect(nextBoundary(cumulative, 100)).toBe(200)
+    expect(nextBoundary(cumulative, 150)).toBe(200)
+  })
+
+  it('末尾では末尾のまま', () => {
+    expect(nextBoundary(cumulative, 200)).toBe(200)
+  })
+
+  it('空配列では 0', () => {
+    expect(nextBoundary([], 0)).toBe(0)
+  })
+})
+
+describe('markerAt（タートル位置の補間）', () => {
+  it('距離 0 は最初の線分の始点・進行方向', () => {
+    const m = markerAt(L_DATA, 0)
+    expect(m.x).toBe(0)
+    expect(m.y).toBe(0)
+    expect(m.heading).toBeCloseTo(0) // 横方向（東）
+  })
+
+  it('線分の途中を補間する', () => {
+    const m = markerAt(L_DATA, 50)
+    expect(m.x).toBe(50)
+    expect(m.y).toBe(0)
+  })
+
+  it('2 本目に入ると向きが変わる', () => {
+    const m = markerAt(L_DATA, 150)
+    expect(m.x).toBe(100)
+    expect(m.y).toBe(50)
+    expect(m.heading).toBeCloseTo(90) // 縦方向（北）
+  })
+
+  it('全描画後は最終状態の heading を使う', () => {
+    const m = markerAt(L_DATA, 200)
+    expect(m.x).toBe(100)
+    expect(m.y).toBe(100)
+    expect(m.heading).toBe(90)
+  })
+})
+
+describe('drawTurtleFrame（部分描画）', () => {
+  const W = 400
+  const H = 400
+
+  it('途中距離では 1 本目のみ完全、2 本目は部分描画', () => {
+    const { ctx, calls } = createMockContext()
+    drawTurtleFrame(ctx, L_DATA, W, H, 150)
+    // 1 本目フル + 2 本目部分 = stroke 2 回
+    expect(calls.filter((c) => c.method === 'stroke')).toHaveLength(2)
+    const lineTos = calls.filter((c) => c.method === 'lineTo')
+    // 2 本目は (100,0)→(100,50) の途中まで。Canvas 座標 y=200-50=150
+    expect(lineTos[1].args).toEqual([300, 150])
+  })
+
+  it('距離 0 では線を描かずマーカーのみ', () => {
+    const { ctx, calls } = createMockContext()
+    drawTurtleFrame(ctx, L_DATA, W, H, 0)
+    expect(calls.some((c) => c.method === 'stroke')).toBe(false)
+    expect(calls.some((c) => c.method === 'fill')).toBe(true)
   })
 })

@@ -11,8 +11,7 @@ use ir::IrNode;
 /// 構文エラー時はJsErrorをthrowする。
 #[wasm_bindgen]
 pub fn python_to_ir(source: &str) -> Result<String, JsError> {
-    let suite = Suite::parse(source, "<input>")
-        .map_err(|e| JsError::new(&e.to_string()))?;
+    let suite = Suite::parse(source, "<input>").map_err(|e| JsError::new(&e.to_string()))?;
     let body = convert_stmts(&suite, source);
     let root = IrNode::Program { body };
     serde_json::to_string(&root).map_err(|e| JsError::new(&e.to_string()))
@@ -21,7 +20,6 @@ pub fn python_to_ir(source: &str) -> Result<String, JsError> {
 /// 後方互換用: 構文チェックのみ行い { "status": "success" } を返す。
 #[wasm_bindgen]
 pub fn parse_and_validate(source: &str) -> Result<String, JsError> {
-    Suite::parse(source, "<input>")
-        .map_err(|e| JsError::new(&e.to_string()))?;
+    Suite::parse(source, "<input>").map_err(|e| JsError::new(&e.to_string()))?;
     Ok(r#"{"status":"success"}"#.to_string())
 }

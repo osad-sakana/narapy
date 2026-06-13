@@ -1,48 +1,55 @@
+use crate::ir::{ElifClause, IrNode};
 use rustpython_parser::ast::{
-    Stmt, Expr, Constant, Operator, BoolOp, CmpOp, UnaryOp, StmtIf, Ranged,
+    BoolOp, CmpOp, Constant, Expr, Operator, Ranged, Stmt, StmtIf, UnaryOp,
 };
-use crate::ir::{IrNode, ElifClause};
 
 pub fn convert_stmts(stmts: &[Stmt], source: &str) -> Vec<IrNode> {
-    stmts.iter().filter_map(|s| convert_stmt(s, source)).collect()
+    stmts
+        .iter()
+        .filter_map(|s| convert_stmt(s, source))
+        .collect()
 }
 
 fn convert_stmt(stmt: &Stmt, source: &str) -> Option<IrNode> {
     match stmt {
-        Stmt::Expr(s) => {
-            match s.value.as_ref() {
-                Expr::Call(call) => {
-                    if let Expr::Name(name_node) = call.func.as_ref() {
-                        let fname = name_node.id.as_str();
-                        if fname == "print" {
-                            let val = if call.args.is_empty() {
-                                IrNode::StrLit { value: String::new() }
-                            } else {
-                                convert_expr(&call.args[0], source)
-                            };
-                            return Some(IrNode::PrintStmt { value: Box::new(val) });
-                        }
-                        let args = call.args.iter().map(|a| convert_expr(a, source)).collect();
-                        return Some(IrNode::FuncCallStmt {
-                            name: fname.to_string(),
-                            args,
+        Stmt::Expr(s) => match s.value.as_ref() {
+            Expr::Call(call) => {
+                if let Expr::Name(name_node) = call.func.as_ref() {
+                    let fname = name_node.id.as_str();
+                    if fname == "print" {
+                        let val = if call.args.is_empty() {
+                            IrNode::StrLit {
+                                value: String::new(),
+                            }
+                        } else {
+                            convert_expr(&call.args[0], source)
+                        };
+                        return Some(IrNode::PrintStmt {
+                            value: Box::new(val),
                         });
                     }
-                    Some(IrNode::Unsupported {
-                        node_type: "ExprStmt(ComplexCall)".to_string(),
-                        code: extract_source(source, s),
-                    })
+                    let args = call.args.iter().map(|a| convert_expr(a, source)).collect();
+                    return Some(IrNode::FuncCallStmt {
+                        name: fname.to_string(),
+                        args,
+                    });
                 }
-                _ => None,
+                Some(IrNode::Unsupported {
+                    node_type: "ExprStmt(ComplexCall)".to_string(),
+                    code: extract_source(source, s),
+                })
             }
-        }
+            _ => None,
+        },
         Stmt::Assign(s) => {
             let target = match s.targets.first() {
                 Some(t) => t,
-                None => return Some(IrNode::Unsupported {
-                    node_type: "AssignNoTarget".to_string(),
-                    code: extract_source(source, s),
-                }),
+                None => {
+                    return Some(IrNode::Unsupported {
+                        node_type: "AssignNoTarget".to_string(),
+                        code: extract_source(source, s),
+                    })
+                }
             };
             match target {
                 Expr::Name(name) => {
@@ -87,11 +94,12 @@ fn convert_stmt(stmt: &Stmt, source: &str) -> Option<IrNode> {
                 if is_range_call(&s.iter) {
                     // range() 呼び出しだが引数が1つでない場合は未対応
                     return Some(
-                        try_convert_range(&s.iter, &var_name, body, source)
-                            .unwrap_or_else(|| IrNode::Unsupported {
+                        try_convert_range(&s.iter, &var_name, body, source).unwrap_or_else(|| {
+                            IrNode::Unsupported {
                                 node_type: "ForRange(multi-arg)".to_string(),
                                 code: extract_source(source, s),
-                            }),
+                            }
+                        }),
                     );
                 }
                 let iter = convert_expr(&s.iter, source);
@@ -115,12 +123,14 @@ fn convert_stmt(stmt: &Stmt, source: &str) -> Option<IrNode> {
                 other => (false, convert_expr(other, source)),
             };
             let body = convert_stmts(&s.body, source);
-            Some(IrNode::While { until, condition: Box::new(condition), body })
+            Some(IrNode::While {
+                until,
+                condition: Box::new(condition),
+                body,
+            })
         }
         Stmt::FunctionDef(s) => {
-            let params: Vec<String> = s.args.args.iter()
-                .map(|a| a.def.arg.to_string())
-                .collect();
+            let params: Vec<String> = s.args.args.iter().map(|a| a.def.arg.to_string()).collect();
             let body = convert_stmts(&s.body, source);
             let has_return = body_has_return(&s.body);
             Some(IrNode::FuncDef {
@@ -187,7 +197,10 @@ fn convert_stmt(stmt: &Stmt, source: &str) -> Option<IrNode> {
 }
 
 fn convert_class_body(stmts: &[Stmt], source: &str) -> Vec<IrNode> {
-    stmts.iter().filter_map(|s| convert_class_stmt(s, source)).collect()
+    stmts
+        .iter()
+        .filter_map(|s| convert_class_stmt(s, source))
+        .collect()
 }
 
 fn convert_class_stmt(stmt: &Stmt, source: &str) -> Option<IrNode> {
@@ -200,7 +213,10 @@ fn convert_class_stmt(stmt: &Stmt, source: &str) -> Option<IrNode> {
                 });
             }
             // selfを除いたパラメータリスト
-            let params: Vec<String> = s.args.args.iter()
+            let params: Vec<String> = s
+                .args
+                .args
+                .iter()
                 .skip(1)
                 .map(|a| a.def.arg.to_string())
                 .collect();
@@ -259,7 +275,12 @@ fn convert_if(s: &StmtIf, source: &str) -> IrNode {
         break;
     }
 
-    IrNode::If { condition: Box::new(condition), body, elif_clauses, else_body }
+    IrNode::If {
+        condition: Box::new(condition),
+        body,
+        elif_clauses,
+        else_body,
+    }
 }
 
 /// iter が `range(...)` 呼び出しかどうかだけを判定する
@@ -274,7 +295,12 @@ fn is_range_call(iter: &Expr) -> bool {
 
 /// `range(stop)` （1引数のみ、かつ変数名が `_` でない）を ForRange に変換。
 /// 条件を満たさない場合は None を返す。
-fn try_convert_range(iter: &Expr, var_name: &str, body: Vec<IrNode>, source: &str) -> Option<IrNode> {
+fn try_convert_range(
+    iter: &Expr,
+    var_name: &str,
+    body: Vec<IrNode>,
+    source: &str,
+) -> Option<IrNode> {
     if let Expr::Call(call) = iter {
         if let Expr::Name(fname) = call.func.as_ref() {
             if fname.id.as_str() == "range" && call.args.len() == 1 && var_name != "_" {
@@ -294,7 +320,9 @@ fn try_convert_range(iter: &Expr, var_name: &str, body: Vec<IrNode>, source: &st
 fn convert_expr(expr: &Expr, source: &str) -> IrNode {
     match expr {
         Expr::Constant(c) => convert_constant(&c.value),
-        Expr::Name(n) => IrNode::VarRef { name: n.id.to_string() },
+        Expr::Name(n) => IrNode::VarRef {
+            name: n.id.to_string(),
+        },
         Expr::BinOp(b) => {
             let op = binop_to_str(&b.op);
             IrNode::BinOp {
@@ -307,13 +335,16 @@ fn convert_expr(expr: &Expr, source: &str) -> IrNode {
             let op = match b.op {
                 BoolOp::And => "AND",
                 BoolOp::Or => "OR",
-            }.to_string();
+            }
+            .to_string();
             let values = b.values.iter().map(|v| convert_expr(v, source)).collect();
             IrNode::BoolOp { op, values }
         }
         Expr::Compare(c) => {
             let op = cmpop_to_str(c.ops.first().unwrap_or(&CmpOp::Eq));
-            let right = c.comparators.first()
+            let right = c
+                .comparators
+                .first()
                 .map(|r| convert_expr(r, source))
                 .unwrap_or(IrNode::Unsupported {
                     node_type: "EmptyComparator".to_string(),
@@ -326,7 +357,9 @@ fn convert_expr(expr: &Expr, source: &str) -> IrNode {
             }
         }
         Expr::UnaryOp(u) => match u.op {
-            UnaryOp::Not => IrNode::Not { operand: Box::new(convert_expr(&u.operand, source)) },
+            UnaryOp::Not => IrNode::Not {
+                operand: Box::new(convert_expr(&u.operand, source)),
+            },
             UnaryOp::USub => {
                 if let Expr::Constant(c) = u.operand.as_ref() {
                     if let Constant::Int(i) = &c.value {
@@ -352,10 +385,21 @@ fn convert_expr(expr: &Expr, source: &str) -> IrNode {
                 let name = fname.id.as_str();
                 let args = c.args.iter().map(|a| convert_expr(a, source)).collect();
                 // 先頭が大文字はクラスのインスタンス生成とみなす（Python慣習）
-                if name.chars().next().map(|ch| ch.is_uppercase()).unwrap_or(false) {
-                    return IrNode::InstanceCreate { class_name: name.to_string(), args };
+                if name
+                    .chars()
+                    .next()
+                    .map(|ch| ch.is_uppercase())
+                    .unwrap_or(false)
+                {
+                    return IrNode::InstanceCreate {
+                        class_name: name.to_string(),
+                        args,
+                    };
                 }
-                IrNode::FuncCallExpr { name: name.to_string(), args }
+                IrNode::FuncCallExpr {
+                    name: name.to_string(),
+                    args,
+                }
             } else {
                 IrNode::Unsupported {
                     node_type: "ComplexCall".to_string(),
@@ -366,7 +410,9 @@ fn convert_expr(expr: &Expr, source: &str) -> IrNode {
         Expr::Attribute(a) => {
             if let Expr::Name(obj) = a.value.as_ref() {
                 if obj.id.as_str() == "self" {
-                    return IrNode::SelfAttrRef { attr: a.attr.to_string() };
+                    return IrNode::SelfAttrRef {
+                        attr: a.attr.to_string(),
+                    };
                 }
             }
             IrNode::Unsupported {
@@ -383,11 +429,19 @@ fn convert_expr(expr: &Expr, source: &str) -> IrNode {
             index: Box::new(convert_expr(&s.slice, source)),
         },
         Expr::JoinedStr(s) => {
-            let parts: Vec<IrNode> = s.values.iter()
+            let parts: Vec<IrNode> = s
+                .values
+                .iter()
                 .filter_map(|v| match v {
                     Expr::Constant(c) => {
                         if let Constant::Str(text) = &c.value {
-                            if text.is_empty() { None } else { Some(IrNode::StrLit { value: text.clone() }) }
+                            if text.is_empty() {
+                                None
+                            } else {
+                                Some(IrNode::StrLit {
+                                    value: text.clone(),
+                                })
+                            }
                         } else {
                             None
                         }
@@ -407,12 +461,20 @@ fn convert_expr(expr: &Expr, source: &str) -> IrNode {
 
 fn convert_constant(c: &Constant) -> IrNode {
     match c {
-        Constant::Int(i) => IrNode::NumLit { value: i.to_string().parse().unwrap_or(0.0) },
+        Constant::Int(i) => IrNode::NumLit {
+            value: i.to_string().parse().unwrap_or(0.0),
+        },
         Constant::Float(f) => IrNode::NumLit { value: *f },
         Constant::Str(s) => IrNode::StrLit { value: s.clone() },
         Constant::Bool(b) => IrNode::BoolLit { value: *b },
-        Constant::None => IrNode::Unsupported { node_type: "None".to_string(), code: "None".to_string() },
-        _ => IrNode::Unsupported { node_type: "Constant".to_string(), code: String::new() },
+        Constant::None => IrNode::Unsupported {
+            node_type: "None".to_string(),
+            code: "None".to_string(),
+        },
+        _ => IrNode::Unsupported {
+            node_type: "Constant".to_string(),
+            code: String::new(),
+        },
     }
 }
 
@@ -426,7 +488,8 @@ fn binop_to_str(op: &Operator) -> String {
         Operator::Pow => "POWER",
         Operator::FloorDiv => "DIVIDE",
         _ => "ADD",
-    }.to_string()
+    }
+    .to_string()
 }
 
 fn cmpop_to_str(op: &CmpOp) -> String {
@@ -438,7 +501,8 @@ fn cmpop_to_str(op: &CmpOp) -> String {
         CmpOp::Gt => "GT",
         CmpOp::GtE => "GTE",
         _ => "EQ",
-    }.to_string()
+    }
+    .to_string()
 }
 
 fn body_has_return(stmts: &[Stmt]) -> bool {
@@ -483,10 +547,10 @@ fn expr_type_name(e: &Expr) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rustpython_parser::parse_program;
+    use rustpython_parser::{ast::Suite, Parse};
 
     fn parse_ir(src: &str) -> Vec<IrNode> {
-        let suite = parse_program(src, "<test>").expect("parse failed");
+        let suite = Suite::parse(src, "<test>").expect("parse failed");
         convert_stmts(&suite, src)
     }
 
@@ -513,7 +577,12 @@ mod tests {
     fn test_if_elif_else() {
         let src = "if x > 0:\n  y = 1\nelif x < 0:\n  y = 2\nelse:\n  y = 3";
         let nodes = parse_ir(src);
-        if let IrNode::If { elif_clauses, else_body, .. } = &nodes[0] {
+        if let IrNode::If {
+            elif_clauses,
+            else_body,
+            ..
+        } = &nodes[0]
+        {
             assert_eq!(elif_clauses.len(), 1);
             assert!(!else_body.is_empty());
         } else {
@@ -525,7 +594,13 @@ mod tests {
     fn test_func_def() {
         let src = "def greet(name):\n  return name";
         let nodes = parse_ir(src);
-        assert!(matches!(&nodes[0], IrNode::FuncDef { has_return: true, .. }));
+        assert!(matches!(
+            &nodes[0],
+            IrNode::FuncDef {
+                has_return: true,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -553,14 +628,18 @@ mod tests {
     fn test_class_def_no_base() {
         let src = "class MyClass:\n  pass";
         let nodes = parse_ir(src);
-        assert!(matches!(&nodes[0], IrNode::ClassDef { name, base: None, .. } if name == "MyClass"));
+        assert!(
+            matches!(&nodes[0], IrNode::ClassDef { name, base: None, .. } if name == "MyClass")
+        );
     }
 
     #[test]
     fn test_class_def_with_base() {
         let src = "class Dog(Animal):\n  pass";
         let nodes = parse_ir(src);
-        assert!(matches!(&nodes[0], IrNode::ClassDef { name, base: Some(b), .. } if name == "Dog" && b == "Animal"));
+        assert!(
+            matches!(&nodes[0], IrNode::ClassDef { name, base: Some(b), .. } if name == "Dog" && b == "Animal")
+        );
     }
 
     #[test]
@@ -569,8 +648,13 @@ mod tests {
         let nodes = parse_ir(src);
         if let IrNode::ClassDef { body, .. } = &nodes[0] {
             assert!(matches!(&body[0], IrNode::InitDef { params, .. } if params == &["x"]));
-            if let IrNode::InitDef { body: init_body, .. } = &body[0] {
-                assert!(matches!(&init_body[0], IrNode::SelfAttrAssign { attr, .. } if attr == "x"));
+            if let IrNode::InitDef {
+                body: init_body, ..
+            } = &body[0]
+            {
+                assert!(
+                    matches!(&init_body[0], IrNode::SelfAttrAssign { attr, .. } if attr == "x")
+                );
             }
         } else {
             panic!("expected ClassDef");
@@ -593,8 +677,13 @@ mod tests {
         let src = "class MyClass:\n  def get_x(self):\n    return self.x";
         let nodes = parse_ir(src);
         if let IrNode::ClassDef { body, .. } = &nodes[0] {
-            if let IrNode::MethodDef { body: method_body, .. } = &body[0] {
-                assert!(matches!(&method_body[0], IrNode::Return { value: Some(v), .. } if matches!(v.as_ref(), IrNode::SelfAttrRef { attr } if attr == "x")));
+            if let IrNode::MethodDef {
+                body: method_body, ..
+            } = &body[0]
+            {
+                assert!(
+                    matches!(&method_body[0], IrNode::Return { value: Some(v), .. } if matches!(v.as_ref(), IrNode::SelfAttrRef { attr } if attr == "x"))
+                );
             }
         }
     }
@@ -604,7 +693,9 @@ mod tests {
         let src = "obj = MyClass(1, 2)";
         let nodes = parse_ir(src);
         if let IrNode::Assign { value, .. } = &nodes[0] {
-            assert!(matches!(value.as_ref(), IrNode::InstanceCreate { class_name, .. } if class_name == "MyClass"));
+            assert!(
+                matches!(value.as_ref(), IrNode::InstanceCreate { class_name, .. } if class_name == "MyClass")
+            );
         } else {
             panic!("expected Assign");
         }

@@ -1,11 +1,14 @@
 import type { TurtleCommands } from '../types'
 import {
   drawTurtleFrame,
+  drawGrid,
   totalLength,
   cumulativeLengths,
   nextBoundary,
   drawnCount,
 } from './turtleRenderer'
+
+const GRID_SPACING = 50
 
 export type PlayMode = 'normal' | 'fast'
 
@@ -56,6 +59,9 @@ export function createTurtlePlayer(
     if (data.background) {
       ctx.fillStyle = data.background
       ctx.fillRect(0, 0, width, height)
+    } else {
+      // 背景指定がなければ方眼を敷く
+      drawGrid(ctx, width, height, GRID_SPACING)
     }
     drawTurtleFrame(ctx, data, width, height, distance)
     onChange?.({

@@ -42,6 +42,46 @@ export function computeView(
   }
 }
 
+const GRID_MINOR_COLOR = '#e6eaf1'
+const GRID_AXIS_COLOR = '#c3cad6'
+
+// 背景未指定のときに描く方眼。spacing px 間隔で、中央（turtle 原点）に必ず罫線がくるようにする。
+export function drawGrid(
+  ctx: DrawContext,
+  width: number,
+  height: number,
+  spacing: number = 50,
+): void {
+  const cx = width / 2
+  const cy = height / 2
+
+  ctx.lineWidth = 1
+  ctx.strokeStyle = GRID_MINOR_COLOR
+  for (let x = cx; x <= width; x += spacing) verticalLine(ctx, x, height)
+  for (let x = cx - spacing; x >= 0; x -= spacing) verticalLine(ctx, x, height)
+  for (let y = cy; y <= height; y += spacing) horizontalLine(ctx, y, width)
+  for (let y = cy - spacing; y >= 0; y -= spacing) horizontalLine(ctx, y, width)
+
+  // 中央軸（原点を通る縦横線）を少し濃く描く
+  ctx.strokeStyle = GRID_AXIS_COLOR
+  verticalLine(ctx, cx, height)
+  horizontalLine(ctx, cy, width)
+}
+
+function verticalLine(ctx: DrawContext, x: number, height: number): void {
+  ctx.beginPath()
+  ctx.moveTo(x, 0)
+  ctx.lineTo(x, height)
+  ctx.stroke()
+}
+
+function horizontalLine(ctx: DrawContext, y: number, width: number): void {
+  ctx.beginPath()
+  ctx.moveTo(0, y)
+  ctx.lineTo(width, y)
+  ctx.stroke()
+}
+
 // turtle 座標（中央原点・Y軸上向き）を Canvas 座標（左上原点・Y軸下向き）へ変換する。
 export function turtleToCanvas(
   x: number,

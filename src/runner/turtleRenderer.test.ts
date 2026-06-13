@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   turtleToCanvas,
   computeView,
+  drawGrid,
   drawTurtleCommands,
   drawTurtleFrame,
   segmentLength,
@@ -192,6 +193,24 @@ describe('markerAt（タートル位置の補間）', () => {
     expect(m.x).toBe(100)
     expect(m.y).toBe(100)
     expect(m.heading).toBe(90)
+  })
+})
+
+describe('drawGrid（方眼）', () => {
+  it('中央（原点）を通る罫線が引かれる', () => {
+    const { ctx, calls } = createMockContext()
+    drawGrid(ctx, 400, 400, 50)
+    const moveTos = calls.filter((c) => c.method === 'moveTo')
+    // 縦の中央線 x=200 と横の中央線 y=200 が存在する
+    expect(moveTos.some((c) => c.args[0] === 200 && c.args[1] === 0)).toBe(true)
+    expect(moveTos.some((c) => c.args[0] === 0 && c.args[1] === 200)).toBe(true)
+  })
+
+  it('50px 間隔で罫線が並ぶ（400px なら縦9本+横9本+中央軸2本）', () => {
+    const { ctx, calls } = createMockContext()
+    drawGrid(ctx, 400, 400, 50)
+    // 縦: 200,150,100,50,0,250,300,350,400 = 9 本 / 横も 9 本 / 中央軸 2 本
+    expect(calls.filter((c) => c.method === 'stroke')).toHaveLength(9 + 9 + 2)
   })
 })
 

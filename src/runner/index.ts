@@ -1,9 +1,10 @@
-import type { WorkerMessage, RunFile, RunPayload } from '../types'
+import type { WorkerMessage, RunFile, RunPayload, TurtleCommands } from '../types'
 import type { EditorInstance } from '../editor/index'
 import { appendLog, appendErrorBlock, clearLog, getLogText } from './log'
 import { getValue } from '../editor/index'
 import { translatePythonError } from './errorTranslator'
 import { showFigureModal } from './figureModal'
+import { showTurtleModal } from './turtleModal'
 
 const RUN_STYLE  = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-bold transition-colors shadow-md shadow-violet-900/50 cursor-pointer'
 const STOP_STYLE = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 text-white text-sm font-bold transition-colors shadow-md shadow-red-900/50 cursor-pointer'
@@ -119,6 +120,11 @@ export function initRunner(
 
       if (msg.type === 'image') {
         showFigureModal(msg.payload, msg.title)
+        return
+      }
+
+      if (msg.type === 'turtle') {
+        showTurtleModal(JSON.parse(msg.payload) as TurtleCommands)
         return
       }
 

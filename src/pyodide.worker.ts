@@ -2,11 +2,13 @@
 
 import type { RunFile, RunPayload } from './types'
 import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from './lib/pyodideLoader'
+import { TURTLE_MODULE_SRC } from './pyodide/turtleModule'
 
 type OutMessage =
   | { type: 'stdout' | 'error' | 'loading'; payload: string }
   | { type: 'result'; payload: string | null }
   | { type: 'image'; payload: string; title: string }
+  | { type: 'turtle'; payload: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
   | { type: 'input_request'; prompt: string }
   | { type: 'interrupt_sab'; sab: SharedArrayBuffer }
@@ -52,6 +54,27 @@ if 'matplotlib.pyplot' in _sys.modules:
         _result.append({'num': _n, 'data': _b64.b64encode(_buf.read()).decode()})
     _plt.close('all')
 _json.dumps(_result)
+`
+
+// 自作 turtle モジュールをフレッシュに sys.modules['turtle'] へ登録する。
+// 毎回 exec し直すことで run 間の描画状態リセットを保証し、
+// sys.modules へ直接注入することで Pyodide stdlib の turtle.py より確実に優先させる。
+const REGISTER_TURTLE_CODE = `
+import sys as _sys, types as _types
+_m = _types.ModuleType('turtle')
+exec(__turtle_src__, _m.__dict__)
+_sys.modules['turtle'] = _m
+del _m
+`
+
+// 実行後に turtle の描画コマンドを JSON で抽出する（turtle 未使用なら segments=[]）。
+const EXTRACT_TURTLE_CODE = `
+import sys as _sys, json as _json
+_out = '{"segments": [], "turtle": {"x": 0, "y": 0, "heading": 0, "visible": False}}'
+_t = _sys.modules.get('turtle')
+if _t is not None and hasattr(_t, '_dump_commands'):
+    _out = _json.dumps(_t._dump_commands())
+_out
 `
 
 // Pyodide への KeyboardInterrupt 注入用バッファ
@@ -258,6 +281,10 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
     writeFilesToFS(files, directories)
     await loadExternalPackages(code)
 
+    // turtle モジュールを毎回フレッシュ登録（描画状態をリセット）
+    pyodide.globals.set('__turtle_src__', TURTLE_MODULE_SRC)
+    await pyodide.runPythonAsync(REGISTER_TURTLE_CODE)
+
     const result = await pyodide.runPythonAsync(code)
 
     // matplotlib フィギュアを PNG として送信
@@ -265,6 +292,13 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
     const figs = JSON.parse(figJson) as Array<{ num: number; data: string }>
     for (const fig of figs) {
       self.postMessage({ type: 'image', payload: fig.data, title: `Figure ${fig.num}` } satisfies OutMessage)
+    }
+
+    // turtle の描画コマンドを抽出し、線分があればメインスレッドへ送信
+    const turtleJson = await pyodide.runPythonAsync(EXTRACT_TURTLE_CODE) as string
+    const turtleData = JSON.parse(turtleJson) as { segments: unknown[] }
+    if (turtleData.segments.length > 0) {
+      self.postMessage({ type: 'turtle', payload: turtleJson } satisfies OutMessage)
     }
 
     // 最後の式が None の場合は REPL 同様にエコーしない（payload: null で表示を抑制）

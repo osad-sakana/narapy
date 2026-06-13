@@ -2,15 +2,21 @@ import type { TurtleCommands } from '../types'
 import {
   drawTurtleFrame,
   drawGrid,
+  computeView,
+  markerAt,
   totalLength,
   cumulativeLengths,
   nextBoundary,
   drawnCount,
+  type View,
 } from './turtleRenderer'
 
 const GRID_SPACING = 50
 
 export type PlayMode = 'normal' | 'fast'
+
+// fit: 全体が収まるよう縮小表示 / follow: 等倍でタートルを中央に保ち画面をスクロール
+export type ViewMode = 'fit' | 'follow'
 
 // 再生モードごとの目標再生時間（ms）。描画の大小に関わらず一定時間で再生するため、
 // 速度は「合計長 / 再生時間」で算出する（速度固定より体感が安定する）。
@@ -22,6 +28,7 @@ const DURATION_MS: Record<PlayMode, number> = {
 export interface PlayerState {
   playing: boolean
   mode: PlayMode | null
+  viewMode: ViewMode
   atEnd: boolean
   drawn: number // 描画済みの線分本数
   count: number // 線分の総数
@@ -32,6 +39,7 @@ export interface TurtlePlayer {
   pause: () => void
   step: () => void
   reset: () => void
+  setViewMode: (mode: ViewMode) => void
   destroy: () => void
 }
 
@@ -50,23 +58,35 @@ export function createTurtlePlayer(
   let distance = total // 初期表示は完成形
   let playing = false
   let mode: PlayMode | null = null
+  let viewMode: ViewMode = 'fit'
   let speed = 0 // px/秒
   let rafId = 0
   let lastTs = 0
 
+  // 現在の表示変換。follow は等倍でタートル位置を画面中央に保つ。
+  function currentView(): View {
+    if (viewMode === 'follow') {
+      const m = markerAt(data, distance)
+      return { scale: 1, cx: m.x, cy: m.y }
+    }
+    return computeView(data.segments, width, height)
+  }
+
   function render(): void {
+    const view = currentView()
     ctx.clearRect(0, 0, width, height)
     if (data.background) {
       ctx.fillStyle = data.background
       ctx.fillRect(0, 0, width, height)
     } else {
-      // 背景指定がなければ方眼を敷く
-      drawGrid(ctx, width, height, GRID_SPACING)
+      // 背景指定がなければ方眼を敷く（view に追従してスクロール）
+      drawGrid(ctx, width, height, GRID_SPACING, view)
     }
-    drawTurtleFrame(ctx, data, width, height, distance)
+    drawTurtleFrame(ctx, data, width, height, distance, view)
     onChange?.({
       playing,
       mode,
+      viewMode,
       atEnd: distance >= total,
       drawn: drawnCount(cumulative, distance),
       count: data.segments.length,
@@ -124,10 +144,15 @@ export function createTurtlePlayer(
     render()
   }
 
+  function setViewMode(next: ViewMode): void {
+    viewMode = next
+    render()
+  }
+
   function destroy(): void {
     stop()
   }
 
   render()
-  return { play, pause, step, reset, destroy }
+  return { play, pause, step, reset, setViewMode, destroy }
 }

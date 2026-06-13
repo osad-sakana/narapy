@@ -45,11 +45,12 @@ export function showTurtleModal(data: TurtleCommands): void {
   const stepBtn = createButton('⏭ ステップ', BTN_SUB)
   const pauseBtn = createButton('⏸ 一時停止', BTN_SUB)
   const resetBtn = createButton('↺ 最初から', BTN_SUB)
+  const viewBtn = createButton('🎯 タートル追従', BTN_SUB)
 
   const progress = document.createElement('span')
   progress.className = 'ml-auto text-xs text-slate-300 font-mono tabular-nums'
 
-  controls.append(playBtn, fastBtn, stepBtn, pauseBtn, resetBtn, progress)
+  controls.append(playBtn, fastBtn, stepBtn, pauseBtn, resetBtn, viewBtn, progress)
 
   header.append(titleEl, closeBtn)
   canvasContainer.appendChild(canvas)
@@ -62,11 +63,16 @@ export function showTurtleModal(data: TurtleCommands): void {
     ? createTurtlePlayer(ctx, data, CANVAS_SIZE, CANVAS_SIZE, (state) => updateControls(state))
     : null
 
+  let viewMode: PlayerState['viewMode'] = 'fit'
+
   function updateControls(state: PlayerState): void {
     progress.textContent = `${state.drawn} / ${state.count} 本`
     pauseBtn.disabled = !state.playing
     pauseBtn.classList.toggle('opacity-40', !state.playing)
     pauseBtn.classList.toggle('cursor-not-allowed', !state.playing)
+    viewMode = state.viewMode
+    // ボタンには「切り替え先」を表示する
+    viewBtn.textContent = state.viewMode === 'follow' ? '🗺 全体表示' : '🎯 タートル追従'
   }
 
   // モーダルを開いたら通常再生で動きを見せる
@@ -77,6 +83,7 @@ export function showTurtleModal(data: TurtleCommands): void {
   stepBtn.addEventListener('click', () => player?.step())
   pauseBtn.addEventListener('click', () => player?.pause())
   resetBtn.addEventListener('click', () => player?.reset())
+  viewBtn.addEventListener('click', () => player?.setViewMode(viewMode === 'follow' ? 'fit' : 'follow'))
 
   const close = (): void => {
     player?.destroy()

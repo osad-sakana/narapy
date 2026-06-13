@@ -44,28 +44,42 @@ export function computeView(
 
 const GRID_MINOR_COLOR = '#e6eaf1'
 const GRID_AXIS_COLOR = '#c3cad6'
+const GRID_MIN_SCREEN_SPACING = 24
 
-// 背景未指定のときに描く方眼。spacing px 間隔で、中央（turtle 原点）に必ず罫線がくるようにする。
+// 背景未指定のときに描く方眼。turtle 座標 spacing 単位ごとに罫線を引き、
+// 原点（0,0）を通る縦横線を中央軸として濃く描く。view に応じてスクロール・拡縮する。
 export function drawGrid(
   ctx: DrawContext,
   width: number,
   height: number,
   spacing: number = 50,
+  view: View = IDENTITY_VIEW,
 ): void {
-  const cx = width / 2
-  const cy = height / 2
+  // 画面上の間隔が狭くなりすぎないよう、必要に応じて spacing を倍化する
+  let step = spacing
+  while (step * view.scale < GRID_MIN_SCREEN_SPACING) step *= 2
+
+  const halfW = width / 2 / view.scale
+  const halfH = height / 2 / view.scale
+  const worldLeft = view.cx - halfW
+  const worldRight = view.cx + halfW
+  const worldBottom = view.cy - halfH
+  const worldTop = view.cy + halfH
 
   ctx.lineWidth = 1
   ctx.strokeStyle = GRID_MINOR_COLOR
-  for (let x = cx; x <= width; x += spacing) verticalLine(ctx, x, height)
-  for (let x = cx - spacing; x >= 0; x -= spacing) verticalLine(ctx, x, height)
-  for (let y = cy; y <= height; y += spacing) horizontalLine(ctx, y, width)
-  for (let y = cy - spacing; y >= 0; y -= spacing) horizontalLine(ctx, y, width)
+  for (let k = Math.ceil(worldLeft / step); k <= Math.floor(worldRight / step); k++) {
+    verticalLine(ctx, turtleToCanvas(k * step, 0, width, height, view).cx, height)
+  }
+  for (let k = Math.ceil(worldBottom / step); k <= Math.floor(worldTop / step); k++) {
+    horizontalLine(ctx, turtleToCanvas(0, k * step, width, height, view).cy, width)
+  }
 
-  // 中央軸（原点を通る縦横線）を少し濃く描く
+  // 原点を通る縦横の中央軸を少し濃く描く（画面内にあるときのみ）
   ctx.strokeStyle = GRID_AXIS_COLOR
-  verticalLine(ctx, cx, height)
-  horizontalLine(ctx, cy, width)
+  const origin = turtleToCanvas(0, 0, width, height, view)
+  if (worldLeft <= 0 && 0 <= worldRight) verticalLine(ctx, origin.cx, height)
+  if (worldBottom <= 0 && 0 <= worldTop) horizontalLine(ctx, origin.cy, width)
 }
 
 function verticalLine(ctx: DrawContext, x: number, height: number): void {
@@ -198,9 +212,9 @@ export function drawTurtleFrame(
   width: number,
   height: number,
   distance: number,
+  view: View = computeView(data.segments, width, height),
 ): void {
   ctx.lineCap = 'round'
-  const view = computeView(data.segments, width, height)
 
   let remaining = distance
   for (const seg of data.segments) {

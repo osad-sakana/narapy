@@ -209,8 +209,17 @@ describe('drawGrid（方眼）', () => {
   it('50px 間隔で罫線が並ぶ（400px なら縦9本+横9本+中央軸2本）', () => {
     const { ctx, calls } = createMockContext()
     drawGrid(ctx, 400, 400, 50)
-    // 縦: 200,150,100,50,0,250,300,350,400 = 9 本 / 横も 9 本 / 中央軸 2 本
+    // 縦: -200..200 を 50 刻み = 9 本 / 横も 9 本 / 中央軸 2 本
     expect(calls.filter((c) => c.method === 'stroke')).toHaveLength(9 + 9 + 2)
+  })
+
+  it('view に応じて方眼がスクロールする（原点軸の位置がずれる）', () => {
+    const { ctx, calls } = createMockContext()
+    // 等倍でタートルが (50,0) にいる追従ビュー → 原点は画面中央より左へ
+    drawGrid(ctx, 400, 400, 50, { scale: 1, cx: 50, cy: 0 })
+    const moveTos = calls.filter((c) => c.method === 'moveTo')
+    // 原点の縦軸は canvasX = 200 + (0 - 50) = 150
+    expect(moveTos.some((c) => c.args[0] === 150 && c.args[1] === 0)).toBe(true)
   })
 })
 

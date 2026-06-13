@@ -60,7 +60,7 @@ export function showTurtleModal(data: TurtleCommands): void {
 
   // createTurtlePlayer はコンストラクタ内で render()→updateControls を同期実行するため、
   // 参照する変数（viewMode）を player 生成より前に初期化しておく。
-  let viewMode: PlayerState['viewMode'] = 'fit'
+  let viewMode: PlayerState['viewMode'] = 'follow'
 
   const ctx = canvas.getContext('2d')
   const player = ctx

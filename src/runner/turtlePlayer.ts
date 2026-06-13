@@ -58,7 +58,7 @@ export function createTurtlePlayer(
   let distance = total // 初期表示は完成形
   let playing = false
   let mode: PlayMode | null = null
-  let viewMode: ViewMode = 'fit'
+  let viewMode: ViewMode = 'follow'
   let speed = 0 // px/秒
   let rafId = 0
   let lastTs = 0

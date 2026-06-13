@@ -58,12 +58,14 @@ export function showTurtleModal(data: TurtleCommands): void {
   backdrop.appendChild(card)
   document.body.appendChild(backdrop)
 
+  // createTurtlePlayer はコンストラクタ内で render()→updateControls を同期実行するため、
+  // 参照する変数（viewMode）を player 生成より前に初期化しておく。
+  let viewMode: PlayerState['viewMode'] = 'fit'
+
   const ctx = canvas.getContext('2d')
   const player = ctx
     ? createTurtlePlayer(ctx, data, CANVAS_SIZE, CANVAS_SIZE, (state) => updateControls(state))
     : null
-
-  let viewMode: PlayerState['viewMode'] = 'fit'
 
   function updateControls(state: PlayerState): void {
     progress.textContent = `${state.drawn} / ${state.count} 本`

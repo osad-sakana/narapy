@@ -86,7 +86,7 @@ let isReady = false
 
 async function initPyodide(): Promise<void> {
   // module worker では importScripts() が禁止のため dynamic import() を使用
-  // SRI 検証（SHA-384）を経由して Blob URL からロードする
+  // SRI 検証（SHA-384）を経て CDN から直接ロードする
   const { loadPyodide } = await verifiedImport(
     `${PYODIDE_CDN}pyodide.mjs`,
     PYODIDE_MJS_HASH,

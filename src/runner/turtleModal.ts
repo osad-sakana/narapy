@@ -69,6 +69,9 @@ export function showTurtleModal(data: TurtleCommands): void {
     pauseBtn.classList.toggle('cursor-not-allowed', !state.playing)
   }
 
+  // モーダルを開いたら通常再生で動きを見せる
+  player?.play('normal')
+
   playBtn.addEventListener('click', () => player?.play('normal'))
   fastBtn.addEventListener('click', () => player?.play('fast'))
   stepBtn.addEventListener('click', () => player?.step())

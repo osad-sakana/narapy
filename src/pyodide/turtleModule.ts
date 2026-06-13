@@ -18,7 +18,30 @@ _pen_color = 'black'
 _pen_width = 1.0
 _visible = True
 _bg_color = None        # 背景色（bgcolor 未指定なら None＝白）
+_colormode = 1.0        # 1.0=RGB 各成分 0..1、255=0..255（標準 turtle 既定は 1.0）
 _segments = []          # {x1,y1,x2,y2,color,width} の配列（turtle 座標）
+
+
+def _rgb_to_css(seq):
+    """(r, g, b) を CSS の rgb(...) 文字列へ変換する。colormode に従う。"""
+    scale = 255.0 / _colormode if _colormode else 1.0
+    comps = []
+    for v in seq[:3]:
+        n = int(round(float(v) * scale))
+        comps.append(max(0, min(255, n)))
+    return 'rgb(%d,%d,%d)' % (comps[0], comps[1], comps[2])
+
+
+def _color_value(args):
+    """color()/pencolor() の引数（文字列・タプル・r,g,b）を CSS 色文字列にする。"""
+    if len(args) >= 3:
+        return _rgb_to_css(args)
+    c = args[0]
+    if isinstance(c, str):
+        return c
+    if isinstance(c, (tuple, list)):
+        return _rgb_to_css(c)
+    return str(c)
 
 
 def _num(value, func):
@@ -75,9 +98,13 @@ def pendown():
     _pen_down = True
 
 
-def color(c):
+def color(*args):
+    # color("red") / color((r,g,b)) / color(r, g, b) に対応。
+    # 2 引数（pen, fill）形式は pen 色のみ採用する。
     global _pen_color
-    _pen_color = str(c)
+    if not args:
+        return
+    _pen_color = _color_value(args)
 
 
 def pensize(n):
@@ -101,9 +128,10 @@ def showturtle():
     _visible = True
 
 
-def bgcolor(c):
+def bgcolor(*args):
     global _bg_color
-    _bg_color = str(c)
+    if args:
+        _bg_color = _color_value(args)
 
 
 def clear():
@@ -113,7 +141,7 @@ def clear():
 
 def reset():
     """描画線を消し、タートルを初期状態に戻す。"""
-    global _x, _y, _heading, _pen_down, _pen_color, _pen_width, _visible, _bg_color
+    global _x, _y, _heading, _pen_down, _pen_color, _pen_width, _visible, _bg_color, _colormode
     _segments.clear()
     _x = 0.0
     _y = 0.0
@@ -123,6 +151,7 @@ def reset():
     _pen_width = 1.0
     _visible = True
     _bg_color = None
+    _colormode = 1.0
 
 
 # 画面・終了系（このプレビューでは画面制御が不要なため no-op）。
@@ -159,8 +188,11 @@ def update(*args, **kwargs):
     pass
 
 
-def colormode(*args, **kwargs):
-    pass
+def colormode(mode=None, *args, **kwargs):
+    global _colormode
+    if mode is not None:
+        _colormode = float(mode)
+    return _colormode
 
 
 class Screen:
@@ -183,7 +215,7 @@ class Screen:
         pass
 
     def colormode(self, *args, **kwargs):
-        pass
+        return colormode(*args, **kwargs)
 
     def mainloop(self, *args, **kwargs):
         pass
@@ -261,8 +293,8 @@ class Turtle:
 
     pd = pendown
 
-    def color(self, c):
-        color(c)
+    def color(self, *args):
+        color(*args)
 
     pencolor = color
 

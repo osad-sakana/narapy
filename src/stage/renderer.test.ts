@@ -5,6 +5,7 @@ import type { StageScene, StageSprite } from './types'
 
 function sprite(overrides: Partial<StageSprite> = {}): StageSprite {
   return {
+    name: 'test',
     x: 0,
     y: 0,
     direction: 0,

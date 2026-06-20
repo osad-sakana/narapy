@@ -12,7 +12,7 @@
 
 import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from '../lib/pyodideLoader'
 import { STAGE_MODULE_SRC } from '../pyodide/stageModule'
-import type { StageInMessage, StageOutMessage, StageScene } from './types'
+import type { StageInMessage, StageOutMessage, StageScene, RunObject } from './types'
 
 interface PyodideInterface {
   runPythonAsync: (code: string) => Promise<unknown>
@@ -41,7 +41,13 @@ _sys.modules['stage'] = _m
 del _m
 `
 
-// ユーザーコード実行後に @on_start を呼ぶ。
+// 1つのゲームオブジェクトのスクリプトを専用名前空間で実行（self 注入）。
+const LOAD_OBJECT_CODE = `
+import sys as _sys
+_sys.modules['stage']._load_object(__obj_name__, __obj_script__)
+`
+
+// 全オブジェクト読み込み後に @on_start を呼ぶ。
 const RUN_START_CODE = `
 import sys as _sys, json as _json
 _stage = _sys.modules['stage']
@@ -116,7 +122,7 @@ async function runFrameLoop(): Promise<void> {
   }
 }
 
-async function run(code: string): Promise<void> {
+async function run(objects: RunObject[]): Promise<void> {
   if (!pyodide || !isReady) {
     post({ type: 'error', payload: 'Pyodide の初期化が完了していません' })
     return
@@ -130,8 +136,18 @@ async function run(code: string): Promise<void> {
     pyodide.globals.set('__stage_src__', STAGE_MODULE_SRC)
     await pyodide.runPythonAsync(REGISTER_STAGE_CODE)
 
-    // ユーザーコード実行（ハンドラ登録・スプライト生成）
-    await pyodide.runPythonAsync(code)
+    // 各ゲームオブジェクトのスクリプトを self 注入付きで読み込む
+    for (const obj of objects) {
+      pyodide.globals.set('__obj_name__', obj.name)
+      pyodide.globals.set('__obj_script__', obj.script)
+      try {
+        await pyodide.runPythonAsync(LOAD_OBJECT_CODE)
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err)
+        post({ type: 'error', payload: `[${obj.name}] ${message}` })
+        return
+      }
+    }
 
     // @on_start を実行し、初期シーンを描画
     const startJson = (await pyodide.runPythonAsync(RUN_START_CODE)) as string
@@ -163,7 +179,7 @@ function setKey(name: string, down: boolean): void {
 self.onmessage = (event: MessageEvent<StageInMessage>) => {
   const msg = event.data
   if (msg.type === 'run') {
-    void initPromise.then(() => run(msg.code))
+    void initPromise.then(() => run(msg.objects))
   } else if (msg.type === 'stop') {
     stopRequested = true
   } else if (msg.type === 'key') {

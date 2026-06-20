@@ -22,11 +22,15 @@ _start_handlers = []    # @on_start で登録された関数
 _update_handlers = []   # @on_update で登録された関数
 _keys = set()           # 現在押されているキー名の集合
 
+# ゲームオブジェクトへ順番に割り当てる色パレット
+_PALETTE = ['#7c3aed', '#22d3ee', '#f472b6', '#a3e635', '#fbbf24', '#f87171']
+
 
 class Sprite:
     """ステージ上のスプライト。PoC では矢印（向きが見える三角形）で描画される。"""
 
     def __init__(self, color='#7c3aed'):
+        self.name = ''
         self.x = 0.0
         self.y = 0.0
         self.direction = 0.0   # 度。0=東、反時計回りが正
@@ -90,11 +94,23 @@ def _set_keys(names):
 
 
 def _call(func, dt):
-    """ハンドラを dt 付き優先で呼ぶ。dt を取らない関数にも対応する。"""
-    try:
+    """ハンドラを呼ぶ。dt を受け取る関数にだけ dt を渡す（引数の有無で判定）。"""
+    code = getattr(func, '__code__', None)
+    if code is not None and code.co_argcount >= 1:
         func(dt)
-    except TypeError:
+    else:
         func()
+
+
+def _load_object(name, script):
+    """1つのゲームオブジェクトのスクリプトを専用名前空間で実行する。
+    名前空間に self（そのオブジェクトのスプライト）を注入する。
+    スクリプト内の @on_start / @on_update は self を閉包したまま共通リストへ登録される。"""
+    sprite = Sprite(color=_PALETTE[len(_sprites) % len(_PALETTE)])
+    sprite.name = str(name)
+    namespace = {'self': sprite, '__name__': '__main__'}
+    exec(script, namespace)
+    return sprite
 
 
 def _run_start():
@@ -116,6 +132,7 @@ def _dump_scene():
         'background': _background,
         'sprites': [
             {
+                'name': s.name,
                 'x': s.x,
                 'y': s.y,
                 'direction': s.direction,

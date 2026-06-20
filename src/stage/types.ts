@@ -4,8 +4,16 @@
 export const STAGE_WIDTH = 480
 export const STAGE_HEIGHT = 360
 
+// ゲームオブジェクト。1オブジェクト = 1スクリプト。
+export interface GameObject {
+  id: string
+  name: string
+  script: string
+}
+
 // 1フレーム分のスプライト状態。stageModule(Python) が _dump_scene() で出力する。
 export interface StageSprite {
+  name: string
   x: number
   y: number
   direction: number // 度。0=東、反時計回りが正
@@ -29,8 +37,14 @@ export type StageOutMessage =
   | { type: 'frame'; scene: StageScene }
   | { type: 'stopped' }
 
+// Worker へ送るゲームオブジェクト（id は不要なので name + script のみ）。
+export interface RunObject {
+  name: string
+  script: string
+}
+
 // メインスレッド → Worker のメッセージ。
 export type StageInMessage =
-  | { type: 'run'; code: string }
+  | { type: 'run'; objects: RunObject[] }
   | { type: 'stop' }
   | { type: 'key'; name: string; down: boolean }

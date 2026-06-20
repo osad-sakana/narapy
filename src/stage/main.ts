@@ -1,38 +1,40 @@
 // Pythonライブステージ PoC のエントリポイント。
-// Monaco エディタ・Canvas ステージ・Worker を結線し、実行/停止とキーボード入力を扱う。
+// ゲームオブジェクト一覧・選択中スクリプトのエディタ・Canvas ステージ・Worker を結線する。
+// 1オブジェクト = 1スクリプト。スクリプトは暗黙の self（そのオブジェクト）を操作する。
 
 import { createEditor, getValue, setValue } from '../editor/index'
 import { appendLog, appendErrorBlock, clearLog } from '../runner/log'
 import { translatePythonError } from '../runner/errorTranslator'
 import { renderScene } from './renderer'
+import { renderObjectList } from './objectList'
+import {
+  createObject,
+  addObject,
+  removeObject,
+  updateScript,
+  findObject,
+} from './objects'
 import { STAGE_WIDTH, STAGE_HEIGHT } from './types'
-import type { StageInMessage, StageOutMessage } from './types'
+import type { GameObject, StageInMessage, StageOutMessage } from './types'
 
-const SAMPLE_CODE = `from stage import Sprite, on_start, on_update, key_pressed, stage
-
-stage(background="#0c1e30")
-
-cat = Sprite()
-cat.size = 140
-
+const PLAYER_SCRIPT = `from stage import on_start, on_update, key_pressed
 
 @on_start
-def setup():
-    cat.goto(0, 0)
-    cat.direction = 90
+def start():
+    self.goto(0, 0)
+    self.size = 140
 
 
 @on_update
-def loop(dt):
+def update(dt):
     if key_pressed("right"):
-        cat.x += 4
+        self.x += 4
     if key_pressed("left"):
-        cat.x -= 4
+        self.x -= 4
     if key_pressed("up"):
-        cat.y += 4
+        self.y += 4
     if key_pressed("down"):
-        cat.y -= 4
-    cat.turn(3)
+        self.y -= 4
 `
 
 // 物理キー → ステージのキー名。
@@ -50,7 +52,7 @@ function toKeyName(e: KeyboardEvent): string | null {
 
 function main(): void {
   const editor = createEditor(document.getElementById('codeEditor') as HTMLElement)
-  setValue(editor, SAMPLE_CODE)
+  const objectListEl = document.getElementById('objectList') as HTMLElement
 
   const canvas = document.getElementById('stageCanvas') as HTMLCanvasElement
   canvas.width = STAGE_WIDTH
@@ -60,14 +62,63 @@ function main(): void {
 
   const runBtn = document.getElementById('runBtn') as HTMLButtonElement
   const stopBtn = document.getElementById('stopBtn') as HTMLButtonElement
-
   const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
 
+  // --- 状態（不変更新） ---
+  let objects: GameObject[] = [createObject('player', PLAYER_SCRIPT)]
+  let activeId: string = objects[0].id
   let running = false
+  // プログラム的なエディタ書き込み中フラグ（オブジェクト切替時の変更通知を抑制）
+  let isSyncingEditor = false
 
   function send(message: StageInMessage): void {
     worker.postMessage(message)
   }
+
+  function refreshList(): void {
+    renderObjectList(objectListEl, objects, activeId, {
+      onSelect: selectObject,
+      onAdd: addNewObject,
+      onDelete: deleteObject,
+    })
+  }
+
+  function loadActiveIntoEditor(): void {
+    const active = findObject(objects, activeId)
+    isSyncingEditor = true
+    setValue(editor, active ? active.script : '')
+    isSyncingEditor = false
+  }
+
+  function selectObject(id: string): void {
+    if (id === activeId) return
+    activeId = id
+    loadActiveIntoEditor()
+    refreshList()
+  }
+
+  function addNewObject(): void {
+    objects = addObject(objects, 'object')
+    activeId = objects[objects.length - 1].id
+    loadActiveIntoEditor()
+    refreshList()
+  }
+
+  function deleteObject(id: string): void {
+    if (objects.length <= 1) return // 最低1つは残す
+    objects = removeObject(objects, id)
+    if (activeId === id) {
+      activeId = objects[0].id
+      loadActiveIntoEditor()
+    }
+    refreshList()
+  }
+
+  // エディタ編集はアクティブオブジェクトのスクリプトへ反映
+  editor.onDidChangeModelContent(() => {
+    if (isSyncingEditor) return
+    objects = updateScript(objects, activeId, getValue(editor))
+  })
 
   function setRunning(next: boolean): void {
     running = next
@@ -110,7 +161,10 @@ function main(): void {
     if (running) return
     clearLog()
     setRunning(true)
-    send({ type: 'run', code: getValue(editor) })
+    send({
+      type: 'run',
+      objects: objects.map((o) => ({ name: o.name, script: o.script })),
+    })
   })
 
   stopBtn.addEventListener('click', () => {
@@ -133,7 +187,9 @@ function main(): void {
     send({ type: 'key', name, down: false })
   })
 
-  // 初期状態: ready が来るまで実行不可。
+  // 初期表示
+  loadActiveIntoEditor()
+  refreshList()
   runBtn.disabled = true
   stopBtn.disabled = true
   appendLog('Pyodide を初期化中…', 'info')

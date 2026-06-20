@@ -1,28 +1,22 @@
-# 複数スプライトを同時に動かすサンプル。
-# それぞれ向きと速度が違う矢印が円弧を描くように進む。
-from stage import Sprite, on_start, on_update, stage
+# 複数オブジェクトの作り方メモ:
+#   右下の「＋ オブジェクトを追加」で増やし、各オブジェクトに別々のスクリプトを貼る。
+#   それぞれの self はそのオブジェクト自身を指す。
+#
+# 下はその一例（壁の手前で向きを変えてウロウロする）。別オブジェクトに貼ると同時に動く。
+from stage import on_start, on_update
 
-stage(background="#08131f")
-
-# 色・初期位置・回転速度の異なる3体を生成
-sprites = [
-    Sprite(color="#f472b6"),
-    Sprite(color="#a3e635"),
-    Sprite(color="#fbbf24"),
-]
-turn_speeds = [2, -3, 4]
+HALF_W = 240
 
 
 @on_start
-def setup():
-    for i, s in enumerate(sprites):
-        s.goto(-120 + i * 120, 0)
-        s.direction = 90
-        s.size = 120
+def start():
+    self.goto(0, 0)
+    self.direction = 0
+    self.size = 120
 
 
 @on_update
-def loop(dt):
-    for s, turn_speed in zip(sprites, turn_speeds):
-        s.move(3)        # 向いている方向へ進む
-        s.turn(turn_speed)
+def update(dt):
+    self.move(3)
+    if self.x > HALF_W - 20 or self.x < -HALF_W + 20:
+        self.direction = (self.direction + 180) % 360

@@ -1,27 +1,23 @@
-# 矢印キーでスプライトを動かす基本サンプル。
-# 実行後、ステージにフォーカスして矢印キーを押す。
-from stage import Sprite, on_start, on_update, key_pressed, stage
-
-stage(background="#0c1e30")
-
-player = Sprite()
-player.size = 140
+# 矢印キーで自分(self)を動かすオブジェクトスクリプト。
+# self = このオブジェクトのスプライト。実行後ステージにフォーカスして矢印キーを押す。
+from stage import on_start, on_update, key_pressed
 
 
 @on_start
-def setup():
-    player.goto(0, 0)
-    player.direction = 90  # 上向き
+def start():
+    self.goto(0, 0)
+    self.direction = 90  # 上向き
+    self.size = 140
 
 
 @on_update
-def loop(dt):
+def update(dt):
     speed = 4
     if key_pressed("right"):
-        player.x += speed
+        self.x += speed
     if key_pressed("left"):
-        player.x -= speed
+        self.x -= speed
     if key_pressed("up"):
-        player.y += speed
+        self.y += speed
     if key_pressed("down"):
-        player.y -= speed
+        self.y -= speed

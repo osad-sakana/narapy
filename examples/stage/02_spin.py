@@ -1,12 +1,12 @@
-# 毎フレーム回転し続けるサンプル。フレームループとturn()の確認用。
-from stage import Sprite, on_update, stage
+# 毎フレーム回転し続けるオブジェクトスクリプト。フレームループの確認用。
+from stage import on_start, on_update
 
-stage(background="black")
 
-arrow = Sprite(color="#22d3ee")
-arrow.size = 200
+@on_start
+def start():
+    self.size = 200
 
 
 @on_update
-def loop(dt):
-    arrow.turn(3)  # 反時計回りに3度/フレーム
+def update(dt):
+    self.turn(3)  # 反時計回りに3度/フレーム

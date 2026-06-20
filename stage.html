@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- GitHub Pages では COOP/COEP ヘッダーを設定できないため Service Worker で代替 -->
+    <script src="%BASE_URL%coi-serviceworker.js"></script>
+    <title>Narapy Stage — Python Live Sprite (PoC)</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=0xProto:ital,wght@0,400;0,700;1,400&family=BIZ+UDPGothic:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body class="bg-[#08080d] text-slate-100 h-screen flex flex-col overflow-hidden font-sans">
+
+    <!-- ヘッダー -->
+    <header class="flex items-center justify-between px-6 py-3 bg-[#110826] border-b border-purple-900/50 shrink-0">
+      <div class="flex items-center gap-3">
+        <img src="/favicon.svg" alt="Narapy" class="w-8 h-8 select-none" draggable="false" />
+        <span class="text-lg font-bold tracking-tight text-purple-100">Narapy Stage</span>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+          Live Sprite PoC
+        </span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          id="stopBtn"
+          class="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors shadow-md shadow-red-900/50 cursor-pointer"
+        >
+          ■ 停止
+        </button>
+        <button
+          id="runBtn"
+          class="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 active:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors shadow-md shadow-violet-900/50 cursor-pointer"
+        >
+          ▶ 実行
+        </button>
+      </div>
+    </header>
+
+    <!-- メインエリア（2カラム） -->
+    <main class="flex flex-1 overflow-hidden">
+
+      <!-- 左カラム: ステージ -->
+      <section class="flex flex-col items-center justify-center shrink-0 w-[520px] border-r border-sky-700/50 bg-[#060d16] p-5">
+        <div class="flex items-center gap-2.5 self-start mb-3">
+          <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse shrink-0"></span>
+          <span class="text-xs font-bold text-sky-300 uppercase tracking-widest">ステージ</span>
+        </div>
+        <canvas
+          id="stageCanvas"
+          class="rounded-lg border border-sky-800/60 shadow-lg shadow-sky-900/30 bg-black"
+        ></canvas>
+        <p class="text-xs text-slate-500 mt-3 self-start">
+          矢印キーで移動 / 実行中はステージにフォーカス
+        </p>
+      </section>
+
+      <!-- 右カラム: エディタ + ログ -->
+      <section class="flex flex-col flex-1 min-w-0">
+
+        <!-- エディタ -->
+        <div class="flex flex-col flex-1 min-h-0 overflow-hidden border-b border-violet-700/50 bg-[#0c0818]">
+          <div class="flex items-center gap-2.5 px-4 py-2.5 bg-[#180a2e] border-b border-violet-700/50 border-l-4 border-l-violet-400 shrink-0">
+            <svg class="w-3.5 h-3.5 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+            </svg>
+            <span class="text-xs font-bold text-violet-300 uppercase tracking-widest">Python エディタ</span>
+          </div>
+          <div id="codeEditor" class="flex-1 w-full min-h-0"></div>
+        </div>
+
+        <!-- ログ -->
+        <div class="flex flex-col h-44 overflow-hidden bg-[#060f0b]">
+          <div class="flex items-center gap-2.5 px-4 py-2.5 bg-[#091c12] border-b border-emerald-700/50 border-l-4 border-l-emerald-400 shrink-0">
+            <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+            </svg>
+            <span class="text-xs font-bold text-emerald-300 uppercase tracking-widest">実行ログ</span>
+          </div>
+          <div
+            id="outputLog"
+            class="flex-1 overflow-y-auto p-4 font-mono text-sm text-slate-300 bg-[#060f0b] leading-relaxed"
+          >
+            <span class="text-slate-600 italic">実行結果がここに表示されます…</span>
+          </div>
+        </div>
+
+      </section>
+    </main>
+
+    <script type="module" src="/src/stage/main.ts"></script>
+  </body>
+</html>

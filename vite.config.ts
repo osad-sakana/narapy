@@ -53,6 +53,13 @@ export default defineConfig({
 
   build: {
     target: 'esnext',
+    rollupOptions: {
+      // メインアプリ(index.html)に加え、ステージ PoC(stage.html)も同梱する
+      input: {
+        main: 'index.html',
+        stage: 'stage.html',
+      },
+    },
   },
 
   optimizeDeps: {

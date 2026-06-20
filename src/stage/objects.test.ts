@@ -7,6 +7,9 @@ import {
   updateScript,
   renameObject,
   findObject,
+  setCostume,
+  removeCostume,
+  updateCostume,
 } from './objects'
 import type { GameObject } from './types'
 
@@ -79,5 +82,39 @@ describe('findObject', () => {
     const objs = seed()
     expect(findObject(objs, objs[0].id)?.name).toBe('player')
     expect(findObject(objs, 'missing')).toBeUndefined()
+  })
+})
+
+describe('costume 操作', () => {
+  it('setCostume は加工オフのコスチュームを付ける（不変）', () => {
+    const objs = seed()
+    const next = setCostume(objs, objs[0].id, 'data:image/png;base64,AAAA')
+    expect(next[0].costume).toEqual({
+      src: 'data:image/png;base64,AAAA',
+      flipH: false,
+      flipV: false,
+      transparent: false,
+    })
+    expect(objs[0].costume).toBeUndefined()
+  })
+
+  it('updateCostume は src を保ったまま加工設定を部分更新する', () => {
+    const base = seed()
+    const objs = setCostume(base, base[0].id, 'x')
+    const next = updateCostume(objs, base[0].id, { flipH: true, transparent: true })
+    expect(next[0].costume).toMatchObject({ flipH: true, flipV: false, transparent: true, src: 'x' })
+  })
+
+  it('costume が無いオブジェクトに updateCostume は何もしない', () => {
+    const objs = seed()
+    const next = updateCostume(objs, objs[0].id, { flipH: true })
+    expect(next[0].costume).toBeUndefined()
+  })
+
+  it('removeCostume はコスチュームを外す（矢印へ戻る）', () => {
+    const base = seed()
+    const withCostume = setCostume(base, base[0].id, 'x')
+    const next = removeCostume(withCostume, base[0].id)
+    expect(next[0].costume).toBeUndefined()
   })
 })

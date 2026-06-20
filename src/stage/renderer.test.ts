@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { toCanvasX, toCanvasY, arrowPoints, renderScene } from './renderer'
+import type { CostumeView } from './renderer'
 import { STAGE_WIDTH, STAGE_HEIGHT } from './types'
 import type { StageScene, StageSprite } from './types'
 
@@ -68,8 +69,21 @@ describe('renderScene', () => {
       lineTo: vi.fn(),
       closePath: vi.fn(),
       fill: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      translate: vi.fn(),
+      rotate: vi.fn(),
+      scale: vi.fn(),
+      drawImage: vi.fn(),
     } as unknown as CanvasRenderingContext2D & Record<string, ReturnType<typeof vi.fn>>
   }
+
+  const view = (overrides: Partial<CostumeView> = {}): CostumeView => ({
+    image: { width: 100, height: 50 } as unknown as CanvasImageSource,
+    flipH: false,
+    flipV: false,
+    ...overrides,
+  })
 
   const scene = (sprites: StageSprite[]): StageScene => ({ background: '#000000', sprites })
 
@@ -93,5 +107,29 @@ describe('renderScene', () => {
     const ctx = fakeCtx()
     renderScene(ctx, scene([sprite({ visible: false })]))
     expect(ctx.beginPath).not.toHaveBeenCalled()
+  })
+
+  it('コスチュームがあれば矢印でなく画像を描く', () => {
+    const ctx = fakeCtx()
+    const lookup = (name: string) => (name === 'test' ? view() : undefined)
+    renderScene(ctx, scene([sprite()]), lookup)
+    expect(ctx.drawImage).toHaveBeenCalledTimes(1)
+    expect(ctx.beginPath).not.toHaveBeenCalled() // 矢印は描かれない
+    expect(ctx.rotate).toHaveBeenCalledTimes(1)
+  })
+
+  it('コスチューム未登録の名前は矢印にフォールバックする', () => {
+    const ctx = fakeCtx()
+    const lookup = () => undefined
+    renderScene(ctx, scene([sprite()]), lookup)
+    expect(ctx.drawImage).not.toHaveBeenCalled()
+    expect(ctx.beginPath).toHaveBeenCalledTimes(1)
+  })
+
+  it('反転設定は ctx.scale に反映される', () => {
+    const ctx = fakeCtx()
+    const lookup = () => view({ flipH: true, flipV: false })
+    renderScene(ctx, scene([sprite()]), lookup)
+    expect(ctx.scale).toHaveBeenCalledWith(-1, 1)
   })
 })

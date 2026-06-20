@@ -1,7 +1,7 @@
 // ゲームオブジェクトのストア。1オブジェクト = 1スクリプト。
 // 状態は不変に扱い、全操作が新しい配列/オブジェクトを返す純関数。
 
-import type { GameObject } from './types'
+import type { GameObject, Costume } from './types'
 
 // 暗黙self（Scratch風）の新規オブジェクト用テンプレート。
 export function defaultScript(): string {
@@ -68,4 +68,37 @@ export function findObject(
   id: string,
 ): GameObject | undefined {
   return objects.find((o) => o.id === id)
+}
+
+// 画像を読み込んでコスチュームを設定（加工は初期値オフ）。
+export function setCostume(
+  objects: readonly GameObject[],
+  id: string,
+  src: string,
+): GameObject[] {
+  const costume: Costume = { src, flipH: false, flipV: false, transparent: false }
+  return objects.map((o) => (o.id === id ? { ...o, costume } : o))
+}
+
+// コスチュームを外す（矢印描画へ戻す）。
+export function removeCostume(
+  objects: readonly GameObject[],
+  id: string,
+): GameObject[] {
+  return objects.map((o) => {
+    if (o.id !== id) return o
+    const { costume: _removed, ...rest } = o
+    return rest
+  })
+}
+
+// コスチュームの加工設定を部分更新（反転・透過トグルなど）。
+export function updateCostume(
+  objects: readonly GameObject[],
+  id: string,
+  patch: Partial<Omit<Costume, 'src'>>,
+): GameObject[] {
+  return objects.map((o) =>
+    o.id === id && o.costume ? { ...o, costume: { ...o.costume, ...patch } } : o,
+  )
 }

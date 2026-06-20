@@ -23,8 +23,19 @@ function buildItem(
   item.className = `${ITEM_BASE} ${obj.id === activeId ? ITEM_ACTIVE : ITEM_IDLE}`
   item.addEventListener('click', () => callbacks.onSelect(obj.id))
 
-  const dot = document.createElement('span')
-  dot.className = 'w-2 h-2 rounded-full bg-violet-400 shrink-0'
+  // コスチュームがあればサムネイル、無ければドット
+  const icon = document.createElement('span')
+  icon.className = 'shrink-0 flex items-center justify-center'
+  if (obj.costume) {
+    const thumb = document.createElement('img')
+    thumb.src = obj.costume.src
+    thumb.className = 'w-5 h-5 object-contain rounded-sm'
+    icon.appendChild(thumb)
+  } else {
+    const dot = document.createElement('span')
+    dot.className = 'w-2 h-2 rounded-full bg-violet-400'
+    icon.appendChild(dot)
+  }
 
   const label = document.createElement('span')
   label.textContent = obj.name
@@ -40,7 +51,7 @@ function buildItem(
     callbacks.onDelete(obj.id)
   })
 
-  item.append(dot, label, del)
+  item.append(icon, label, del)
   return item
 }
 

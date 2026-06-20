@@ -4,11 +4,21 @@
 export const STAGE_WIDTH = 480
 export const STAGE_HEIGHT = 360
 
-// ゲームオブジェクト。1オブジェクト = 1スクリプト。
+// コスチューム（オブジェクトの見た目画像）。src は元画像の data URL。
+// flipH/flipV は描画時に適用、transparent は白背景の透過処理。
+export interface Costume {
+  src: string
+  flipH: boolean
+  flipV: boolean
+  transparent: boolean
+}
+
+// ゲームオブジェクト。1オブジェクト = 1スクリプト。costume が無ければ矢印で描画。
 export interface GameObject {
   id: string
   name: string
   script: string
+  costume?: Costume
 }
 
 // 1フレーム分のスプライト状態。stageModule(Python) が _dump_scene() で出力する。

@@ -1,5 +1,5 @@
 import { KeyMod, KeyCode } from 'monaco-editor'
-import { initLayout } from './layout/index'
+import { initLayout, isBlocklyPanelHidden, onBlocklyPanelVisibilityChange } from './layout/index'
 import { applyBlocklyMessages } from './blockly/messages'
 import { createWorkspace, isSyncingFromPython } from './blockly/workspace'
 import { setTooltipsEnabled, isTooltipsEnabled } from './blockly/tooltips'
@@ -7,6 +7,7 @@ import { loadWasm, triggerValidation } from './runner/validator'
 import { initRunner } from './runner/index'
 import { applyPythonToWorkspace } from './converter/index'
 import { createDebounced } from './converter/debounce'
+import { shouldConvert, shouldResyncOnReveal, type ActiveSource } from './converter/conversionGuard'
 import { createEditor, getValue, setValue } from './editor/index'
 import { initFontSizeControls } from './editor/fontSize'
 import { downloadNarapyProject, openNarapyFilePicker } from './fileio/index'
@@ -35,7 +36,6 @@ const editorContainer = document.getElementById('codeEditor') as HTMLElement
 const editor = createEditor(editorContainer)
 
 // --- アクティブパネル管理 ---
-type ActiveSource = 'blockly' | 'editor'
 let activeSource: ActiveSource = 'blockly'
 
 // プログラム的なエディタ書き込み中フラグ（Blocklyやファイル切替など）
@@ -101,9 +101,21 @@ const workspace = createWorkspace((code) => {
 })
 
 // Python→Blockly変換（300msデバウンス）
+// Blocklyパネルが非表示の間は無駄な変換を行わない
 const debouncedConvert = createDebounced((source: string) => {
+  if (!shouldConvert(isBlocklyPanelHidden())) return
   void applyPythonToWorkspace(source, workspace)
 }, 300)
+
+// Blocklyパネルが再表示された時、非表示中に編集された可能性のある
+// 最新のPythonコードで一度だけ再同期する
+onBlocklyPanelVisibilityChange((hidden) => {
+  if (shouldResyncOnReveal(hidden, activeSource)) {
+    // 非表示中に仕込まれた保留中の変換と二重実行にならないようキャンセルする
+    debouncedConvert.cancel()
+    void applyPythonToWorkspace(getValue(editor), workspace)
+  }
+})
 
 // --- エディタ変更 ---
 editor.onDidChangeModelContent(() => {

@@ -25,6 +25,20 @@ const BTN_ACTIVE: Record<'blockly' | 'python' | 'log', string> = {
 }
 const BTN_INACTIVE = 'text-xs px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer text-slate-600 border border-transparent hover:text-slate-400'
 
+// Blocklyパネルの表示状態（Python→Blockly変換を行うべきかの判定に使う）
+let blocklyPanelHidden = false
+let blocklyVisibilityListener: ((hidden: boolean) => void) | null = null
+
+export function isBlocklyPanelHidden(): boolean {
+  return blocklyPanelHidden
+}
+
+// initLayout() の呼び出しタイミングを変えずに済むよう、
+// 可視性変化の通知先はコールバック引数ではなくリスナー登録で分離する
+export function onBlocklyPanelVisibilityChange(listener: (hidden: boolean) => void): void {
+  blocklyVisibilityListener = listener
+}
+
 function load(): LayoutState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -43,10 +57,19 @@ function save(patch: Partial<LayoutState>): void {
 export function initLayout(): void {
   const state = load()
 
+  blocklyPanelHidden = state.blocklyCollapsed
+
   const blocklyPanel = document.getElementById('blocklyPanel') as HTMLElement
   const rightPanel   = document.getElementById('rightPanel')   as HTMLElement
   const emptyMessage = document.getElementById('emptyMessage') as HTMLElement
   const mainEl       = document.querySelector('main')          as HTMLElement
+
+  function setBlocklyCollapsed(next: boolean): void {
+    blocklyCollapsed = next
+    if (blocklyPanelHidden === next) return
+    blocklyPanelHidden = next
+    blocklyVisibilityListener?.(next)
+  }
 
   const hSplit = Split(['#blocklyPanel', '#rightPanel'], {
     sizes: state.horizontal,
@@ -57,7 +80,7 @@ export function initLayout(): void {
     cursor: 'col-resize',
     gutterStyle: () => ({ 'flex-shrink': '0' }),
     onDragEnd: (sizes) => {
-      blocklyCollapsed = sizes[0] < 5
+      setBlocklyCollapsed(sizes[0] < 5)
       save({ horizontal: [sizes[0], sizes[1]], blocklyCollapsed })
       updateAll()
       window.dispatchEvent(new Event('resize'))
@@ -129,7 +152,7 @@ export function initLayout(): void {
 
   // --- ブロックトグル ---
   blocklyBtn.addEventListener('click', () => {
-    blocklyCollapsed = !blocklyCollapsed
+    setBlocklyCollapsed(!blocklyCollapsed)
     if (blocklyCollapsed) {
       hSplit.collapse(0)
     } else {

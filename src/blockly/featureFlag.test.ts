@@ -18,4 +18,12 @@ describe('isBlocklyEnabled', () => {
   it('他のパラメータと併存していても判定できる', () => {
     expect(isBlocklyEnabled('?project=foo&blockly=1')).toBe(true)
   })
+
+  it('値のない空パラメータでは無効', () => {
+    expect(isBlocklyEnabled('?blockly')).toBe(false)
+  })
+
+  it('パラメータが重複している場合は最初の値が使われる', () => {
+    expect(isBlocklyEnabled('?blockly=0&blockly=1')).toBe(false)
+  })
 })

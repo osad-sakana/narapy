@@ -39,6 +39,11 @@ export function onBlocklyPanelVisibilityChange(listener: (hidden: boolean) => vo
   blocklyVisibilityListener = listener
 }
 
+// Blockly無効時はパネル自体が存在しないため、保存状態によらず常に折りたたみ扱いにする
+export function resolveBlocklyCollapsed(blocklyEnabled: boolean, savedCollapsed: boolean): boolean {
+  return blocklyEnabled ? savedCollapsed : true
+}
+
 function load(): LayoutState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -57,7 +62,7 @@ function save(patch: Partial<LayoutState>): void {
 export function initLayout(blocklyEnabled: boolean): void {
   const state = load()
 
-  blocklyPanelHidden = blocklyEnabled ? state.blocklyCollapsed : true
+  blocklyPanelHidden = resolveBlocklyCollapsed(blocklyEnabled, state.blocklyCollapsed)
 
   const blocklyPanel = document.getElementById('blocklyPanel') as HTMLElement
   const rightPanel   = document.getElementById('rightPanel')   as HTMLElement
@@ -112,7 +117,7 @@ export function initLayout(blocklyEnabled: boolean): void {
   const hGutter = mainEl.querySelector<HTMLElement>('.gutter.gutter-horizontal')
 
   let { blocklyCollapsed, editorCollapsed, logCollapsed } = state
-  if (!blocklyEnabled) blocklyCollapsed = true
+  blocklyCollapsed = resolveBlocklyCollapsed(blocklyEnabled, blocklyCollapsed)
 
   const blocklyBtn = document.getElementById('panelToggleBlockly') as HTMLElement
   const pythonBtn  = document.getElementById('panelTogglePython')  as HTMLElement

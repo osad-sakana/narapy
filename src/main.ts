@@ -1,11 +1,8 @@
 import { KeyMod, KeyCode } from 'monaco-editor'
 import { initLayout, isBlocklyPanelHidden, onBlocklyPanelVisibilityChange } from './layout/index'
-import { applyBlocklyMessages } from './blockly/messages'
-import { createWorkspace, isSyncingFromPython } from './blockly/workspace'
-import { setTooltipsEnabled, isTooltipsEnabled } from './blockly/tooltips'
+import { isBlocklyEnabled } from './blockly/featureFlag'
 import { loadWasm, triggerValidation } from './runner/validator'
 import { initRunner } from './runner/index'
-import { applyPythonToWorkspace } from './converter/index'
 import { createDebounced } from './converter/debounce'
 import { shouldConvert, shouldResyncOnReveal, type ActiveSource } from './converter/conversionGuard'
 import { createEditor, getValue, setValue } from './editor/index'
@@ -26,8 +23,10 @@ import {
   getDirectories,
 } from './explorer/store'
 
-applyBlocklyMessages()
-initLayout()
+// Blocklyはデフォルトで無効。?blockly=1 のときのみ初期化・変換を行う（issue #31）
+const blocklyEnabled = isBlocklyEnabled()
+
+initLayout(blocklyEnabled)
 
 await initStore()
 
@@ -64,6 +63,11 @@ function setActiveSource(source: ActiveSource): void {
   }
 }
 
+// Blockly無効時はパネルが存在しないため、常にエディタをアクティブ扱いにする
+if (!blocklyEnabled) {
+  setActiveSource('editor')
+}
+
 function codeEqual(a: string, b: string): boolean {
   return a.trimEnd() === b.trimEnd()
 }
@@ -88,34 +92,77 @@ function switchToFile(path: string): void {
   }
 }
 
-// --- Blockly ワークスペース ---
-const workspace = createWorkspace((code) => {
-  if (activeSource === 'editor') return
-  if (codeEqual(getValue(editor), code)) return
-  isSyncingEditor = true
-  setValue(editor, code)
-  isSyncingEditor = false
-  // Blockly 生成コードをストアにも反映
-  updateFileContent(getActiveFile(), code)
-  void triggerValidation(code)
-})
+// Python→Blockly変換（300msデバウンス）。Blockly無効時は常にno-op
+let debouncedConvert: { call: (source: string) => void; cancel: () => void } = {
+  call: () => {},
+  cancel: () => {},
+}
 
-// Python→Blockly変換（300msデバウンス）
-// Blocklyパネルが非表示の間は無駄な変換を行わない
-const debouncedConvert = createDebounced((source: string) => {
-  if (!shouldConvert(isBlocklyPanelHidden())) return
-  void applyPythonToWorkspace(source, workspace)
-}, 300)
+// --- Blockly ワークスペース（?blockly=1 のときのみ初期化・変換を行う） ---
+if (blocklyEnabled) {
+  const { applyBlocklyMessages } = await import('./blockly/messages')
+  const { createWorkspace, isSyncingFromPython } = await import('./blockly/workspace')
+  const { applyPythonToWorkspace } = await import('./converter/index')
+  const { setTooltipsEnabled, isTooltipsEnabled } = await import('./blockly/tooltips')
 
-// Blocklyパネルが再表示された時、非表示中に編集された可能性のある
-// 最新のPythonコードで一度だけ再同期する
-onBlocklyPanelVisibilityChange((hidden) => {
-  if (shouldResyncOnReveal(hidden, activeSource)) {
-    // 非表示中に仕込まれた保留中の変換と二重実行にならないようキャンセルする
+  applyBlocklyMessages()
+
+  const workspace = createWorkspace((code) => {
+    if (activeSource === 'editor') return
+    if (codeEqual(getValue(editor), code)) return
+    isSyncingEditor = true
+    setValue(editor, code)
+    isSyncingEditor = false
+    // Blockly 生成コードをストアにも反映
+    updateFileContent(getActiveFile(), code)
+    void triggerValidation(code)
+  })
+
+  // Blocklyパネルが非表示の間は無駄な変換を行わない
+  debouncedConvert = createDebounced((source: string) => {
+    if (!shouldConvert(isBlocklyPanelHidden())) return
+    void applyPythonToWorkspace(source, workspace)
+  }, 300)
+
+  // Blocklyパネルが再表示された時、非表示中に編集された可能性のある
+  // 最新のPythonコードで一度だけ再同期する
+  onBlocklyPanelVisibilityChange((hidden) => {
+    if (shouldResyncOnReveal(hidden, activeSource)) {
+      // 非表示中に仕込まれた保留中の変換と二重実行にならないようキャンセルする
+      debouncedConvert.cancel()
+      void applyPythonToWorkspace(getValue(editor), workspace)
+    }
+  })
+
+  // capture: true でBlockly内部のstopPropagationを回避して確実に捕捉する
+  const blocklyDiv = document.getElementById('blocklyDiv') as HTMLElement
+  blocklyDiv.addEventListener('mousedown', () => {
+    setActiveSource('blockly')
     debouncedConvert.cancel()
-    void applyPythonToWorkspace(getValue(editor), workspace)
-  }
-})
+  }, { capture: true })
+  blocklyDiv.addEventListener('touchstart', () => {
+    setActiveSource('blockly')
+    debouncedConvert.cancel()
+  }, { capture: true, passive: true })
+
+  // Blocklyの実際の変更（値変更・移動・追加・削除）でアクティブを確定してデバウンスをキャンセル
+  workspace.addChangeListener((event) => {
+    if (!event.isUiEvent && !isSyncingFromPython()) {
+      setActiveSource('blockly')
+      debouncedConvert.cancel()
+    }
+  })
+
+  // --- ヒントトグル ---
+  const hintToggleBtn = document.getElementById('hintToggleBtn') as HTMLButtonElement
+  hintToggleBtn.addEventListener('click', () => {
+    const next = !isTooltipsEnabled()
+    setTooltipsEnabled(next)
+    hintToggleBtn.className = next
+      ? 'flex items-center gap-1 text-xs text-sky-400 hover:text-sky-200 transition-colors cursor-pointer'
+      : 'flex items-center gap-1 text-xs text-sky-800 hover:text-sky-600 transition-colors cursor-pointer'
+  })
+}
 
 // --- エディタ変更 ---
 editor.onDidChangeModelContent(() => {
@@ -128,41 +175,11 @@ editor.onDidChangeModelContent(() => {
   debouncedConvert.call(source)
 })
 
-// --- Blockly 操作 ---
-// capture: true でBlockly内部のstopPropagationを回避して確実に捕捉する
-const blocklyDiv = document.getElementById('blocklyDiv') as HTMLElement
-blocklyDiv.addEventListener('mousedown', () => {
-  setActiveSource('blockly')
-  debouncedConvert.cancel()
-}, { capture: true })
-blocklyDiv.addEventListener('touchstart', () => {
-  setActiveSource('blockly')
-  debouncedConvert.cancel()
-}, { capture: true, passive: true })
-
-// Blocklyの実際の変更（値変更・移動・追加・削除）でアクティブを確定してデバウンスをキャンセル
-workspace.addChangeListener((event) => {
-  if (!event.isUiEvent && !isSyncingFromPython()) {
-    setActiveSource('blockly')
-    debouncedConvert.cancel()
-  }
-})
-
 // --- キーボードショートカット ---
 editor.addCommand(
   KeyMod.CtrlCmd | KeyCode.Enter,
   () => document.getElementById('runBtn')?.click(),
 )
-
-// --- ヒントトグル ---
-const hintToggleBtn = document.getElementById('hintToggleBtn') as HTMLButtonElement
-hintToggleBtn.addEventListener('click', () => {
-  const next = !isTooltipsEnabled()
-  setTooltipsEnabled(next)
-  hintToggleBtn.className = next
-    ? 'flex items-center gap-1 text-xs text-sky-400 hover:text-sky-200 transition-colors cursor-pointer'
-    : 'flex items-center gap-1 text-xs text-sky-800 hover:text-sky-600 transition-colors cursor-pointer'
-})
 
 // --- ファイルエクスプローラー初期化 ---
 const explorerContainer = document.getElementById('fileExplorer') as HTMLElement

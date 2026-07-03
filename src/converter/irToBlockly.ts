@@ -256,6 +256,15 @@ function producesStringBlock(node: IrNode): boolean {
   return false
 }
 
+// 左結合でネストした ADD 連鎖（"a" + "b" + "c" → BinOp(ADD, BinOp(ADD, a, b), c)）を
+// 平坦なノード配列に正規化する
+function flattenAddChain(node: IrNode): IrNode[] {
+  if (node.type === 'BinOp' && node.op === 'ADD') {
+    return [...flattenAddChain(node.left), ...flattenAddChain(node.right)]
+  }
+  return [node]
+}
+
 // 式ノード → BlockJson（value inputに入れるブロック）
 function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
   switch (node.type) {
@@ -320,16 +329,28 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
         },
       }
 
-    case 'BinOp':
-      // ADD で一方以上が StrLit の場合は文字列連結ブロック（text_join）を使う。
-      if (node.op === 'ADD' && (node.left.type === 'StrLit' || node.right.type === 'StrLit')) {
-        return {
-          type: 'text_join',
-          extraState: { itemCount: 2 },
-          inputs: {
-            ADD0: { block: exprToBlock(node.left, getVarId) },
-            ADD1: { block: exprToBlock(node.right, getVarId) },
-          },
+    case 'BinOp': {
+      // ADD の連鎖にひとつでも文字列系の項が含まれる場合、連鎖全体を平坦化して
+      // 単一の N 項 text_join（文字列連結ブロック）にする。
+      // ("name" + "age" + "は" のような左結合ネストを nested text_join にすると
+      //  再生成された Python が壊れて実行できなくなるため、必ず平坦化する)
+      if (node.op === 'ADD') {
+        const addends = flattenAddChain(node)
+        // producesStringBlock と異なり Unsupported は文字列扱いしない
+        // （Unsupported 同士の ADD は text_join より math_arithmetic の方が実態に近いため）
+        const isStringConcat = addends.some(
+          (a) => a.type === 'StrLit' || a.type === 'FStringLit'
+        )
+        if (isStringConcat) {
+          const inputs: Record<string, InputJson> = {}
+          addends.forEach((addend, i) => {
+            inputs[`ADD${i}`] = { block: exprToBlock(addend, getVarId) }
+          })
+          return {
+            type: 'text_join',
+            extraState: { itemCount: addends.length },
+            inputs,
+          }
         }
       }
       return {
@@ -340,6 +361,7 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
           B: { block: exprToBlock(node.right, getVarId) },
         },
       }
+    }
 
     case 'Compare':
       return {

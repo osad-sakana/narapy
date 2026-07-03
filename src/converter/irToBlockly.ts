@@ -336,6 +336,8 @@ function exprToBlock(node: IrNode, getVarId: VarFn): BlockJson {
       //  再生成された Python が壊れて実行できなくなるため、必ず平坦化する)
       if (node.op === 'ADD') {
         const addends = flattenAddChain(node)
+        // producesStringBlock と異なり Unsupported は文字列扱いしない
+        // （Unsupported 同士の ADD は text_join より math_arithmetic の方が実態に近いため）
         const isStringConcat = addends.some(
           (a) => a.type === 'StrLit' || a.type === 'FStringLit'
         )

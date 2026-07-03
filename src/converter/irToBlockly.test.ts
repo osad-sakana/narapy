@@ -116,6 +116,36 @@ describe('irToWorkspaceJson - BinOp(ADD) 文字列連結', () => {
     expect(joinBlock?.inputs?.ADD1?.block?.type).toBe('variables_get')
   })
 
+  it('FStringLitを含む連鎖も文字列連結として単一の text_join に平坦化される', () => {
+    const root: IrNode = {
+      type: 'Program',
+      body: [
+        {
+          type: 'PrintStmt',
+          value: {
+            type: 'BinOp',
+            op: 'ADD',
+            left: {
+              type: 'BinOp',
+              op: 'ADD',
+              left: { type: 'FStringLit', parts: [{ type: 'VarRef', name: 'x' }] },
+              right: { type: 'VarRef', name: 'y' },
+            },
+            right: strLit('!'),
+          },
+        },
+      ],
+    }
+
+    const printBlock = firstTopBlock(root)
+    const joinBlock = printBlock.inputs?.TEXT?.block
+    expect(joinBlock?.type).toBe('text_join')
+    expect(joinBlock?.extraState).toEqual({ itemCount: 3 })
+    expect(joinBlock?.inputs?.ADD0?.block?.type).toBe('text_fstring')
+    expect(joinBlock?.inputs?.ADD1?.block?.type).toBe('variables_get')
+    expect(joinBlock?.inputs?.ADD2?.block?.fields?.TEXT).toBe('!')
+  })
+
   it('4つ以上の文字列連結も単一の text_join に平坦化される', () => {
     const root: IrNode = {
       type: 'Program',

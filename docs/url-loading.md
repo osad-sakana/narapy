@@ -17,7 +17,7 @@
 
 `#code=` / `#project=` の値はURLのフラグメント（`#`以降）に置きます。フラグメントはブラウザからサーバーに送信されないため、アクセスログに残らず、CORS設定も不要です。
 
-### ⚠️ postMessage方式は使えない
+### 注意: postMessage方式は使えない
 
 「`window.open` でNarapyを開いて `postMessage` でデータを送る」設計は**動作しません**。NarapyはPyodide (`SharedArrayBuffer`) のために `Cross-Origin-Opener-Policy: same-origin` を設定しており、このヘッダーが別オリジンとの `window.opener` 関係を切断するためです。外部サイト連携はこの前提を崩さないでください。
 

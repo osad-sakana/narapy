@@ -16,8 +16,11 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return buf
 }
 
-function mockFetchOnce(response: Partial<Response> & { arrayBuffer?: () => Promise<ArrayBuffer> }): void {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response))
+function mockFetchOnce(
+  response: Partial<Response> & { arrayBuffer?: () => Promise<ArrayBuffer>; contentLength?: string | null },
+): void {
+  const headers = { get: (name: string) => (name.toLowerCase() === 'content-length' ? (response.contentLength ?? null) : null) }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ headers, ...response }))
 }
 
 afterEach(() => {
@@ -60,5 +63,23 @@ describe('fetchNarapyFromUrl', () => {
       arrayBuffer: async () => toArrayBuffer(invalid),
     })
     await expect(fetchNarapyFromUrl('https://example.com/broken.narapy')).rejects.toThrow(/解析/)
+  })
+
+  it('Content-Lengthが上限を超える場合はbodyを読む前にエラーになる', async () => {
+    const arrayBuffer = vi.fn()
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      contentLength: String(MAX_REMOTE_PROJECT_SIZE + 1),
+      arrayBuffer,
+    })
+    await expect(fetchNarapyFromUrl('https://example.com/huge.narapy')).rejects.toThrow(/サイズ/)
+    expect(arrayBuffer).not.toHaveBeenCalled()
+  })
+
+  it('タイムアウト(AbortSignal.timeout)はタイムアウト用のメッセージになる', async () => {
+    const timeoutError = new DOMException('signal timed out', 'TimeoutError')
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(timeoutError))
+    await expect(fetchNarapyFromUrl('https://example.com/slow.narapy')).rejects.toThrow(/タイムアウト/)
   })
 })

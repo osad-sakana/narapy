@@ -23,8 +23,7 @@ import {
   getDirectories,
   hasUserContent,
 } from './explorer/store'
-import { resolveProjectFromUrl } from './urlload/loadFromUrl'
-import { confirmOverwriteExistingWork } from './urlload/confirmOverwrite'
+import { applyUrlLoad } from './urlload/applyUrlLoad'
 
 // Blocklyはデフォルトで無効。?blockly=1 のときのみ初期化・変換を行う（issue #31）
 const blocklyEnabled = isBlocklyEnabled()
@@ -209,11 +208,7 @@ const { refresh: refreshExplorer } = createExplorer(
 // --- URLパラメータからの初期プロジェクト読み込み (issue #32) ---
 // #project= > #code= > ?project=<URL> の優先順位で解決する。既存の作業内容がある場合のみ確認する。
 try {
-  const urlLoadResult = await resolveProjectFromUrl()
-  if (urlLoadResult && (!hasUserContent() || confirmOverwriteExistingWork())) {
-    loadProject(urlLoadResult.project.files, urlLoadResult.project.directories, urlLoadResult.project.activeFile)
-    refreshExplorer()
-  }
+  await applyUrlLoad({ hasUserContent, loadProject, refreshExplorer })
 } catch (err) {
   window.alert(err instanceof Error ? err.message : String(err))
 }

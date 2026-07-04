@@ -2,6 +2,7 @@
   "name": "narapy",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "build:wasm": "cd core && wasm-pack build --target web --out-dir ../src/wasm",

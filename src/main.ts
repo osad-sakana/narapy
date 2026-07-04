@@ -28,6 +28,11 @@ const blocklyEnabled = isBlocklyEnabled()
 
 initLayout(blocklyEnabled)
 
+// 構文チェックはBlockly変換の前段としての役割が主なため、Blockly無効時は行わない（issue #37）
+function runValidation(source: string): void {
+  if (blocklyEnabled) void triggerValidation(source)
+}
+
 await initStore()
 
 // Monaco Editor を初期化
@@ -86,7 +91,7 @@ function switchToFile(path: string): void {
   // ファイル名表示を更新
   editorFileName.textContent = path
   // バリデーションと Blockly 変換
-  void triggerValidation(content)
+  runValidation(content)
   if (activeSource === 'editor') {
     debouncedConvert.call(content)
   }
@@ -115,7 +120,7 @@ if (blocklyEnabled) {
     isSyncingEditor = false
     // Blockly 生成コードをストアにも反映
     updateFileContent(getActiveFile(), code)
-    void triggerValidation(code)
+    runValidation(code)
   })
 
   // Blocklyパネルが非表示の間は無駄な変換を行わない
@@ -174,7 +179,7 @@ editor.onDidChangeModelContent(() => {
   const source = getValue(editor)
   // 変更をストアに保存
   updateFileContent(getActiveFile(), source)
-  void triggerValidation(source)
+  runValidation(source)
   debouncedConvert.call(source)
 })
 

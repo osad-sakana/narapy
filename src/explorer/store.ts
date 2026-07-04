@@ -180,6 +180,14 @@ export function getAllFilesForRun(): { files: RunFile[]; directories: string[] }
   return { files, directories }
 }
 
+// URLからの初期読み込み(issue #32)で、既存の作業内容を無断で上書きしないための判定
+export function hasUserContent(): boolean {
+  if (state.directories.length > 0) return true
+  if (state.files.length !== 1) return true
+  const file = state.files[0]
+  return !(file.path === 'main.py' && file.content.kind === 'text' && file.content.data === '')
+}
+
 export function loadProject(files: FileEntry[], directories: DirectoryEntry[], activeFile: string): void {
   const cloned = files.map(f => ({
     path: f.path,

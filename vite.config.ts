@@ -1,8 +1,11 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
 import wasm from 'vite-plugin-wasm'
 import topLevelAwait from 'vite-plugin-top-level-await'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
+
+const root = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig({
   // CI 環境（GitHub Actions）では GitHub Pages のサブパスに合わせる
@@ -36,6 +39,9 @@ export default defineConfig({
       // blob: / cdn.jsdelivr.net: Pyodide を CDN + Blob URL 経由でロードするため必要
       // connect-src cdn.jsdelivr.net: Pyodide パッケージのダウンロード
       // connect-src files.pythonhosted.org pypi.org: micropip によるパッケージインストール
+      // connect-src https:: ?project=<URL> (issue #32) で任意の外部サイトが提供する .narapy を
+      // fetch するため。取得先はCORS(Access-Control-Allow-Origin)必須なので任意originへの
+      // 送信ではなく読み取りのみが許可される点に注意
       'Content-Security-Policy': [
         "default-src 'self'",
         // blob: はworker内部のdynamic import()にのみ使用 → worker-srcで許可済みのためscript-srcから除外
@@ -44,7 +50,7 @@ export default defineConfig({
         "img-src 'self' data: blob:",
         "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
         "font-src 'self' fonts.gstatic.com data:",
-        "connect-src 'self' cdn.jsdelivr.net files.pythonhosted.org pypi.org",
+        "connect-src 'self' https: cdn.jsdelivr.net files.pythonhosted.org pypi.org",
         "frame-src 'none'",
         "object-src 'none'",
       ].join('; '),
@@ -53,6 +59,13 @@ export default defineConfig({
 
   build: {
     target: 'esnext',
+    rollupOptions: {
+      // /make-url (共有リンク生成ページ, issue #32) を静的マルチページとしてビルド対象に含める
+      input: {
+        main: `${root}index.html`,
+        makeUrl: `${root}make-url.html`,
+      },
+    },
   },
 
   optimizeDeps: {

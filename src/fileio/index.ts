@@ -33,7 +33,8 @@ function triggerDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url)
 }
 
-export function downloadNarapyProject(project: NarapyProject, filename = 'project.narapy'): void {
+// .narapy(zip)のバイト列を組み立てる。ダウンロードとURL共有リンク生成(issue #32)の両方で使う
+export function buildNarapyArchive(project: NarapyProject) {
   const archive: Record<string, Uint8Array> = {}
 
   const metadata: NarapyMetadataV2 = {
@@ -52,7 +53,11 @@ export function downloadNarapyProject(project: NarapyProject, filename = 'projec
     }
   }
 
-  const zipped = zipSync(archive, { level: 6 })
+  return zipSync(archive, { level: 6 })
+}
+
+export function downloadNarapyProject(project: NarapyProject, filename = 'project.narapy'): void {
+  const zipped = buildNarapyArchive(project)
   triggerDownload(new Blob([zipped], { type: 'application/zip' }), filename)
 }
 
@@ -79,7 +84,7 @@ export function openNarapyFilePicker(
   input.click()
 }
 
-function parseNarapyArchive(data: Uint8Array): NarapyProject {
+export function parseNarapyArchive(data: Uint8Array): NarapyProject {
   // v1 (旧): プレーン JSON
   if (looksLikeJson(data)) {
     return parseLegacyJson(strFromU8(data))

@@ -21,7 +21,9 @@ import {
   loadProject,
   getFiles,
   getDirectories,
+  hasUserContent,
 } from './explorer/store'
+import { applyUrlLoad } from './urlload/applyUrlLoad'
 
 // Blocklyはデフォルトで無効。?blockly=1 のときのみ初期化・変換を行う（issue #31）
 const blocklyEnabled = isBlocklyEnabled()
@@ -202,6 +204,14 @@ const { refresh: refreshExplorer } = createExplorer(
   },
   (message) => window.alert(message),
 )
+
+// --- URLパラメータからの初期プロジェクト読み込み (issue #32) ---
+// #project= > #code= > ?project=<URL> の優先順位で解決する。既存の作業内容がある場合のみ確認する。
+try {
+  await applyUrlLoad({ hasUserContent, loadProject, refreshExplorer })
+} catch (err) {
+  window.alert(err instanceof Error ? err.message : String(err))
+}
 
 // エディタを永続化済みの内容で初期化
 isSyncingEditor = true

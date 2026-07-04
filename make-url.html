@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Narapy — 共有リンクを作る</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=0xProto:ital,wght@0,400;0,700;1,400&family=BIZ+UDPGothic:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body class="bg-[#08080d] text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <header class="flex items-center justify-between px-6 py-3 bg-[#110826] border-b border-purple-900/50 shrink-0">
+      <div class="flex items-center gap-3">
+        <img src="/favicon.svg" alt="Narapy" class="w-8 h-8 select-none" draggable="false" />
+        <span class="text-lg font-bold tracking-tight text-purple-100">Narapy</span>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+          共有リンクを作る
+        </span>
+      </div>
+      <div class="flex items-center gap-3">
+        <!-- フォントサイズ制御 -->
+        <div class="flex items-center gap-0.5 border border-slate-700/60 rounded-lg overflow-hidden">
+          <button
+            id="fontDecrease"
+            title="文字を小さく"
+            class="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700/40 transition-colors cursor-pointer select-none"
+          >A-</button>
+          <span id="fontSizeLabel" class="px-1 text-xs text-slate-500 select-none tabular-nums w-6 text-center">13</span>
+          <button
+            id="fontIncrease"
+            title="文字を大きく"
+            class="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700/40 transition-colors cursor-pointer select-none"
+          >A+</button>
+        </div>
+        <a href="./index.html" class="text-xs text-slate-400 hover:text-slate-100 transition-colors">← エディタに戻る</a>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-6">
+      <div class="space-y-6">
+
+        <p class="text-sm text-slate-400 leading-relaxed">
+          Pythonコードや複数ファイルのプロジェクトから、開くだけで内容が復元されるURLを作成します。
+          生成されるリンクはURLのハッシュ(<code class="font-mono text-slate-300">#</code>以降)に埋め込まれるため、
+          サーバーには送信されません。
+        </p>
+
+        <!-- モード切替 -->
+        <div class="flex gap-2" role="tablist">
+          <button
+            id="modeCodeBtn"
+            type="button"
+            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer bg-violet-500/20 text-violet-200 border border-violet-500/40"
+          >単一コード (#code=)</button>
+          <button
+            id="modeProjectBtn"
+            type="button"
+            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-slate-400 border border-transparent hover:bg-slate-700/40"
+          >複数ファイル (#project=)</button>
+        </div>
+
+        <!-- 単一コードモード -->
+        <section id="codeModeSection" class="space-y-1.5">
+          <span class="text-xs text-slate-400 block">Pythonコード (main.py として開かれます)</span>
+          <div id="codeEditor" class="h-72 rounded-lg overflow-hidden border border-violet-800/40"></div>
+        </section>
+
+        <!-- 複数ファイルモード -->
+        <section id="projectModeSection" class="hidden space-y-3">
+          <p class="text-xs text-slate-500">ラジオボタンを選択した状態のファイルが、開いた状態（アクティブなファイル）になります。</p>
+          <div id="fileRows" class="space-y-4"></div>
+          <button
+            id="addFileRowBtn"
+            type="button"
+            class="text-xs text-violet-300 hover:text-violet-100 transition-colors cursor-pointer"
+          >+ ファイルを追加</button>
+        </section>
+
+        <!-- ベースURL -->
+        <section class="space-y-1.5">
+          <label for="baseUrlInput" class="text-xs text-slate-400 block">NarapyのURL（配布先のドメインに書き換えてください）</label>
+          <input
+            id="baseUrlInput"
+            type="text"
+            spellcheck="false"
+            class="w-full font-mono text-xs bg-[#0c0818] border border-violet-800/40 rounded-lg p-2 focus:outline-none focus:border-violet-500"
+          />
+        </section>
+
+        <button
+          id="generateBtn"
+          type="button"
+          class="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-bold transition-colors cursor-pointer"
+        >リンクを生成</button>
+
+        <p id="errorMessage" class="hidden text-xs text-rose-400"></p>
+
+        <!-- 結果 -->
+        <section id="resultSection" class="hidden space-y-2 border-t border-purple-900/40 pt-4">
+          <label for="resultUrl" class="text-xs text-slate-400 block">生成されたリンク</label>
+          <div class="flex gap-2">
+            <input
+              id="resultUrl"
+              type="text"
+              readonly
+              class="flex-1 font-mono text-xs bg-[#0c0818] border border-emerald-700/40 rounded-lg p-2"
+            />
+            <button
+              id="copyResultBtn"
+              type="button"
+              class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
+            >コピー</button>
+            <button
+              id="openResultBtn"
+              type="button"
+              title="生成されたリンクを新しいタブで開く(動作確認用)"
+              class="px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
+            >開く</button>
+          </div>
+          <p id="resultSize" class="text-xs text-slate-500"></p>
+        </section>
+
+      </div>
+    </main>
+
+    <script type="module" src="/src/makeUrl/index.ts"></script>
+  </body>
+</html>

@@ -95,6 +95,72 @@ https://<narapyのURL>/?project=https://your-materials-site.example.com/api/exer
 
 ---
 
+## 動作確認用サンプル（ローカル開発環境）
+
+`pnpm dev` で開発サーバー（`http://localhost:5173`）を起動した状態で、以下のURLをブラウザで開くと動作を確認できます（実際に動作検証済み）。
+
+### `#code=` の例
+
+```
+http://localhost:5173/#code=eNorKMrMK9FQ8kjNycnXUfBLLEosqFRU0uRKyy9SyFTIzFMoSsxLT9Uw1rTiUgACiPJMTQDshhC8
+```
+
+以下のPythonコードが `main.py` として開きます。
+
+```python
+print("Hello, Narapy!")
+for i in range(3):
+    print(i)
+```
+
+### `#project=` の例
+
+```
+http://localhost:5173/#project=eNoL8GZmEWFgYOBg-JH7JKYm2I_PHMgzBWJuIM5LLEosqNTLKs7PWx2m5a2rde7M-eBNRpcCvXz0Tup4l54-4xm6KeiU75kzl7VXhACFT-p4-eqd1D_loxu2qatvLSsDqvn6rgutlYE8VSDmBeK0zJzUYv3cxMw8vYJKb-1T50M1dE-eCTxxRveEvlagh76Xr-5DLY1TZ7QvMmw2NTFlRDVta_3Kfl0gD4QRppWWZOaATPP0DQYbcPHClkdBDE2Lrky6tMiGVbX_ypw5Na1bFv2Jab006YzM3iYvV1WgKxmZRBhwhwMqQAoVdI3oHkSABHTvomtF9w0CrEP3W4A3KxtIghkI1wNpNkYQDwCabXzk
+```
+
+`main.py` が `util.py` の `greet()` をimportして呼び出す2ファイル構成が開きます。
+
+```python
+# main.py
+from util import greet
+print(greet())
+
+# util.py
+def greet():
+    return "Hello from util.py!"
+```
+
+上記2つのサンプルは、本ドキュメントの生成スクリプト（Node.js + fflate）で以下のように作成しました。
+
+```javascript
+const { strToU8, zlibSync, zipSync } = require('fflate')
+
+function bytesToBase64Url(bytes) {
+  let binary = ''
+  for (const b of bytes) binary += String.fromCharCode(b)
+  return Buffer.from(binary, 'binary').toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+// #code=
+const code = 'print("Hello, Narapy!")\nfor i in range(3):\n    print(i)'
+console.log(bytesToBase64Url(zlibSync(strToU8(code), { level: 9 })))
+
+// #project=
+const metadata = { version: 2, activeFile: 'main.py', directories: [] }
+const archive = zipSync({
+  'narapy.json': strToU8(JSON.stringify(metadata)),
+  'files/main.py': strToU8('from util import greet\nprint(greet())'),
+  'files/util.py': strToU8('def greet():\n    return "Hello from util.py!"'),
+})
+console.log(bytesToBase64Url(zlibSync(archive, { level: 9 })))
+```
+
+`?project=<URL>` はCORS付きの外部サーバーが必要なため、手早く試すなら `#code=` / `#project=` のほうが手軽です。
+
+---
+
 ## 他のクエリパラメータとの併用
 
 Blockly有効化フラグ（issue #31, `?blockly=1`）と併用できます。

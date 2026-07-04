@@ -50,6 +50,7 @@ const editorHeader     = document.getElementById('editorHeader')     as HTMLElem
 const blocklyActiveDot = document.getElementById('blocklyActiveDot') as HTMLElement
 const editorActiveDot  = document.getElementById('editorActiveDot')  as HTMLElement
 const editorFileName   = document.getElementById('editorFileName')   as HTMLElement
+const validationBadge  = document.getElementById('validationBadge')  as HTMLElement
 
 function setActiveSource(source: ActiveSource): void {
   if (activeSource === source) return
@@ -69,8 +70,10 @@ function setActiveSource(source: ActiveSource): void {
 }
 
 // Blockly無効時はパネルが存在しないため、常にエディタをアクティブ扱いにする
+// また構文チェックを行わないため、バッジ自体も表示しない（issue #37）
 if (!blocklyEnabled) {
   setActiveSource('editor')
+  validationBadge.style.display = 'none'
 }
 
 function codeEqual(a: string, b: string): boolean {

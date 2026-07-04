@@ -119,6 +119,9 @@ if (blocklyEnabled) {
   })
 
   // Blocklyパネルが非表示の間は無駄な変換を行わない
+  // 呼び出し時点のactiveSourceは常に'editor'（'blockly'への遷移は必ずdebouncedConvert.cancel()を伴うため）
+  // なのでshouldReportConversionErrorは常にfalseになる。Python編集起点の変換エラーで
+  // 構文検証結果を表示する共有バッジを上書きしないための意図的な挙動（issue #37）
   debouncedConvert = createDebounced((source: string) => {
     if (!shouldConvert(isBlocklyPanelHidden())) return
     void applyPythonToWorkspace(source, workspace, shouldReportConversionError(activeSource))

@@ -34,7 +34,7 @@ function triggerDownload(blob: Blob, filename: string): void {
 }
 
 // .narapy(zip)のバイト列を組み立てる。ダウンロードとURL共有リンク生成(issue #32)の両方で使う
-export function buildNarapyArchive(project: NarapyProject): Uint8Array {
+export function buildNarapyArchive(project: NarapyProject) {
   const archive: Record<string, Uint8Array> = {}
 
   const metadata: NarapyMetadataV2 = {

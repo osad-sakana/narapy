@@ -1,8 +1,11 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
 import wasm from 'vite-plugin-wasm'
 import topLevelAwait from 'vite-plugin-top-level-await'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
+
+const root = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig({
   // CI 環境（GitHub Actions）では GitHub Pages のサブパスに合わせる
@@ -56,6 +59,13 @@ export default defineConfig({
 
   build: {
     target: 'esnext',
+    rollupOptions: {
+      // /make-url (共有リンク生成ページ, issue #32) を静的マルチページとしてビルド対象に含める
+      input: {
+        main: `${root}index.html`,
+        makeUrl: `${root}make-url.html`,
+      },
+    },
   },
 
   optimizeDeps: {

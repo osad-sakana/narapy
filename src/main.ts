@@ -4,7 +4,7 @@ import { isBlocklyEnabled } from './blockly/featureFlag'
 import { loadWasm, triggerValidation } from './runner/validator'
 import { initRunner } from './runner/index'
 import { createDebounced } from './converter/debounce'
-import { shouldConvert, shouldResyncOnReveal, type ActiveSource } from './converter/conversionGuard'
+import { shouldConvert, shouldResyncOnReveal, shouldReportConversionError, type ActiveSource } from './converter/conversionGuard'
 import { createEditor, getValue, setValue } from './editor/index'
 import { initFontSizeControls } from './editor/fontSize'
 import { downloadNarapyProject, openNarapyFilePicker } from './fileio/index'
@@ -28,6 +28,11 @@ const blocklyEnabled = isBlocklyEnabled()
 
 initLayout(blocklyEnabled)
 
+// 構文チェックはBlockly変換の前段としての役割が主なため、Blockly無効時は行わない（issue #37）
+function runValidation(source: string): void {
+  if (blocklyEnabled) void triggerValidation(source)
+}
+
 await initStore()
 
 // Monaco Editor を初期化
@@ -45,6 +50,7 @@ const editorHeader     = document.getElementById('editorHeader')     as HTMLElem
 const blocklyActiveDot = document.getElementById('blocklyActiveDot') as HTMLElement
 const editorActiveDot  = document.getElementById('editorActiveDot')  as HTMLElement
 const editorFileName   = document.getElementById('editorFileName')   as HTMLElement
+const validationBadge  = document.getElementById('validationBadge')  as HTMLElement
 
 function setActiveSource(source: ActiveSource): void {
   if (activeSource === source) return
@@ -64,8 +70,10 @@ function setActiveSource(source: ActiveSource): void {
 }
 
 // Blockly無効時はパネルが存在しないため、常にエディタをアクティブ扱いにする
+// また構文チェックを行わないため、バッジ自体も表示しない（issue #37）
 if (!blocklyEnabled) {
   setActiveSource('editor')
+  validationBadge.style.display = 'none'
 }
 
 function codeEqual(a: string, b: string): boolean {
@@ -86,7 +94,7 @@ function switchToFile(path: string): void {
   // ファイル名表示を更新
   editorFileName.textContent = path
   // バリデーションと Blockly 変換
-  void triggerValidation(content)
+  runValidation(content)
   if (activeSource === 'editor') {
     debouncedConvert.call(content)
   }
@@ -115,13 +123,16 @@ if (blocklyEnabled) {
     isSyncingEditor = false
     // Blockly 生成コードをストアにも反映
     updateFileContent(getActiveFile(), code)
-    void triggerValidation(code)
+    runValidation(code)
   })
 
   // Blocklyパネルが非表示の間は無駄な変換を行わない
+  // 呼び出し時点のactiveSourceは常に'editor'（'blockly'への遷移は必ずdebouncedConvert.cancel()を伴うため）
+  // なのでshouldReportConversionErrorは常にfalseになる。Python編集起点の変換エラーで
+  // 構文検証結果を表示する共有バッジを上書きしないための意図的な挙動（issue #37）
   debouncedConvert = createDebounced((source: string) => {
     if (!shouldConvert(isBlocklyPanelHidden())) return
-    void applyPythonToWorkspace(source, workspace)
+    void applyPythonToWorkspace(source, workspace, shouldReportConversionError(activeSource))
   }, 300)
 
   // Blocklyパネルが再表示された時、非表示中に編集された可能性のある
@@ -130,7 +141,7 @@ if (blocklyEnabled) {
     if (shouldResyncOnReveal(hidden, activeSource)) {
       // 非表示中に仕込まれた保留中の変換と二重実行にならないようキャンセルする
       debouncedConvert.cancel()
-      void applyPythonToWorkspace(getValue(editor), workspace)
+      void applyPythonToWorkspace(getValue(editor), workspace, shouldReportConversionError(activeSource))
     }
   })
 
@@ -171,7 +182,7 @@ editor.onDidChangeModelContent(() => {
   const source = getValue(editor)
   // 変更をストアに保存
   updateFileContent(getActiveFile(), source)
-  void triggerValidation(source)
+  runValidation(source)
   debouncedConvert.call(source)
 })
 

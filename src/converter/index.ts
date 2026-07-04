@@ -14,7 +14,8 @@ function containsUnsupported(irJson: string): boolean {
 
 export async function applyPythonToWorkspace(
   source: string,
-  workspace: WorkspaceSvg
+  workspace: WorkspaceSvg,
+  reportErrors: boolean = true
 ): Promise<void> {
   const pythonToIr = getPythonToIr()
   if (!pythonToIr || source.trim() === '') {
@@ -28,8 +29,10 @@ export async function applyPythonToWorkspace(
     irJson = pythonToIr(source)
   } catch (err: unknown) {
     // 構文エラー: Blocklyは変更しない
-    const message = err instanceof Error ? err.message : String(err)
-    setBadge(`エラー: ${message}`, 'error')
+    if (reportErrors) {
+      const message = err instanceof Error ? err.message : String(err)
+      setBadge(`エラー: ${message}`, 'error')
+    }
     setHasUnsupportedCode(false)
     setBlocklyUnsupportedBanner(false)
     return
@@ -58,8 +61,10 @@ export async function applyPythonToWorkspace(
     workspace.clear()
     serialization.workspaces.load(workspaceJson, workspace, { recordUndo: false })
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err)
-    setBadgeWithDetail('変換エラー', 'error', message)
+    if (reportErrors) {
+      const message = err instanceof Error ? err.message : String(err)
+      setBadgeWithDetail('変換エラー', 'error', message)
+    }
     setSyncingFromPython(false)
     return
   }

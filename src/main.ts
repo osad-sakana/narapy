@@ -4,7 +4,7 @@ import { isBlocklyEnabled } from './blockly/featureFlag'
 import { loadWasm, triggerValidation } from './runner/validator'
 import { initRunner } from './runner/index'
 import { createDebounced } from './converter/debounce'
-import { shouldConvert, shouldResyncOnReveal, type ActiveSource } from './converter/conversionGuard'
+import { shouldConvert, shouldResyncOnReveal, shouldReportConversionError, type ActiveSource } from './converter/conversionGuard'
 import { createEditor, getValue, setValue } from './editor/index'
 import { initFontSizeControls } from './editor/fontSize'
 import { downloadNarapyProject, openNarapyFilePicker } from './fileio/index'
@@ -121,7 +121,7 @@ if (blocklyEnabled) {
   // Blocklyパネルが非表示の間は無駄な変換を行わない
   debouncedConvert = createDebounced((source: string) => {
     if (!shouldConvert(isBlocklyPanelHidden())) return
-    void applyPythonToWorkspace(source, workspace)
+    void applyPythonToWorkspace(source, workspace, shouldReportConversionError(activeSource))
   }, 300)
 
   // Blocklyパネルが再表示された時、非表示中に編集された可能性のある
@@ -130,7 +130,7 @@ if (blocklyEnabled) {
     if (shouldResyncOnReveal(hidden, activeSource)) {
       // 非表示中に仕込まれた保留中の変換と二重実行にならないようキャンセルする
       debouncedConvert.cancel()
-      void applyPythonToWorkspace(getValue(editor), workspace)
+      void applyPythonToWorkspace(getValue(editor), workspace, shouldReportConversionError(activeSource))
     }
   })
 

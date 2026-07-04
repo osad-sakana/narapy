@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { shouldConvert, shouldResyncOnReveal } from './conversionGuard'
+import { shouldConvert, shouldResyncOnReveal, shouldReportConversionError } from './conversionGuard'
 
 describe('shouldConvert', () => {
   it('Blocklyパネルが非表示のときは変換しない', () => {
@@ -26,5 +26,15 @@ describe('shouldResyncOnReveal', () => {
 
   it('非表示かつBlocklyアクティブでも再同期しない', () => {
     expect(shouldResyncOnReveal(true, 'blockly')).toBe(false)
+  })
+})
+
+describe('shouldReportConversionError', () => {
+  it('Blocklyがアクティブなときは変換エラーを表示する', () => {
+    expect(shouldReportConversionError('blockly')).toBe(true)
+  })
+
+  it('エディタがアクティブなときは変換エラーを表示しない', () => {
+    expect(shouldReportConversionError('editor')).toBe(false)
   })
 })

@@ -1,3 +1,5 @@
+import { createEditor, getValue, setValue, type EditorInstance } from '../editor/index'
+import { initFontSizeControls } from '../editor/fontSize'
 import { encodeCodeParam, encodeProjectParam } from '../urlload/encode'
 import { buildProjectFromRows } from './buildProject'
 import { addRow, removeRow, updateRow, type FileRowState } from './fileRows'
@@ -9,7 +11,7 @@ function init(): void {
   const modeProjectBtn = document.getElementById('modeProjectBtn') as HTMLButtonElement
   const codeSection = document.getElementById('codeModeSection') as HTMLElement
   const projectSection = document.getElementById('projectModeSection') as HTMLElement
-  const codeInput = document.getElementById('codeInput') as HTMLTextAreaElement
+  const codeEditorContainer = document.getElementById('codeEditor') as HTMLElement
   const fileRowsContainer = document.getElementById('fileRows') as HTMLElement
   const addFileRowBtn = document.getElementById('addFileRowBtn') as HTMLButtonElement
   const baseUrlInput = document.getElementById('baseUrlInput') as HTMLInputElement
@@ -19,6 +21,7 @@ function init(): void {
   const resultUrl = document.getElementById('resultUrl') as HTMLInputElement
   const resultSize = document.getElementById('resultSize') as HTMLElement
   const copyResultBtn = document.getElementById('copyResultBtn') as HTMLButtonElement
+  const openResultBtn = document.getElementById('openResultBtn') as HTMLButtonElement
 
   let mode: Mode = 'code'
   let rows: FileRowState[] = [
@@ -26,6 +29,10 @@ function init(): void {
     { path: 'util.py', content: 'def greet():\n    return "Hello from util.py!"' },
   ]
   let activeIndex = 0
+  let rowEditors: EditorInstance[] = []
+
+  const codeEditor = createEditor(codeEditorContainer)
+  setValue(codeEditor, 'print("Hello, Narapy!")')
 
   // main.tsが動くNarapy本体のURL(現在のページのディレクトリ)をデフォルト値にする
   baseUrlInput.value = new URL('.', window.location.href).toString()
@@ -46,7 +53,13 @@ function init(): void {
     }
   }
 
+  function disposeRowEditors(): void {
+    for (const editor of rowEditors) editor.dispose()
+    rowEditors = []
+  }
+
   function renderFileRows(): void {
+    disposeRowEditors()
     fileRowsContainer.replaceChildren()
     rows.forEach((row, index) => {
       const wrapper = document.createElement('div')
@@ -91,17 +104,18 @@ function init(): void {
 
       topRow.append(activeRadio, pathInput, removeBtn)
 
-      const contentInput = document.createElement('textarea')
-      contentInput.rows = 5
-      contentInput.spellcheck = false
-      contentInput.value = row.content
-      contentInput.className = 'w-full font-mono text-xs bg-[#08080d] border border-violet-800/40 rounded p-2 focus:outline-none focus:border-violet-500'
-      contentInput.addEventListener('input', () => {
-        rows = updateRow(rows, index, { content: contentInput.value })
-      })
+      const editorContainer = document.createElement('div')
+      editorContainer.className = 'h-40 rounded overflow-hidden border border-violet-800/40'
 
-      wrapper.append(topRow, contentInput)
+      wrapper.append(topRow, editorContainer)
       fileRowsContainer.appendChild(wrapper)
+
+      const rowEditor = createEditor(editorContainer)
+      setValue(rowEditor, row.content)
+      rowEditor.onDidChangeModelContent(() => {
+        rows = updateRow(rows, index, { content: getValue(rowEditor) })
+      })
+      rowEditors.push(rowEditor)
     })
   }
 
@@ -125,7 +139,7 @@ function init(): void {
     const base = baseUrlInput.value.trim() || new URL('.', window.location.href).toString()
     try {
       const hashParam = mode === 'code'
-        ? `code=${encodeCodeParam(codeInput.value)}`
+        ? `code=${encodeCodeParam(getValue(codeEditor))}`
         : `project=${encodeProjectParam(buildProjectFromRows(rows, activeIndex))}`
       const url = `${base}#${hashParam}`
       resultUrl.value = url
@@ -140,8 +154,19 @@ function init(): void {
     void navigator.clipboard.writeText(resultUrl.value)
   })
 
+  openResultBtn.addEventListener('click', () => {
+    if (!resultUrl.value) return
+    window.open(resultUrl.value, '_blank', 'noopener,noreferrer')
+  })
+
   renderFileRows()
   setMode('code')
+
+  // 本体アプリ(main.ts)と同じlocalStorageキーでフォントサイズを共有する
+  initFontSizeControls((size) => {
+    codeEditor.updateOptions({ fontSize: size })
+    for (const editor of rowEditors) editor.updateOptions({ fontSize: size })
+  })
 }
 
 init()

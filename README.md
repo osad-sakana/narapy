@@ -28,6 +28,7 @@
 タートルグラフィックスの描画も、すべてあなたの手元のブラウザで動きます。
 
 > 💡 標準ライブラリの `turtle` 互換モジュールを内蔵。`import turtle` で図形描画の授業がそのまま動きます。
+> 🧩 Blockly 連携は現在 `?blockly=1` を付けたときのみ有効な実験的機能です。既定の画面は Python エディタのみで構成されます。
 
 ---
 
@@ -35,12 +36,15 @@
 
 | 機能 | 説明 |
 | --- | --- |
-| 🧩 **ブロック ⇄ Python 双方向変換** | Blockly で組んだブロックが Python に、書いた Python がブロックに即変換 |
+| 🧩 **ブロック ⇄ Python 双方向変換** | `?blockly=1` で有効化すると、Blockly で組んだブロックが Python に、書いた Python がブロックに即変換（既定では非表示） |
 | 🐍 **ブラウザ内 Python 実行** | Pyodide を Web Worker で動かし、メインスレッドを止めずに実行 |
+| ⌨️ **コード補完** | Pyodide を使った Web Worker 上での Python コード補完（Monaco エディタ） |
 | 🐢 **タートルグラフィックス** | Tkinter 不要の Canvas 独自実装。アニメーション付きで図形を描画 |
+| 📊 **matplotlib 画像表示** | `plt.show()` の出力をモーダルで表示 |
 | ⚡ **高速な構文検証** | Rust 製エンジンを WebAssembly 化し、リアルタイムにコードを検証 |
-| 📂 **プロジェクト保存・復元** | 複数ファイルを `.narapy` 形式で書き出し／読み込み |
-| 🎨 **3 パネル UI** | ブロック・エディタ・実行ログを自由に表示／非表示、サイズ調整も自在 |
+| 📂 **プロジェクト保存・復元** | 複数ファイル・ディレクトリを `.narapy` 形式で書き出し／読み込み、フォルダごとアップロードも可能 |
+| 🔗 **共有リンク** | Python コードやプロジェクトをURLのハッシュに埋め込んで共有（サーバー送信なし）。`/make-url` で生成可能 |
+| 🎨 **3 パネル UI** | エディタ・実行ログ（・ブロック）を自由に表示／非表示、サイズ調整も自在 |
 | 🔤 **読みやすさ重視** | UI に BIZ UDPGothic、コードに 0xProto を採用。フォントサイズも調整可能 |
 
 ---
@@ -59,6 +63,7 @@ pnpm dev
 ```
 
 ブラウザで表示された URL（通常 `http://localhost:5173`）を開けば、すぐに使い始められます。
+Blockly パネルは既定では非表示です。試したい場合は `http://localhost:5173/?blockly=1` を開いてください。
 
 > ⚠️ `src/wasm/` は gitignore 済みです。クローン直後は必ず `pnpm dev`（または `pnpm build:wasm`）を実行して WASM を生成してください。
 
@@ -87,7 +92,7 @@ Narapy は **フロントエンド完結型**。バックエンドサーバー�
 ┌─────────────────────────────────────────────────────────────┐
 │                     ブラウザ (UI スレッド)                     │
 │                                                               │
-│   🧩 Blockly  ⇄  🐍 Monaco エディタ  ⇄  🐢 Turtle Canvas       │
+│   🧩 Blockly(任意) ⇄ 🐍 Monaco エディタ ⇄ 🐢 Turtle/📊 matplotlib  │
 │        │                  │                                   │
 │        └──────────┬───────┘                                   │
 │                   ▼                                           │
@@ -120,20 +125,26 @@ narapy/
 │       └── ir.rs          #   中間表現の定義
 ├── src/
 │   ├── main.ts            # エントリポイント（初期化・各モジュール連携）
-│   ├── blockly/           # Blockly ワークスペース・カスタムブロック
+│   ├── blockly/           # Blockly ワークスペース・カスタムブロック（?blockly=1 で有効化）
 │   ├── converter/         # IR ⇄ Blockly 変換・変数レジストリ
-│   ├── editor/            # Monaco エディタ
-│   ├── runner/            # 実行・検証・Turtle 描画・エラー翻訳
-│   ├── pyodide/           # Pyodide 連携
-│   ├── explorer/          # ファイルエクスプローラー
+│   ├── editor/            # Monaco エディタ・コード補完・フォントサイズ
+│   ├── completion.worker.ts # Pyodide を使ったコード補完 Web Worker
+│   ├── runner/            # 実行・検証・Turtle/matplotlib 描画・エラー翻訳
+│   ├── pyodide/           # Pyodide 連携（Turtle互換モジュール）
+│   ├── lib/               # Pyodide ローダーなど共通ユーティリティ
+│   ├── explorer/          # ファイルエクスプローラー・アップロード
 │   ├── fileio/            # .narapy プロジェクト入出力
+│   ├── urlload/           # URLの #code= / #project= / ?project=<URL> 読み込み
+│   ├── makeUrl/           # /make-url（共有リンク生成ページ）のロジック
 │   ├── layout/            # パネルレイアウト（split.js）
 │   ├── about/             # ライセンス表示
 │   ├── pyodide.worker.ts  # Pyodide 初期化 Web Worker
 │   └── wasm/              # wasm-pack ビルド成果物（gitignore 済み）
 ├── docs/
-│   └── turtle-reference.md # 教材作成者向け Turtle リファレンス
-└── index.html             # 3 パネルレイアウト（ブロック / エディタ / ログ）
+│   ├── turtle-reference.md # 教材作成者向け Turtle リファレンス
+│   └── url-loading.md      # 外部サイト連携・共有リンクの仕組み
+├── index.html             # メイン画面（エディタ / ログ、?blockly=1 でブロックパネルも追加）
+└── make-url.html          # 共有リンク生成ページ（/make-url）
 ```
 
 ---
@@ -159,6 +170,24 @@ for _ in range(4):
 
 ---
 
+## 🔗 共有リンク
+
+Python コードやプロジェクトを、サーバーを介さずURLだけで共有できます。値はURLのハッシュ（`#`以降）に
+zlib圧縮 + base64url化して埋め込むため、アクセスログにも残りません。
+
+| 方式 | 用途 |
+| --- | --- |
+| `#code=<...>` | 単一ファイル（`main.py`）を開く |
+| `#project=<...>` | 複数ファイル構成のプロジェクトを開く（外部サイト連携の推奨方式） |
+| `?project=<URL>` | 外部サーバーが動的生成する `.narapy` をCORS経由で読み込む（画像等を含む大きめの教材向け） |
+
+リンクは `/make-url`（`make-url.html`）にブラウザでアクセスすると、コードやファイルを貼り付けるだけで生成できます
+（教材作成者向けのツールで、アプリ本体からの導線はあえて設けていません）。
+
+> 詳しい仕組み・外部サイト連携時の実装例は [`docs/url-loading.md`](docs/url-loading.md) を参照してください。
+
+---
+
 ## 📝 実装メモ
 
 ブラウザの制約まわりで知っておくと役立つポイントです。
@@ -166,6 +195,8 @@ for _ in range(4):
 - **COOP/COEP ヘッダー** — `SharedArrayBuffer`（Pyodide に必要）のため、開発時は `vite.config.ts` の `server.headers` で付与。GitHub Pages 等ヘッダーを設定できない環境では [`coi-serviceworker`](https://github.com/gzuidhof/coi-serviceworker) で代替しています。
 - **Blockly メディア** — 外部 CDN が COEP でブロックされるため、`vite-plugin-static-copy` で `blockly/media/*` をローカルへコピーして配信。
 - **Pyodide Worker** — `type: 'module'` の Worker では `importScripts()` が使えないため、`import()` で CDN から動的読み込み。
+- **共有リンクとCSP** — `?project=<URL>` での外部取得のため `vite.config.ts` の CSP `connect-src` に `https:` を許可。自前デプロイ時も同等の設定が必要です。
+- **postMessage連携は不可** — COOP設定により `window.opener` 経由の連携ができないため、外部サイトとの連携はURLハッシュ方式のみをサポートしています。
 
 詳細は [`CLAUDE.md`](CLAUDE.md) にまとまっています。
 

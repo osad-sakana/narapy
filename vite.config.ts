@@ -36,6 +36,9 @@ export default defineConfig({
       // blob: / cdn.jsdelivr.net: Pyodide を CDN + Blob URL 経由でロードするため必要
       // connect-src cdn.jsdelivr.net: Pyodide パッケージのダウンロード
       // connect-src files.pythonhosted.org pypi.org: micropip によるパッケージインストール
+      // connect-src https:: ?project=<URL> (issue #32) で任意の外部サイトが提供する .narapy を
+      // fetch するため。取得先はCORS(Access-Control-Allow-Origin)必須なので任意originへの
+      // 送信ではなく読み取りのみが許可される点に注意
       'Content-Security-Policy': [
         "default-src 'self'",
         // blob: はworker内部のdynamic import()にのみ使用 → worker-srcで許可済みのためscript-srcから除外
@@ -44,7 +47,7 @@ export default defineConfig({
         "img-src 'self' data: blob:",
         "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
         "font-src 'self' fonts.gstatic.com data:",
-        "connect-src 'self' cdn.jsdelivr.net files.pythonhosted.org pypi.org",
+        "connect-src 'self' https: cdn.jsdelivr.net files.pythonhosted.org pypi.org",
         "frame-src 'none'",
         "object-src 'none'",
       ].join('; '),

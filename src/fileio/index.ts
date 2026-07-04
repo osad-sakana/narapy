@@ -79,7 +79,7 @@ export function openNarapyFilePicker(
   input.click()
 }
 
-function parseNarapyArchive(data: Uint8Array): NarapyProject {
+export function parseNarapyArchive(data: Uint8Array): NarapyProject {
   // v1 (旧): プレーン JSON
   if (looksLikeJson(data)) {
     return parseLegacyJson(strFromU8(data))

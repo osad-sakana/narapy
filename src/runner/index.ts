@@ -97,6 +97,20 @@ export function initRunner(
     }, INTERRUPT_FALLBACK_MS)
   }
 
+  // 実行中の停止操作（停止ボタン・input() モーダル内の停止ボタン共通）
+  function stopExecution(): void {
+    if (!running) return
+    if (interruptBuffer) {
+      // Pyodide が準備済みであれば graceful stop を試みる
+      gracefulStop()
+      appendLog('--- 停止シグナルを送信しました ---', 'info')
+    } else {
+      // Pyodide 初期化中は interrupt buffer が未取得なので即座に強制停止
+      hardStop()
+      appendLog('--- 実行を強制停止しました ---', 'info')
+    }
+  }
+
   function attachWorkerHandlers(): void {
     worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
       const msg = event.data
@@ -115,7 +129,7 @@ export function initRunner(
       if (msg.type === 'input_request') {
         // ユーザーの入力待ちの間はタイムアウトを止め、考える時間を強制停止のカウントに含めない
         clearExecutionTimeout()
-        showInputModal(msg.prompt, (handle) => { openInputModal = handle })
+        showInputModal(msg.prompt, (handle) => { openInputModal = handle }, stopExecution)
           .then((value) => {
             if (!inputStatus || !inputData) return
             const result = encodeInputValue(value, MAX_INPUT_BYTES)
@@ -187,15 +201,7 @@ export function initRunner(
 
   runBtn.addEventListener('click', () => {
     if (running) {
-      if (interruptBuffer) {
-        // Pyodide が準備済みであれば graceful stop を試みる
-        gracefulStop()
-        appendLog('--- 停止シグナルを送信しました ---', 'info')
-      } else {
-        // Pyodide 初期化中は interrupt buffer が未取得なので即座に強制停止
-        hardStop()
-        appendLog('--- 実行を強制停止しました ---', 'info')
-      }
+      stopExecution()
       return
     }
 

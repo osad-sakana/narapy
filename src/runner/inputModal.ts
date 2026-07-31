@@ -11,9 +11,13 @@ let nextModalId = 0
 //
 // onOpen で dismiss 関数を受け取れる。停止操作でワーカーごと再生成する際に、
 // 開いたままのモーダルを外部から閉じるために使う。
+// onStop を渡すと、モーダル内に実行停止ボタンを表示する（input() 待ちの間は
+// バックドロップがツールバーの停止ボタンを覆ってしまうため、無限ループで
+// input() を繰り返すコードを止める手段をモーダル内にも用意する）。
 export function showInputModal(
   prompt: string,
   onOpen?: (handle: InputModalHandle) => void,
+  onStop?: () => void,
 ): Promise<string | null> {
   return new Promise((resolve) => {
     const previouslyFocused = document.activeElement as HTMLElement | null
@@ -50,7 +54,14 @@ export function showInputModal(
     input.className = 'w-full px-3 py-1.5 rounded-lg bg-slate-900 text-white text-sm border border-slate-600 focus:border-violet-400 focus:outline-none'
 
     const actions = document.createElement('div')
-    actions.className = 'flex items-center justify-end gap-2'
+    actions.className = 'flex items-center justify-between gap-2'
+
+    const stopBtn = document.createElement('button')
+    stopBtn.className = 'px-3 py-1.5 rounded-lg text-sm text-red-300 hover:text-white hover:bg-red-900/50 transition-colors cursor-pointer'
+    stopBtn.textContent = '■ 実行を停止'
+
+    const rightActions = document.createElement('div')
+    rightActions.className = 'flex items-center gap-2'
 
     const cancelBtn = document.createElement('button')
     cancelBtn.className = 'px-3 py-1.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-slate-600 transition-colors cursor-pointer'
@@ -60,8 +71,10 @@ export function showInputModal(
     submitBtn.className = 'px-3 py-1.5 rounded-lg text-sm font-bold bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white transition-colors cursor-pointer'
     submitBtn.textContent = '送信'
 
-    actions.appendChild(cancelBtn)
-    actions.appendChild(submitBtn)
+    rightActions.appendChild(cancelBtn)
+    rightActions.appendChild(submitBtn)
+    if (onStop) actions.appendChild(stopBtn)
+    actions.appendChild(rightActions)
     body.appendChild(promptEl)
     body.appendChild(input)
     body.appendChild(actions)
@@ -77,11 +90,7 @@ export function showInputModal(
       closed = true
       backdrop.remove()
       document.removeEventListener('keydown', handleEscape)
-      // Enter/Escape のキーイベント処理中に同期でフォーカスを移すと、ブラウザが
-      // 「Enterキーを押した時点でフォーカスされているボタン」への既定動作を
-      // 移動後の要素に対して発火させてしまう（実行ボタンの意図しない誤クリック）。
-      // イベント処理が完全に終わった後のタスクまでフォーカス復元を遅らせる。
-      setTimeout(() => previouslyFocused?.focus(), 0)
+      previouslyFocused?.focus()
       resolve(value)
     }
 
@@ -93,11 +102,19 @@ export function showInputModal(
 
     const handleInputKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Enter' || e.isComposing) return
+      // 既定動作（Enter押下時にフォーカスされているボタンをクリックする挙動）を
+      // 止めておかないと、close() 内でフォーカスを戻した瞬間にその既定動作が
+      // 移動後のボタン（実行/停止ボタンなど）に対して発火してしまう。
+      e.preventDefault()
       close(input.value)
     }
 
     submitBtn.addEventListener('click', () => close(input.value))
     cancelBtn.addEventListener('click', () => close(null))
+    stopBtn.addEventListener('click', () => {
+      onStop?.()
+      close(null)
+    })
     input.addEventListener('keydown', handleInputKey)
     document.addEventListener('keydown', handleEscape)
 

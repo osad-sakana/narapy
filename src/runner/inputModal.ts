@@ -1,8 +1,18 @@
+export interface InputModalHandle {
+  dismiss: () => void
+}
+
 // Python の input() に対応するアプリ内モーダル。
 // window.prompt() は連続表示するとブラウザが「これ以降のダイアログをブロック」を
 // 有効化することがあり、有効化された瞬間から null が即座に返り続けて
 // 2回目以降の input() が常に空文字になってしまう。そのため window.prompt には頼らない。
-export function showInputModal(prompt: string): Promise<string | null> {
+//
+// onOpen で dismiss 関数を受け取れる。停止操作でワーカーごと再生成する際に、
+// 開いたままのモーダルを外部から閉じるために使う。
+export function showInputModal(
+  prompt: string,
+  onOpen?: (handle: InputModalHandle) => void,
+): Promise<string | null> {
   return new Promise((resolve) => {
     const backdrop = document.createElement('div')
     backdrop.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4'
@@ -50,21 +60,32 @@ export function showInputModal(prompt: string): Promise<string | null> {
     backdrop.appendChild(card)
     document.body.appendChild(backdrop)
 
+    let closed = false
     const close = (value: string | null): void => {
+      if (closed) return
+      closed = true
       backdrop.remove()
-      document.removeEventListener('keydown', handleKey)
+      document.removeEventListener('keydown', handleEscape)
       resolve(value)
     }
 
-    const handleKey = (e: KeyboardEvent): void => {
+    // Escape はフォーカス位置に関わらずキャンセルできるよう document で拾う。
+    // Enter は input 自身にだけ紐付け、IME変換確定やボタンフォーカス中の誤送信を避ける。
+    const handleEscape = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') close(null)
-      if (e.key === 'Enter') close(input.value)
+    }
+
+    const handleInputKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Enter' || e.isComposing) return
+      close(input.value)
     }
 
     submitBtn.addEventListener('click', () => close(input.value))
     cancelBtn.addEventListener('click', () => close(null))
-    document.addEventListener('keydown', handleKey)
+    input.addEventListener('keydown', handleInputKey)
+    document.addEventListener('keydown', handleEscape)
 
+    onOpen?.({ dismiss: () => close(null) })
     input.focus()
   })
 }

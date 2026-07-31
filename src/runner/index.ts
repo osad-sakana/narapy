@@ -5,7 +5,10 @@ import { getValue } from '../editor/index'
 import { translatePythonError } from './errorTranslator'
 import { showFigureModal } from './figureModal'
 import { showTurtleModal } from './turtleModal'
-import { showInputModal } from './inputModal'
+import { showInputModal, type InputModalHandle } from './inputModal'
+
+// pyodide.worker.ts の INPUT_SAB データ領域サイズ（4 + 4092 バイト）と合わせる
+const MAX_INPUT_BYTES = 4092
 
 const RUN_STYLE  = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-bold transition-colors shadow-md shadow-violet-900/50 cursor-pointer'
 const STOP_STYLE = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 text-white text-sm font-bold transition-colors shadow-md shadow-red-900/50 cursor-pointer'
@@ -37,6 +40,7 @@ export function initRunner(
   let inputData: Uint8Array | null = null
   let interruptBuffer: Uint8Array | null = null
   let executionTimeoutId: ReturnType<typeof setTimeout> | null = null
+  let openInputModal: InputModalHandle | null = null
 
   function clearExecutionTimeout(): void {
     if (executionTimeoutId !== null) {
@@ -75,6 +79,9 @@ export function initRunner(
     inputStatus = null
     inputData = null
     interruptBuffer = null
+    // 開いたままの input() モーダルは古い worker 宛の SAB を握っているので閉じる
+    openInputModal?.dismiss()
+    openInputModal = null
     attachWorkerHandlers()
     setRunning(false)
   }
@@ -107,19 +114,26 @@ export function initRunner(
       if (msg.type === 'input_request') {
         // ユーザーの入力待ちの間はタイムアウトを止め、考える時間を強制停止のカウントに含めない
         clearExecutionTimeout()
-        showInputModal(msg.prompt).then((value) => {
-          if (inputStatus && inputData) {
-            if (value === null) {
+        showInputModal(msg.prompt, (handle) => { openInputModal = handle })
+          .then((value) => {
+            if (!inputStatus || !inputData) return
+            const encoded = value === null ? null : new TextEncoder().encode(value)
+            if (!encoded) {
+              Atomics.store(inputStatus, 0, -1)
+            } else if (encoded.length > MAX_INPUT_BYTES) {
+              // SAB のデータ領域を超える入力は書き込めないためキャンセル扱いにする
+              appendLog(`--- 入力が長すぎます（${MAX_INPUT_BYTES}バイトまで） ---`, 'warn')
               Atomics.store(inputStatus, 0, -1)
             } else {
-              const encoded = new TextEncoder().encode(value)
               inputData.set(encoded)
               Atomics.store(inputStatus, 0, encoded.length)
             }
             Atomics.notify(inputStatus, 0)
-          }
-          if (running) armExecutionTimeout()
-        })
+          })
+          .finally(() => {
+            openInputModal = null
+            if (running) armExecutionTimeout()
+          })
         return
       }
 

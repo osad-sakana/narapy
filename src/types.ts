@@ -1,3 +1,8 @@
+// input() の1回分の入力データに使える最大バイト数（UTF-8）。
+// pyodide.worker.ts の INPUT_SAB のデータ領域サイズと src/runner/index.ts の
+// 入力上限チェックの両方から参照し、二重管理を避ける。
+export const MAX_INPUT_BYTES = 4092
+
 export type WorkerMessage =
   | { type: 'stdout' | 'error' | 'loading'; payload: string }
   | { type: 'result'; payload: string | null }

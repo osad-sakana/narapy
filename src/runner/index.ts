@@ -1,10 +1,12 @@
-import type { WorkerMessage, RunFile, RunPayload, TurtleCommands } from '../types'
+import { MAX_INPUT_BYTES, type WorkerMessage, type RunFile, type RunPayload, type TurtleCommands } from '../types'
 import type { EditorInstance } from '../editor/index'
 import { appendLog, appendErrorBlock, clearLog, getLogText } from './log'
 import { getValue } from '../editor/index'
 import { translatePythonError } from './errorTranslator'
 import { showFigureModal } from './figureModal'
 import { showTurtleModal } from './turtleModal'
+import { showInputModal, type InputModalHandle } from './inputModal'
+import { encodeInputValue } from './encodeInput'
 
 const RUN_STYLE  = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-bold transition-colors shadow-md shadow-violet-900/50 cursor-pointer'
 const STOP_STYLE = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 text-white text-sm font-bold transition-colors shadow-md shadow-red-900/50 cursor-pointer'
@@ -36,6 +38,11 @@ export function initRunner(
   let inputData: Uint8Array | null = null
   let interruptBuffer: Uint8Array | null = null
   let executionTimeoutId: ReturnType<typeof setTimeout> | null = null
+  let openInputModal: InputModalHandle | null = null
+  // 停止操作のたびに増やす世代カウンタ。gracefulStop の 800ms フォールバックが
+  // 発火する前に「停止→即座に再実行」されると、古いタイマーが新しい実行を
+  // 誤って hardStop してしまうため、世代が一致する場合のみ実行する。
+  let runGeneration = 0
 
   function clearExecutionTimeout(): void {
     if (executionTimeoutId !== null) {
@@ -44,16 +51,22 @@ export function initRunner(
     }
   }
 
+  function armExecutionTimeout(): void {
+    clearExecutionTimeout()
+    executionTimeoutId = setTimeout(() => {
+      if (!running) return
+      hardStop()
+      appendLog(`--- タイムアウト（${EXECUTION_TIMEOUT_MS / 1000}秒）で強制停止しました ---`, 'warn')
+    }, EXECUTION_TIMEOUT_MS)
+  }
+
   function setRunning(state: boolean): void {
     running = state
     if (state) {
+      runGeneration++
       runBtn.className = STOP_STYLE
       runBtn.textContent = '■ 停止'
-      executionTimeoutId = setTimeout(() => {
-        if (!running) return
-        hardStop()
-        appendLog(`--- タイムアウト（${EXECUTION_TIMEOUT_MS / 1000}秒）で強制停止しました ---`, 'warn')
-      }, EXECUTION_TIMEOUT_MS)
+      armExecutionTimeout()
     } else {
       runBtn.className = RUN_STYLE
       runBtn.textContent = '▶ 実行'
@@ -69,6 +82,12 @@ export function initRunner(
     inputStatus = null
     inputData = null
     interruptBuffer = null
+    // 開いたままの input() モーダルは古い worker 宛の SAB を握っているので閉じる。
+    // dismiss() が呼ぶ close() は同期実行され、input_request ハンドラの
+    // .then/.finally はその後のマイクロタスクで走るため、そちらが参照する
+    // inputStatus/inputData/running は既にここで更新済みの値を見る。
+    openInputModal?.dismiss()
+    openInputModal = null
     attachWorkerHandlers()
     setRunning(false)
   }
@@ -78,9 +97,25 @@ export function initRunner(
     if (interruptBuffer) {
       interruptBuffer[0] = 2 // SIGINT → Python が KeyboardInterrupt を発生させる
     }
+    const generation = runGeneration
     setTimeout(() => {
-      if (running) hardStop()
+      // 800ms の間に停止→再実行されていたら世代が変わっているので誤爆させない
+      if (running && runGeneration === generation) hardStop()
     }, INTERRUPT_FALLBACK_MS)
+  }
+
+  // 実行中の停止操作（停止ボタン・input() モーダル内の停止ボタン共通）
+  function stopExecution(): void {
+    if (!running) return
+    if (interruptBuffer) {
+      // Pyodide が準備済みであれば graceful stop を試みる
+      gracefulStop()
+      appendLog('--- 停止シグナルを送信しました ---', 'info')
+    } else {
+      // Pyodide 初期化中は interrupt buffer が未取得なので即座に強制停止
+      hardStop()
+      appendLog('--- 実行を強制停止しました ---', 'info')
+    }
   }
 
   function attachWorkerHandlers(): void {
@@ -99,17 +134,28 @@ export function initRunner(
       }
 
       if (msg.type === 'input_request') {
-        const value = window.prompt(msg.prompt || 'input()')
-        if (inputStatus && inputData) {
-          if (value === null) {
-            Atomics.store(inputStatus, 0, -1)
-          } else {
-            const encoded = new TextEncoder().encode(value)
-            inputData.set(encoded)
-            Atomics.store(inputStatus, 0, encoded.length)
-          }
-          Atomics.notify(inputStatus, 0)
-        }
+        // ユーザーの入力待ちの間はタイムアウトを止め、考える時間を強制停止のカウントに含めない
+        clearExecutionTimeout()
+        showInputModal(msg.prompt, (handle) => { openInputModal = handle }, stopExecution)
+          .then((value) => {
+            if (!inputStatus || !inputData) return
+            const result = encodeInputValue(value, MAX_INPUT_BYTES)
+            if (!result.ok) {
+              // SAB のデータ領域を超える入力は書き込めないためキャンセル扱いにする
+              if (value !== null) {
+                appendLog(`--- 入力が長すぎます（${MAX_INPUT_BYTES}バイトまで） ---`, 'warn')
+              }
+              Atomics.store(inputStatus, 0, -1)
+            } else {
+              inputData.set(result.bytes)
+              Atomics.store(inputStatus, 0, result.bytes.length)
+            }
+            Atomics.notify(inputStatus, 0)
+          })
+          .finally(() => {
+            openInputModal = null
+            if (running) armExecutionTimeout()
+          })
         return
       }
 
@@ -162,15 +208,7 @@ export function initRunner(
 
   runBtn.addEventListener('click', () => {
     if (running) {
-      if (interruptBuffer) {
-        // Pyodide が準備済みであれば graceful stop を試みる
-        gracefulStop()
-        appendLog('--- 停止シグナルを送信しました ---', 'info')
-      } else {
-        // Pyodide 初期化中は interrupt buffer が未取得なので即座に強制停止
-        hardStop()
-        appendLog('--- 実行を強制停止しました ---', 'info')
-      }
+      stopExecution()
       return
     }
 

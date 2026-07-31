@@ -1,4 +1,4 @@
-import type { WorkerMessage, RunFile, RunPayload, TurtleCommands } from '../types'
+import { MAX_INPUT_BYTES, type WorkerMessage, type RunFile, type RunPayload, type TurtleCommands } from '../types'
 import type { EditorInstance } from '../editor/index'
 import { appendLog, appendErrorBlock, clearLog, getLogText } from './log'
 import { getValue } from '../editor/index'
@@ -6,9 +6,7 @@ import { translatePythonError } from './errorTranslator'
 import { showFigureModal } from './figureModal'
 import { showTurtleModal } from './turtleModal'
 import { showInputModal, type InputModalHandle } from './inputModal'
-
-// pyodide.worker.ts の INPUT_SAB データ領域サイズ（4 + 4092 バイト）と合わせる
-const MAX_INPUT_BYTES = 4092
+import { encodeInputValue } from './encodeInput'
 
 const RUN_STYLE  = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-bold transition-colors shadow-md shadow-violet-900/50 cursor-pointer'
 const STOP_STYLE = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 text-white text-sm font-bold transition-colors shadow-md shadow-red-900/50 cursor-pointer'
@@ -79,7 +77,10 @@ export function initRunner(
     inputStatus = null
     inputData = null
     interruptBuffer = null
-    // 開いたままの input() モーダルは古い worker 宛の SAB を握っているので閉じる
+    // 開いたままの input() モーダルは古い worker 宛の SAB を握っているので閉じる。
+    // dismiss() が呼ぶ close() は同期実行され、input_request ハンドラの
+    // .then/.finally はその後のマイクロタスクで走るため、そちらが参照する
+    // inputStatus/inputData/running は既にここで更新済みの値を見る。
     openInputModal?.dismiss()
     openInputModal = null
     attachWorkerHandlers()
@@ -117,16 +118,16 @@ export function initRunner(
         showInputModal(msg.prompt, (handle) => { openInputModal = handle })
           .then((value) => {
             if (!inputStatus || !inputData) return
-            const encoded = value === null ? null : new TextEncoder().encode(value)
-            if (!encoded) {
-              Atomics.store(inputStatus, 0, -1)
-            } else if (encoded.length > MAX_INPUT_BYTES) {
+            const result = encodeInputValue(value, MAX_INPUT_BYTES)
+            if (!result.ok) {
               // SAB のデータ領域を超える入力は書き込めないためキャンセル扱いにする
-              appendLog(`--- 入力が長すぎます（${MAX_INPUT_BYTES}バイトまで） ---`, 'warn')
+              if (value !== null) {
+                appendLog(`--- 入力が長すぎます（${MAX_INPUT_BYTES}バイトまで） ---`, 'warn')
+              }
               Atomics.store(inputStatus, 0, -1)
             } else {
-              inputData.set(encoded)
-              Atomics.store(inputStatus, 0, encoded.length)
+              inputData.set(result.bytes)
+              Atomics.store(inputStatus, 0, result.bytes.length)
             }
             Atomics.notify(inputStatus, 0)
           })

@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import type { RunFile, RunPayload } from './types'
+import { MAX_INPUT_BYTES, type RunFile, type RunPayload } from './types'
 import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from './lib/pyodideLoader'
 import { TURTLE_MODULE_SRC } from './pyodide/turtleModule'
 
@@ -84,8 +84,8 @@ const interruptBuffer = new Uint8Array(INTERRUPT_SAB)
 
 // SharedArrayBuffer で stdin の同期通信を行う
 // [0..3] Int32: 0=idle, N>0=入力データのバイト数
-// [4..]  Uint8: UTF-8 エンコードされた入力データ（最大 4092 バイト）
-const INPUT_SAB = new SharedArrayBuffer(4 + 4092)
+// [4..]  Uint8: UTF-8 エンコードされた入力データ（最大 MAX_INPUT_BYTES バイト）
+const INPUT_SAB = new SharedArrayBuffer(4 + MAX_INPUT_BYTES)
 const inputStatus = new Int32Array(INPUT_SAB, 0, 1)
 const inputData = new Uint8Array(INPUT_SAB, 4)
 

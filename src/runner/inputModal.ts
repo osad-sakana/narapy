@@ -1,0 +1,70 @@
+// Python の input() に対応するアプリ内モーダル。
+// window.prompt() は連続表示するとブラウザが「これ以降のダイアログをブロック」を
+// 有効化することがあり、有効化された瞬間から null が即座に返り続けて
+// 2回目以降の input() が常に空文字になってしまう。そのため window.prompt には頼らない。
+export function showInputModal(prompt: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div')
+    backdrop.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4'
+
+    const card = document.createElement('div')
+    card.className = 'bg-slate-800 rounded-xl shadow-2xl overflow-hidden max-w-md w-full flex flex-col'
+
+    const header = document.createElement('div')
+    header.className = 'flex items-center justify-between px-4 py-2 bg-slate-700 flex-shrink-0'
+
+    const titleEl = document.createElement('span')
+    titleEl.className = 'text-slate-200 text-sm font-medium'
+    titleEl.textContent = '⌨ input()'
+
+    const body = document.createElement('div')
+    body.className = 'p-4 flex flex-col gap-3'
+
+    const promptEl = document.createElement('label')
+    promptEl.className = 'text-slate-300 text-sm whitespace-pre-wrap break-all'
+    promptEl.textContent = prompt || 'input()'
+
+    const input = document.createElement('input')
+    input.type = 'text'
+    input.className = 'w-full px-3 py-1.5 rounded-lg bg-slate-900 text-white text-sm border border-slate-600 focus:border-violet-400 focus:outline-none'
+
+    const actions = document.createElement('div')
+    actions.className = 'flex items-center justify-end gap-2'
+
+    const cancelBtn = document.createElement('button')
+    cancelBtn.className = 'px-3 py-1.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-slate-600 transition-colors cursor-pointer'
+    cancelBtn.textContent = 'キャンセル'
+
+    const submitBtn = document.createElement('button')
+    submitBtn.className = 'px-3 py-1.5 rounded-lg text-sm font-bold bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white transition-colors cursor-pointer'
+    submitBtn.textContent = '送信'
+
+    actions.appendChild(cancelBtn)
+    actions.appendChild(submitBtn)
+    body.appendChild(promptEl)
+    body.appendChild(input)
+    body.appendChild(actions)
+    header.appendChild(titleEl)
+    card.appendChild(header)
+    card.appendChild(body)
+    backdrop.appendChild(card)
+    document.body.appendChild(backdrop)
+
+    const close = (value: string | null): void => {
+      backdrop.remove()
+      document.removeEventListener('keydown', handleKey)
+      resolve(value)
+    }
+
+    const handleKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') close(null)
+      if (e.key === 'Enter') close(input.value)
+    }
+
+    submitBtn.addEventListener('click', () => close(input.value))
+    cancelBtn.addEventListener('click', () => close(null))
+    document.addEventListener('keydown', handleKey)
+
+    input.focus()
+  })
+}

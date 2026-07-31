@@ -5,6 +5,7 @@ import { getValue } from '../editor/index'
 import { translatePythonError } from './errorTranslator'
 import { showFigureModal } from './figureModal'
 import { showTurtleModal } from './turtleModal'
+import { showInputModal } from './inputModal'
 
 const RUN_STYLE  = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-bold transition-colors shadow-md shadow-violet-900/50 cursor-pointer'
 const STOP_STYLE = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 text-white text-sm font-bold transition-colors shadow-md shadow-red-900/50 cursor-pointer'
@@ -44,16 +45,21 @@ export function initRunner(
     }
   }
 
+  function armExecutionTimeout(): void {
+    clearExecutionTimeout()
+    executionTimeoutId = setTimeout(() => {
+      if (!running) return
+      hardStop()
+      appendLog(`--- タイムアウト（${EXECUTION_TIMEOUT_MS / 1000}秒）で強制停止しました ---`, 'warn')
+    }, EXECUTION_TIMEOUT_MS)
+  }
+
   function setRunning(state: boolean): void {
     running = state
     if (state) {
       runBtn.className = STOP_STYLE
       runBtn.textContent = '■ 停止'
-      executionTimeoutId = setTimeout(() => {
-        if (!running) return
-        hardStop()
-        appendLog(`--- タイムアウト（${EXECUTION_TIMEOUT_MS / 1000}秒）で強制停止しました ---`, 'warn')
-      }, EXECUTION_TIMEOUT_MS)
+      armExecutionTimeout()
     } else {
       runBtn.className = RUN_STYLE
       runBtn.textContent = '▶ 実行'
@@ -99,17 +105,21 @@ export function initRunner(
       }
 
       if (msg.type === 'input_request') {
-        const value = window.prompt(msg.prompt || 'input()')
-        if (inputStatus && inputData) {
-          if (value === null) {
-            Atomics.store(inputStatus, 0, -1)
-          } else {
-            const encoded = new TextEncoder().encode(value)
-            inputData.set(encoded)
-            Atomics.store(inputStatus, 0, encoded.length)
+        // ユーザーの入力待ちの間はタイムアウトを止め、考える時間を強制停止のカウントに含めない
+        clearExecutionTimeout()
+        showInputModal(msg.prompt).then((value) => {
+          if (inputStatus && inputData) {
+            if (value === null) {
+              Atomics.store(inputStatus, 0, -1)
+            } else {
+              const encoded = new TextEncoder().encode(value)
+              inputData.set(encoded)
+              Atomics.store(inputStatus, 0, encoded.length)
+            }
+            Atomics.notify(inputStatus, 0)
           }
-          Atomics.notify(inputStatus, 0)
-        }
+          if (running) armExecutionTimeout()
+        })
         return
       }
 

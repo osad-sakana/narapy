@@ -39,6 +39,10 @@ export function initRunner(
   let interruptBuffer: Uint8Array | null = null
   let executionTimeoutId: ReturnType<typeof setTimeout> | null = null
   let openInputModal: InputModalHandle | null = null
+  // 停止操作のたびに増やす世代カウンタ。gracefulStop の 800ms フォールバックが
+  // 発火する前に「停止→即座に再実行」されると、古いタイマーが新しい実行を
+  // 誤って hardStop してしまうため、世代が一致する場合のみ実行する。
+  let runGeneration = 0
 
   function clearExecutionTimeout(): void {
     if (executionTimeoutId !== null) {
@@ -59,6 +63,7 @@ export function initRunner(
   function setRunning(state: boolean): void {
     running = state
     if (state) {
+      runGeneration++
       runBtn.className = STOP_STYLE
       runBtn.textContent = '■ 停止'
       armExecutionTimeout()
@@ -92,8 +97,10 @@ export function initRunner(
     if (interruptBuffer) {
       interruptBuffer[0] = 2 // SIGINT → Python が KeyboardInterrupt を発生させる
     }
+    const generation = runGeneration
     setTimeout(() => {
-      if (running) hardStop()
+      // 800ms の間に停止→再実行されていたら世代が変わっているので誤爆させない
+      if (running && runGeneration === generation) hardStop()
     }, INTERRUPT_FALLBACK_MS)
   }
 

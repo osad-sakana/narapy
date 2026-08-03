@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { deleteFile, getActiveContent, getActiveFile, loadProject, setActiveFile, updateFileContent, upsertFile } from '../explorer/store'
+import { deleteFile, getActiveContent, getActiveFile, getFile, loadProject, setActiveFile, updateFileContent, upsertFile } from '../explorer/store'
 import { createFileSwitcher, type FileSwitcherDeps } from './fileSwitcher'
 
 // エディタバッファを模した簡易ハーネス。setEditorValue/getEditorValue の実体を差し替え可能にする。
@@ -129,5 +129,9 @@ describe('createFileSwitcher', () => {
     expect(runValidation).toHaveBeenCalledWith('サブの内容')
     // 退避が行われ、main.py の内容は編集後の値で保存されている
     expect(getActiveFile()).toBe('sub.py')
+
+    // 退避が実際に行われたことを検証
+    const saved = getFile('main.py')
+    expect(saved?.content.kind === 'text' && saved.content.data).toBe('メインの内容(編集後)')
   })
 })

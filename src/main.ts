@@ -24,6 +24,7 @@ import {
   hasUserContent,
 } from './explorer/store'
 import { applyUrlLoad } from './urlload/applyUrlLoad'
+import { applyProjectLoad } from './fileio/applyProjectLoad'
 
 // Blocklyはデフォルトで無効。?blockly=1 のときのみ初期化・変換を行う（issue #31）
 const blocklyEnabled = isBlocklyEnabled()
@@ -46,6 +47,20 @@ let activeSource: ActiveSource = 'blockly'
 
 // プログラム的なエディタ書き込み中フラグ（Blocklyやファイル切替など）
 let isSyncingEditor = false
+
+// エディタが「今実際に表示している」ファイルパス。
+// getActiveFile()（ストア側のアクティブファイル）は loadProject や deleteFile 等で
+// エディタ更新より先に書き換わることがあるため、退避先の判定には必ずこちらを使う(issue #45)。
+let editorPath = ''
+
+// editor.setValue を呼ぶ唯一の入り口。isSyncingEditor のトグルと editorPath の更新を
+// 必ずセットで行うことで、更新漏れによる第4の内容破壊経路を防ぐ。
+function setEditorContent(path: string, content: string): void {
+  isSyncingEditor = true
+  setValue(editor, content)
+  editorPath = path
+  isSyncingEditor = false
+}
 
 const blocklyHeader    = document.getElementById('blocklyHeader')    as HTMLElement
 const editorHeader     = document.getElementById('editorHeader')     as HTMLElement
@@ -84,15 +99,18 @@ function codeEqual(a: string, b: string): boolean {
 
 // --- ファイル切替 ---
 function switchToFile(path: string): void {
-  // 現在の内容を保存
-  updateFileContent(getActiveFile(), getValue(editor))
+  // 現在の内容を保存（エディタが実際に表示していたパスへ。getActiveFile()は
+  // deleteFile 等で既に切替後を指している場合があるため使わない、issue #45）。
+  // 同一パスへの切替（アップロード等でストアの内容が既に更新済みのケース）では、
+  // エディタの古いバッファを書き戻すと上書きしてしまうため保存自体をスキップする。
+  if (path !== editorPath) {
+    updateFileContent(editorPath, getValue(editor))
+  }
   // ストアを切替（テキストファイルのみ）
   if (!setActiveFile(path)) return
   // エディタに新しい内容をロード（変更ハンドラを抑制）
-  isSyncingEditor = true
   const content = getActiveContent()
-  setValue(editor, content)
-  isSyncingEditor = false
+  setEditorContent(path, content)
   // ファイル名表示を更新
   editorFileName.textContent = path
   // バリデーションと Blockly 変換
@@ -120,11 +138,9 @@ if (blocklyEnabled) {
   const workspace = createWorkspace((code) => {
     if (activeSource === 'editor') return
     if (codeEqual(getValue(editor), code)) return
-    isSyncingEditor = true
-    setValue(editor, code)
-    isSyncingEditor = false
-    // Blockly 生成コードをストアにも反映
-    updateFileContent(getActiveFile(), code)
+    setEditorContent(editorPath, code)
+    // Blockly 生成コードをストアにも反映（ファイル切替は発生しないため editorPath と同義）
+    updateFileContent(editorPath, code)
     runValidation(code)
   })
 
@@ -214,10 +230,8 @@ try {
 }
 
 // エディタを永続化済みの内容で初期化
-isSyncingEditor = true
-setValue(editor, getActiveContent())
+setEditorContent(getActiveFile(), getActiveContent())
 editorFileName.textContent = getActiveFile()
-isSyncingEditor = false
 
 
 initRunner(editor, () => {
@@ -237,10 +251,20 @@ const importProjectBtn = document.getElementById('importProjectBtn') as HTMLButt
 importProjectBtn.addEventListener('click', () => {
   openNarapyFilePicker(
     (project) => {
-      updateFileContent(getActiveFile(), getValue(editor))
-      loadProject(project.files, project.directories, project.activeFile)
-      refreshExplorer()
-      switchToFile(getActiveFile())
+      applyProjectLoad(
+        { files: project.files, directories: project.directories, activeFile: project.activeFile },
+        {
+          loadProject,
+          refreshExplorer,
+          getActiveFile,
+          getActiveContent,
+          setEditorValue: setEditorContent,
+          setEditorFileName: (path) => { editorFileName.textContent = path },
+          runValidation,
+          isEditorActive: () => activeSource === 'editor',
+          convert: (source) => debouncedConvert.call(source),
+        },
+      )
     },
     (message) => window.alert(message),
   )

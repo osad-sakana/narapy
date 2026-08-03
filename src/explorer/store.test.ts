@@ -27,9 +27,11 @@ describe('hasUserContent', () => {
   })
 })
 
-// issue #45 回帰: アクティブファイル削除時、退避先が「削除前にエディタが表示していたパス」で
-// あれば残ったファイルの内容は破壊されない。main.ts の editorPath による不変条件回復と対になる。
-describe('deleteFile (issue #45 回帰): アクティブファイル削除時の内容破壊防止', () => {
+// updateFileContent の契約確認: 削除済み(=存在しない)パスへの書き込みは早期returnでno-opになる。
+// これは main.ts の fileSwitcher が「削除前にエディタが表示していたパス」へ退避しても
+// 安全である根拠となる store 側の性質であり、main.ts 経由の実際の回帰シナリオ検証は
+// src/editor/fileSwitcher.test.ts で行っている。
+describe('updateFileContent: 存在しないパスへの書き込みはno-op', () => {
   beforeEach(() => {
     loadProject(
       [
@@ -41,17 +43,12 @@ describe('deleteFile (issue #45 回帰): アクティブファイル削除時の
     )
   })
 
-  it('削除前にエディタが表示していたパスへ退避すれば、切替先ファイルの内容は破壊されない', () => {
-    const editorPathBeforeDelete = getActiveFile() // 'main.py' (削除前にエディタが表示していたパス)
-
+  it('削除済みのパスへ書き込んでも、他のファイルの内容には一切影響しない', () => {
     expect(deleteFile('main.py')).toBe(true)
-    const switchedTo = getActiveFile() // 削除により 'sub.py' へ自動的に切り替わる
 
-    // 削除済みのパスへ退避 → updateFileContent は対象が見つからず早期returnし、
-    // 切り替え先ファイル(sub.py)の内容には一切影響しない
-    updateFileContent(editorPathBeforeDelete, 'エディタ編集中の内容(未保存)')
+    updateFileContent('main.py', '削除済みファイルへの書き込み')
 
-    expect(switchedTo).toBe('sub.py')
+    expect(getActiveFile()).toBe('sub.py')
     expect(getActiveContent()).toBe('サブの内容')
   })
 })

@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deleteFile, getActiveContent, getActiveFile, getFile, loadProject, setActiveFile, updateFileContent, upsertFile } from '../explorer/store'
 import { createFileSwitcher, type FileSwitcherDeps } from './fileSwitcher'
 
-// エディタバッファを模した簡易ハーネス。setEditorValue/getEditorValue の実体を差し替え可能にする。
+// エディタバッファを模した簡易ハーネス。setEditorValue の実体を差し替え、
+// 書き込まれた内容を get でアサーションできるようにする。
 function createEditorBuffer(initial = ''): { get: () => string; set: (v: string) => void } {
   let value = initial
   return { get: () => value, set: (v) => { value = v } }
@@ -10,10 +11,8 @@ function createEditorBuffer(initial = ''): { get: () => string; set: (v: string)
 
 function buildDeps(buffer: { get: () => string; set: (v: string) => void }): FileSwitcherDeps {
   return {
-    getEditorValue: buffer.get,
     setEditorValue: buffer.set,
     setSyncingEditor: vi.fn(),
-    updateFileContent,
     setActiveFile,
     getActiveContent,
     setFileName: vi.fn(),
@@ -53,11 +52,9 @@ describe('createFileSwitcher', () => {
     expect(buffer.get()).toBe('サブの内容')
   })
 
-  it('要件2: 同一パス切替（アップロード上書き）で退避がスキップされる', () => {
+  it('要件2: 同一パス切替（アップロード上書き）でストアの新内容が保持される', () => {
     const buffer = createEditorBuffer()
-    const deps = buildDeps(buffer)
-    const updateFileContentSpy = vi.fn(updateFileContent)
-    const switcher = createFileSwitcher({ ...deps, updateFileContent: updateFileContentSpy })
+    const switcher = createFileSwitcher(buildDeps(buffer))
     switcher.setEditorContent('main.py', '古いエディタ内容')
 
     // アップロードによりストアの内容が直接上書きされる（main.tsのアップロード処理を模す）
@@ -65,9 +62,33 @@ describe('createFileSwitcher', () => {
 
     switcher.switchToFile('main.py')
 
-    expect(updateFileContentSpy).not.toHaveBeenCalled()
     expect(getActiveContent()).toBe('アップロードされた新しい内容')
     expect(buffer.get()).toBe('アップロードされた新しい内容')
+  })
+
+  it('要件2b: 別パス切替（フォルダアップロード）で切替元のアップロード内容が潰されない(issue #48 回帰)', () => {
+    loadProject(
+      [
+        { path: 'main.py', content: { kind: 'text', data: '元のmain' } },
+        { path: 'a.py', content: { kind: 'text', data: '元のa' } },
+      ],
+      [],
+      'main.py',
+    )
+    const buffer = createEditorBuffer()
+    const switcher = createFileSwitcher(buildDeps(buffer))
+    switcher.setEditorContent('main.py', '古いエディタ内容')
+
+    // main.py と a.py を含むフォルダのアップロードでストアが直接更新される
+    upsertFile('main.py', { kind: 'text', data: 'アップロードされたmain' })
+    upsertFile('a.py', { kind: 'text', data: 'アップロードされたa' })
+
+    // firstTextPath が a.py になり、開いている main.py とは別パスへ切り替わる
+    switcher.switchToFile('a.py')
+
+    const saved = getFile('main.py')
+    expect(saved?.content.kind === 'text' && saved.content.data).toBe('アップロードされたmain')
+    expect(buffer.get()).toBe('アップロードされたa')
   })
 
   it('要件3: プロジェクト読込直後の switchToFile で新内容が保持される', () => {
@@ -86,13 +107,31 @@ describe('createFileSwitcher', () => {
     expect(buffer.get()).toBe('読み込んだ新しい内容')
   })
 
+  it('切替先が非テキスト等で setActiveFile が false を返す場合、エディタもeditorPathも変更されない', () => {
+    const buffer = createEditorBuffer()
+    const setFileName = vi.fn()
+    const runValidation = vi.fn()
+    const switcher = createFileSwitcher({
+      ...buildDeps(buffer),
+      setActiveFile: () => false,
+      setFileName,
+      runValidation,
+    })
+    switcher.setEditorContent('main.py', 'main.pyの内容')
+
+    switcher.switchToFile('image.png')
+
+    expect(switcher.getEditorPath()).toBe('main.py')
+    expect(buffer.get()).toBe('main.pyの内容')
+    expect(setFileName).not.toHaveBeenCalled()
+    expect(runValidation).not.toHaveBeenCalled()
+  })
+
   it('M1: setEditorValueが例外を投げてもsetSyncingEditor(false)が呼ばれ、editorPathは更新される', () => {
     const setSyncingEditor = vi.fn()
     const switcher = createFileSwitcher({
-      getEditorValue: () => '',
       setEditorValue: () => { throw new Error('boom') },
       setSyncingEditor,
-      updateFileContent: vi.fn(),
       setActiveFile: vi.fn(() => true),
       getActiveContent: () => '',
       setFileName: vi.fn(),
@@ -107,7 +146,7 @@ describe('createFileSwitcher', () => {
     expect(switcher.getEditorPath()).toBe('new.py')
   })
 
-  it('通常のファイル切替: 別ファイルへ切替えると退避が行われ、切替先の内容がエディタへ反映される', () => {
+  it('通常のファイル切替: 打鍵で保存済みの内容が維持され、切替先の内容がエディタへ反映される', () => {
     loadProject(
       [
         { path: 'main.py', content: { kind: 'text', data: 'メインの内容' } },
@@ -116,21 +155,24 @@ describe('createFileSwitcher', () => {
       [],
       'main.py',
     )
-    const buffer = createEditorBuffer('メインの内容(編集後)')
+    const buffer = createEditorBuffer()
     const setFileName = vi.fn()
     const runValidation = vi.fn()
     const switcher = createFileSwitcher({ ...buildDeps(buffer), setFileName, runValidation })
     switcher.setEditorContent('main.py', 'メインの内容(編集後)')
+    // 打鍵時の onDidChangeModelContent 相当。ユーザー編集はこの経路で必ずストアへ届く。
+    updateFileContent('main.py', 'メインの内容(編集後)')
+    // その後にエディタバッファだけが乖離しても、切替時に書き戻されないこと(issue #48)
+    buffer.set('ストアへ届いていない乖離内容')
 
     switcher.switchToFile('sub.py')
 
     expect(buffer.get()).toBe('サブの内容')
     expect(setFileName).toHaveBeenCalledWith('sub.py')
     expect(runValidation).toHaveBeenCalledWith('サブの内容')
-    // 退避が行われ、main.py の内容は編集後の値で保存されている
     expect(getActiveFile()).toBe('sub.py')
 
-    // 退避が実際に行われたことを検証
+    // 切替元は打鍵時に保存された値のまま。switchToFile はストアへ書き込まない。
     const saved = getFile('main.py')
     expect(saved?.content.kind === 'text' && saved.content.data).toBe('メインの内容(編集後)')
   })

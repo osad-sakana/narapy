@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createTextFile, createDirectory, deleteFile, getActiveContent, getActiveFile, hasUserContent, loadProject, updateFileContent } from './store'
+import { createTextFile, createDirectory, deleteFile, getActiveContent, getActiveFile, hasUserContent, loadProject, setActiveFile, updateFileContent } from './store'
 
 // state はモジュール単位のシングルトンなので、各テスト前にデフォルト状態へ明示的に戻す。
 describe('hasUserContent', () => {
@@ -27,10 +27,42 @@ describe('hasUserContent', () => {
   })
 })
 
+// setActiveFile の契約確認: fileSwitcher.switchToFile はこの戻り値で早期returnを決めるため、
+// fileSwitcher 側のテストで使うスタブが実挙動と乖離しないよう契約を固定する。
+describe('setActiveFile: テキストファイルのみアクティブにできる', () => {
+  beforeEach(() => {
+    loadProject(
+      [
+        { path: 'main.py', content: { kind: 'text', data: 'メインの内容' } },
+        { path: 'image.png', content: { kind: 'binary', data: new Uint8Array([1, 2, 3]), mime: 'image/png' } },
+      ],
+      [],
+      'main.py',
+    )
+  })
+
+  it('バイナリファイルへの切替はfalseを返し、アクティブファイルは変わらない', () => {
+    expect(setActiveFile('image.png')).toBe(false)
+    expect(getActiveFile()).toBe('main.py')
+  })
+
+  it('存在しないパスへの切替はfalseを返し、アクティブファイルは変わらない', () => {
+    expect(setActiveFile('missing.py')).toBe(false)
+    expect(getActiveFile()).toBe('main.py')
+  })
+
+  it('同一パスへの切替はtrueを返す', () => {
+    expect(setActiveFile('main.py')).toBe(true)
+    expect(getActiveFile()).toBe('main.py')
+  })
+})
+
 // updateFileContent の契約確認: 削除済み(=存在しない)パスへの書き込みは早期returnでno-opになる。
-// これは main.ts の fileSwitcher が「削除前にエディタが表示していたパス」へ退避しても
-// 安全である根拠となる store 側の性質であり、main.ts 経由の実際の回帰シナリオ検証は
-// src/editor/fileSwitcher.test.ts で行っている。
+// これは main.ts の実行前同期・エクスポート前同期が editorPath を宛先に書き込む際、
+// editorPath が削除済みファイルを指していても安全である根拠となる store 側の性質。
+// （switchToFile は setActiveFile が false のとき早期returnして editorPath を更新しないため、
+// editorPath は「更新されないまま削除されたパス」を指しうる）
+// ファイル切替まわりの回帰シナリオ検証は src/editor/fileSwitcher.test.ts で行っている。
 describe('updateFileContent: 存在しないパスへの書き込みはno-op', () => {
   beforeEach(() => {
     loadProject(

@@ -184,7 +184,7 @@ if (blocklyEnabled) {
 // --- エディタ変更 ---
 // issue #48 で切替時の退避を削除したため、ここでのストア(メモリ上のstate)への書き込みは
 // 同期・非デバウンスに保つこと。下の debouncedConvert に合わせてデバウンスすると、
-// ファイル切替直前の編集が失われる。（IndexedDBへの永続化タイミングは store 側の関心事)
+// ファイル切替直前の編集が失われる。（IndexedDBへの永続化タイミングは store 側の関心事）
 editor.onDidChangeModelContent(() => {
   if (isSyncingEditor) return
   const path = fileSwitcher.getEditorPath()

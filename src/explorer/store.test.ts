@@ -61,7 +61,7 @@ describe('setActiveFile: テキストファイルのみアクティブにでき�
 // これは main.ts の実行前同期・エクスポート前同期が editorPath を宛先に書き込む際、
 // editorPath が削除済みファイルを指していても安全である根拠となる store 側の性質。
 // （switchToFile は setActiveFile が false のとき早期returnして editorPath を更新しないため、
-// editorPath は削除済み／非テキストのパスを指しうる）
+// editorPath は「更新されないまま削除されたパス」を指しうる）
 // ファイル切替まわりの回帰シナリオ検証は src/editor/fileSwitcher.test.ts で行っている。
 describe('updateFileContent: 存在しないパスへの書き込みはno-op', () => {
   beforeEach(() => {

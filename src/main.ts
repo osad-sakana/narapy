@@ -24,6 +24,8 @@ import {
   hasUserContent,
 } from './explorer/store'
 import { applyUrlLoad } from './urlload/applyUrlLoad'
+import { applyProjectLoad } from './fileio/applyProjectLoad'
+import { createFileSwitcher } from './editor/fileSwitcher'
 
 // Blocklyはデフォルトで無効。?blockly=1 のときのみ初期化・変換を行う（issue #31）
 const blocklyEnabled = isBlocklyEnabled()
@@ -82,30 +84,32 @@ function codeEqual(a: string, b: string): boolean {
   return a.trimEnd() === b.trimEnd()
 }
 
-// --- ファイル切替 ---
-function switchToFile(path: string): void {
-  // 現在の内容を保存
-  updateFileContent(getActiveFile(), getValue(editor))
-  // ストアを切替（テキストファイルのみ）
-  if (!setActiveFile(path)) return
-  // エディタに新しい内容をロード（変更ハンドラを抑制）
-  isSyncingEditor = true
-  const content = getActiveContent()
-  setValue(editor, content)
-  isSyncingEditor = false
-  // ファイル名表示を更新
-  editorFileName.textContent = path
-  // バリデーションと Blockly 変換
-  runValidation(content)
-  if (activeSource === 'editor') {
-    debouncedConvert.call(content)
-  }
-}
-
 // Python→Blockly変換（300msデバウンス）。Blockly無効時は常にno-op
 let debouncedConvert: { call: (source: string) => void; cancel: () => void } = {
   call: () => {},
   cancel: () => {},
+}
+
+// --- ファイル切替 ---
+// エディタが「今実際に表示している」ファイルパス(editorPath)の追跡と、
+// ファイル切替時の退避先選択ロジックは fileSwitcher に集約する。
+// getActiveFile()（ストア側のアクティブファイル）は loadProject や deleteFile 等で
+// エディタ更新より先に書き換わることがあるため、退避先の判定には使わない(issue #45)。
+const fileSwitcher = createFileSwitcher({
+  getEditorValue: () => getValue(editor),
+  setEditorValue: (content) => setValue(editor, content),
+  setSyncingEditor: (syncing) => { isSyncingEditor = syncing },
+  updateFileContent,
+  setActiveFile,
+  getActiveContent,
+  setFileName: (path) => { editorFileName.textContent = path },
+  runValidation,
+  isEditorActive: () => activeSource === 'editor',
+  convert: (source) => debouncedConvert.call(source),
+})
+
+function switchToFile(path: string): void {
+  fileSwitcher.switchToFile(path)
 }
 
 // --- Blockly ワークスペース（?blockly=1 のときのみ初期化・変換を行う） ---
@@ -120,11 +124,13 @@ if (blocklyEnabled) {
   const workspace = createWorkspace((code) => {
     if (activeSource === 'editor') return
     if (codeEqual(getValue(editor), code)) return
-    isSyncingEditor = true
-    setValue(editor, code)
-    isSyncingEditor = false
-    // Blockly 生成コードをストアにも反映
-    updateFileContent(getActiveFile(), code)
+    const path = fileSwitcher.getEditorPath()
+    // 起動シーケンス完了前（editorPath未確定、"" のまま）にBlocklyが操作されると、
+    // 反映先のファイルが定まらないため無視する（issue #45 M2）
+    if (!path) return
+    fileSwitcher.setEditorContent(path, code)
+    // Blockly 生成コードをストアにも反映（ファイル切替は発生しないため editorPath と同義）
+    updateFileContent(path, code)
     runValidation(code)
   })
 
@@ -180,10 +186,14 @@ if (blocklyEnabled) {
 // --- エディタ変更 ---
 editor.onDidChangeModelContent(() => {
   if (isSyncingEditor) return
+  const path = fileSwitcher.getEditorPath()
+  // 起動シーケンス完了前（editorPath未確定、"" のまま）の変更は保存先が
+  // 定まらないため無視する（issue #45 M2）
+  if (!path) return
   setActiveSource('editor')
   const source = getValue(editor)
-  // 変更をストアに保存
-  updateFileContent(getActiveFile(), source)
+  // 変更をストアに保存（エディタが実際に表示しているパスへ、issue #45 L1）
+  updateFileContent(path, source)
   runValidation(source)
   debouncedConvert.call(source)
 })
@@ -214,15 +224,13 @@ try {
 }
 
 // エディタを永続化済みの内容で初期化
-isSyncingEditor = true
-setValue(editor, getActiveContent())
+fileSwitcher.setEditorContent(getActiveFile(), getActiveContent())
 editorFileName.textContent = getActiveFile()
-isSyncingEditor = false
 
 
 initRunner(editor, () => {
-  // 実行前に現在の内容をストアへ同期
-  updateFileContent(getActiveFile(), getValue(editor))
+  // 実行前に現在の内容をストアへ同期（エディタが実際に表示しているパスへ、issue #45 L1）
+  updateFileContent(fileSwitcher.getEditorPath(), getValue(editor))
   return getAllFilesForRun()
 })
 
@@ -237,10 +245,20 @@ const importProjectBtn = document.getElementById('importProjectBtn') as HTMLButt
 importProjectBtn.addEventListener('click', () => {
   openNarapyFilePicker(
     (project) => {
-      updateFileContent(getActiveFile(), getValue(editor))
-      loadProject(project.files, project.directories, project.activeFile)
-      refreshExplorer()
-      switchToFile(getActiveFile())
+      applyProjectLoad(
+        { files: project.files, directories: project.directories, activeFile: project.activeFile },
+        {
+          loadProject,
+          refreshExplorer,
+          getActiveFile,
+          getActiveContent,
+          setEditorValue: fileSwitcher.setEditorContent,
+          setEditorFileName: (path) => { editorFileName.textContent = path },
+          runValidation,
+          isEditorActive: () => activeSource === 'editor',
+          convert: (source) => debouncedConvert.call(source),
+        },
+      )
     },
     (message) => window.alert(message),
   )
@@ -249,7 +267,8 @@ importProjectBtn.addEventListener('click', () => {
 // --- プロジェクトを保存 (.narapy) ---
 const exportProjectBtn = document.getElementById('exportProjectBtn') as HTMLButtonElement
 exportProjectBtn.addEventListener('click', async () => {
-  updateFileContent(getActiveFile(), getValue(editor))
+  // エディタが実際に表示しているパスへ同期する（issue #45 L1）
+  updateFileContent(fileSwitcher.getEditorPath(), getValue(editor))
   await flushStore()
   downloadNarapyProject({
     version: 2,

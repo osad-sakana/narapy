@@ -55,10 +55,15 @@ interface ExplorerHandle {
   refresh: () => void
 }
 
+// 非アクティブなファイルの削除はエディタ側に切替を伴わないため、
+// 削除を知らせないとエディタが保持する当該ファイルの状態（undo履歴など）が残り続ける(issue #47)
+export type OnFileDeleted = () => void
+
 export function createExplorer(
   container: HTMLElement,
   onFileSelect: OnFileSelect,
   onError: OnNotify,
+  onFileDeleted: OnFileDeleted,
 ): ExplorerHandle {
   const expanded = new Set<string>()
   let dragDepth = 0
@@ -336,6 +341,7 @@ export function createExplorer(
         window.alert('最後のテキストファイルは削除できません')
         return
       }
+      onFileDeleted()
       if (wasActive) {
         const next = getActiveFile()
         onFileSelect(next)

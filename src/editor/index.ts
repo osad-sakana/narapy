@@ -2,6 +2,7 @@ import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { getFontSize } from './fontSize'
 import { registerPythonCompletion } from './completion'
+import type { ModelRegistryHost } from './modelRegistry'
 
 export type EditorInstance = monaco.editor.IStandaloneCodeEditor
 
@@ -87,13 +88,44 @@ export function getValue(editor: EditorInstance): string {
   return editor.getValue()
 }
 
+// 表示中のモデルを in-place で書き換える。undoスタックを壊さないようにeditOperationを使う。
+// ファイル切替には使わないこと（切替が undo 可能な編集操作になってしまうため、issue #47）。
+// ファイル切替は modelRegistry 経由でモデルごと差し替える。
 export function setValue(editor: EditorInstance, code: string): void {
   const model = editor.getModel()
   if (!model) return
-  // undoスタックを壊さないようにeditOperationを使う
   model.pushEditOperations(
     [],
     [{ range: model.getFullModelRange(), text: code }],
     () => null,
   )
+}
+
+// modelRegistry から Monaco を操作するためのアダプタ（issue #47）
+export function createEditorModelHost(
+  editor: EditorInstance,
+): ModelRegistryHost<monaco.editor.ITextModel> {
+  // createEditor() が生成した初期モデルは最初の差し替え以降不要になるため破棄する
+  let initialModel: monaco.editor.ITextModel | null = editor.getModel()
+
+  return {
+    createModel: (content) => {
+      const model = monaco.editor.createModel(content, 'python')
+      // createModel は内容からインデントを推測する（detectIndentation の既定値が true）ため、
+      // ファイルごとにタブ幅が変わらないよう createEditor と同じ設定を明示的に適用する
+      model.updateOptions({ tabSize: 4, insertSpaces: true })
+      return model
+    },
+    setModel: (model) => {
+      editor.setModel(model)
+      if (initialModel && initialModel !== model) {
+        initialModel.dispose()
+        initialModel = null
+      }
+    },
+    saveViewState: () => editor.saveViewState(),
+    restoreViewState: (state) => {
+      editor.restoreViewState(state as monaco.editor.ICodeEditorViewState | null)
+    },
+  }
 }

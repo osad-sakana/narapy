@@ -6,7 +6,7 @@ import { initRunner } from './runner/index'
 import { createDebounced } from './converter/debounce'
 import { shouldConvert, shouldResyncOnReveal, shouldReportConversionError, type ActiveSource } from './converter/conversionGuard'
 import { createEditor, createEditorModelHost, getValue, setValue } from './editor/index'
-import { createModelRegistry } from './editor/modelRegistry'
+import { createFileOpener, createModelRegistry } from './editor/modelRegistry'
 import { initFontSizeControls } from './editor/fontSize'
 import { downloadNarapyProject, openNarapyFilePicker } from './fileio/index'
 import { createExplorer } from './explorer/ui'
@@ -98,15 +98,13 @@ let debouncedConvert: { call: (source: string) => void; cancel: () => void } = {
 // エディタ更新より先に書き換わることがあるため、退避先の判定には使わない(issue #45)。
 // ファイルごとにエディタモデルを持たせ、切替がundoスタックに積まれないようにする(issue #47)
 const modelRegistry = createModelRegistry(createEditorModelHost(editor))
+const listFilePaths = (): string[] => getFiles().map(f => f.path)
 
 const fileSwitcher = createFileSwitcher({
   getEditorValue: () => getValue(editor),
-  openEditorFile: (path, content, mode) => {
-    // ストアから消えたファイルのモデルを先に破棄する。残しておくと、同名ファイルが
-    // 再作成されたときに削除済みファイルの undo 履歴が復活してしまう(issue #47)
-    modelRegistry.prune(getFiles().map(f => f.path))
-    modelRegistry.openFile(path, content, mode)
-  },
+  // ストアから消えたファイルのモデルを破棄してから開く。残しておくと、同名ファイルが
+  // 再作成されたときに削除済みファイルの undo 履歴が復活してしまう(issue #47)
+  openEditorFile: createFileOpener(modelRegistry, listFilePaths),
   writeEditorContent: (content) => setValue(editor, content),
   setSyncingEditor: (syncing) => { isSyncingEditor = syncing },
   updateFileContent,
@@ -223,6 +221,8 @@ const { refresh: refreshExplorer } = createExplorer(
     refreshExplorer()
   },
   (message) => window.alert(message),
+  // 非アクティブなファイルの削除では切替が起きないため、ここでモデルを破棄する(issue #47)
+  () => modelRegistry.prune(listFilePaths()),
 )
 
 // --- URLパラメータからの初期プロジェクト読み込み (issue #32) ---
@@ -262,7 +262,7 @@ importProjectBtn.addEventListener('click', () => {
           refreshExplorer,
           getActiveFile,
           getActiveContent,
-          setEditorValue: fileSwitcher.openProjectFile,
+          openEditorFile: fileSwitcher.openProjectFile,
           setEditorFileName: (path) => { editorFileName.textContent = path },
           runValidation,
           isEditorActive: () => activeSource === 'editor',

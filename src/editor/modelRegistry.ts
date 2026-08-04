@@ -23,6 +23,7 @@ export type OpenMode = 'reuse' | 'fresh' | 'reset'
 export interface ModelRegistry {
   openFile: (path: string, content: string, mode?: OpenMode) => void
   prune: (existingPaths: readonly string[]) => void
+  // 保持中のモデルを観測するための入口（テストと、将来 prune の契機を増やす際の確認用）
   getOpenPaths: () => readonly string[]
 }
 
@@ -53,7 +54,9 @@ export function createModelRegistry<M extends ManagedModel>(
   }
 
   function attach(path: string, model: M): void {
-    if (activePath && activePath !== path && host.saveViewState) {
+    // 破棄済みパス（削除されたファイル）のビューステートは保存しない。
+    // 保存すると prune で消したエントリが復活し、同名ファイルの再作成時に復元されてしまう。
+    if (activePath && activePath !== path && models[activePath] && host.saveViewState) {
       viewStates = { ...viewStates, [activePath]: host.saveViewState() }
     }
     host.setModel(model)
@@ -119,5 +122,17 @@ export function createModelRegistry<M extends ManagedModel>(
     openFile,
     prune,
     getOpenPaths: () => Object.keys(models),
+  }
+}
+
+// ストアの現況に合わせてモデルを整理してからファイルを開く。
+// main.ts の配線をテスト可能な形に切り出したもの。
+export function createFileOpener(
+  registry: ModelRegistry,
+  listFilePaths: () => readonly string[],
+): (path: string, content: string, mode: OpenMode) => void {
+  return (path, content, mode) => {
+    registry.prune(listFilePaths())
+    registry.openFile(path, content, mode)
   }
 }

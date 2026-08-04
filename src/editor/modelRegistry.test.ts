@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createModelRegistry, type ManagedModel } from './modelRegistry'
+import { createFileOpener, createModelRegistry, type ManagedModel } from './modelRegistry'
 
 // Monaco の ITextModel を模したテストダブル。エディタ上での編集は setValue で模す。
 interface FakeModel extends ManagedModel {
@@ -160,6 +160,22 @@ describe('createModelRegistry', () => {
     expect(restoreViewState).toHaveBeenCalledWith({ scrollTop: 120 })
   })
 
+  it('破棄済みパスのビューステートは保存し直されない', () => {
+    const { host } = createFakeHost()
+    const saveViewState = vi.fn(() => ({ scrollTop: 120 }))
+    const restoreViewState = vi.fn()
+    const registry = createModelRegistry({ ...host, saveViewState, restoreViewState })
+
+    registry.openFile('a.py', 'Aの内容')
+    // 表示中の a.py が削除され、次のファイルへ切り替わる導線
+    registry.prune(['b.py'])
+    registry.openFile('b.py', 'Bの内容')
+    // 同名ファイルが再作成されても、削除済みファイルのビューステートは復元されない
+    registry.openFile('a.py', '')
+
+    expect(restoreViewState).not.toHaveBeenCalled()
+  })
+
   it('作り直したモデルには古いビューステートを復元しない', () => {
     const { host } = createFakeHost()
     const saveViewState = vi.fn(() => ({ scrollTop: 120 }))
@@ -171,5 +187,28 @@ describe('createModelRegistry', () => {
     registry.openFile('a.py', '外部から上書きされた内容')
 
     expect(restoreViewState).not.toHaveBeenCalled()
+  })
+})
+
+describe('createFileOpener', () => {
+  it('開く前にストアの現況でモデルを整理する', () => {
+    const { host, created, current } = createFakeHost()
+    const registry = createModelRegistry(host)
+    let paths = ['a.py', 'b.py']
+    const openFile = createFileOpener(registry, () => paths)
+
+    openFile('a.py', '', 'reuse')
+    const deleted = created[0]
+    openFile('b.py', 'Bの内容', 'reuse')
+
+    // a.py が削除された後、同名ファイルが新規作成された（内容は空文字で一致する）
+    paths = ['b.py']
+    openFile('b.py', 'Bの内容', 'reuse')
+    paths = ['b.py', 'a.py']
+    openFile('a.py', '', 'reuse')
+
+    // 削除済みファイルのモデル（＝undo履歴）は再利用されない
+    expect(deleted.disposed).toBe(true)
+    expect(current()).not.toBe(deleted)
   })
 })

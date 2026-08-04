@@ -20,7 +20,7 @@ const DEFAULT_STATE: LayoutState = {
 
 // ヘッダー幅が狭くなってもラベルが潰れたり縦積みに折り返したりしないよう、
 // whitespace-nowrap + shrink-0 を全パネルトグル共通で必須にする
-export const BTN_BASE = 'text-xs px-2 lg:px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0'
+const BTN_BASE = 'text-xs px-2 lg:px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0'
 
 export const BTN_ACTIVE: Record<'blockly' | 'python' | 'log', string> = {
   blockly: `${BTN_BASE} bg-sky-500/15 text-sky-300 border border-sky-600/40`,
@@ -28,6 +28,11 @@ export const BTN_ACTIVE: Record<'blockly' | 'python' | 'log', string> = {
   log:     `${BTN_BASE} bg-emerald-500/15 text-emerald-300 border border-emerald-600/40`,
 }
 const BTN_INACTIVE = `${BTN_BASE} text-slate-600 border border-transparent hover:text-slate-400`
+
+// BTN_INACTIVE は BTN_ACTIVE 各値と違い index.html との完全一致テストで間接的に
+// 守られていない（初期状態では常にACTIVE側が使われるため）。回帰ガード用に
+// パネルトグルの全スタイルをまとめて公開する。
+export const HEADER_BTN_STYLES = [BTN_INACTIVE, ...Object.values(BTN_ACTIVE)]
 
 // Blocklyパネルの表示状態（Python→Blockly変換を行うべきかの判定に使う）
 let blocklyPanelHidden = false

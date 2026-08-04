@@ -28,9 +28,11 @@ describe('hasUserContent', () => {
 })
 
 // updateFileContent の契約確認: 削除済み(=存在しない)パスへの書き込みは早期returnでno-opになる。
-// これは main.ts の fileSwitcher が「削除前にエディタが表示していたパス」へ退避しても
-// 安全である根拠となる store 側の性質であり、main.ts 経由の実際の回帰シナリオ検証は
-// src/editor/fileSwitcher.test.ts で行っている。
+// これは main.ts の実行前同期・エクスポート前同期が editorPath を宛先に書き込む際、
+// editorPath が削除済みファイルを指していても安全である根拠となる store 側の性質。
+// （アクティブファイル削除後のフォールバックがバイナリだと setActiveFile が false を返し、
+// switchToFile が早期returnするため editorPath は削除済みパスのまま残りうる）
+// ファイル切替まわりの回帰シナリオ検証は src/editor/fileSwitcher.test.ts で行っている。
 describe('updateFileContent: 存在しないパスへの書き込みはno-op', () => {
   beforeEach(() => {
     loadProject(

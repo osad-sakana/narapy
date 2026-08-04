@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deleteFile, getActiveContent, getActiveFile, getFile, loadProject, setActiveFile, updateFileContent, upsertFile } from '../explorer/store'
 import { createFileSwitcher, type FileSwitcherDeps } from './fileSwitcher'
 
-// エディタバッファを模した簡易ハーネス。setEditorValue/getEditorValue の実体を差し替え可能にする。
+// エディタバッファを模した簡易ハーネス。setEditorValue の実体を差し替え、
+// 書き込まれた内容を get でアサーションできるようにする。
 function createEditorBuffer(initial = ''): { get: () => string; set: (v: string) => void } {
   let value = initial
   return { get: () => value, set: (v) => { value = v } }
@@ -74,7 +75,7 @@ describe('createFileSwitcher', () => {
       [],
       'main.py',
     )
-    const buffer = createEditorBuffer('古いエディタ内容')
+    const buffer = createEditorBuffer()
     const switcher = createFileSwitcher(buildDeps(buffer))
     switcher.setEditorContent('main.py', '古いエディタ内容')
 
@@ -104,6 +105,26 @@ describe('createFileSwitcher', () => {
 
     expect(getActiveContent()).toBe('読み込んだ新しい内容')
     expect(buffer.get()).toBe('読み込んだ新しい内容')
+  })
+
+  it('切替先が非テキスト等で setActiveFile が false を返す場合、エディタもeditorPathも変更されない', () => {
+    const buffer = createEditorBuffer()
+    const setFileName = vi.fn()
+    const runValidation = vi.fn()
+    const switcher = createFileSwitcher({
+      ...buildDeps(buffer),
+      setActiveFile: () => false,
+      setFileName,
+      runValidation,
+    })
+    switcher.setEditorContent('main.py', 'main.pyの内容')
+
+    switcher.switchToFile('image.png')
+
+    expect(switcher.getEditorPath()).toBe('main.py')
+    expect(buffer.get()).toBe('main.pyの内容')
+    expect(setFileName).not.toHaveBeenCalled()
+    expect(runValidation).not.toHaveBeenCalled()
   })
 
   it('M1: setEditorValueが例外を投げてもsetSyncingEditor(false)が呼ばれ、editorPathは更新される', () => {

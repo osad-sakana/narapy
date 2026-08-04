@@ -182,6 +182,9 @@ if (blocklyEnabled) {
 }
 
 // --- エディタ変更 ---
+// ここがユーザー編集の唯一の永続化経路（issue #48 で切替時の退避を削除したため）。
+// 必ず同期・非デバウンスでストアへ書くこと。下の debouncedConvert に合わせてここを
+// デバウンスすると、ファイル切替直前の編集が黙って失われる。
 editor.onDidChangeModelContent(() => {
   if (isSyncingEditor) return
   const path = fileSwitcher.getEditorPath()

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { resolveBlocklyCollapsed, BTN_ACTIVE, BTN_INACTIVE } from './index'
+import indexHtml from '../../index.html?raw'
+import { resolveBlocklyCollapsed, BTN_BASE, BTN_ACTIVE } from './index'
 import { RUN_STYLE, STOP_STYLE } from '../runner/buttonStyles'
 
 describe('resolveBlocklyCollapsed', () => {
@@ -20,16 +19,11 @@ describe('resolveBlocklyCollapsed', () => {
 // issue #51: shrink-0/whitespace-nowrapが欠けるとボタンが折り返してヘッダー高さが伸び、
 // はみ出した#runBtnがoverflow-hiddenのbodyにクリップされ操作不能になる。
 describe('ヘッダーの潰れ・折り返し防止クラス', () => {
-  it('BTN_ACTIVE の全パネルトグルが whitespace-nowrap と shrink-0 を含む', () => {
-    for (const className of Object.values(BTN_ACTIVE)) {
-      expect(className).toContain('whitespace-nowrap')
-      expect(className).toContain('shrink-0')
-    }
-  })
-
-  it('BTN_INACTIVE が whitespace-nowrap と shrink-0 を含む', () => {
-    expect(BTN_INACTIVE).toContain('whitespace-nowrap')
-    expect(BTN_INACTIVE).toContain('shrink-0')
+  // BTN_ACTIVE/BTN_INACTIVEはどちらもBTN_BASEをテンプレートリテラルで合成しているだけなので、
+  // BTN_BASE自体を検査すれば両方をカバーできる（個別に検査すると同じ主張を繰り返すだけになる）
+  it('BTN_BASE が whitespace-nowrap と shrink-0 を含む', () => {
+    expect(BTN_BASE).toContain('whitespace-nowrap')
+    expect(BTN_BASE).toContain('shrink-0')
   })
 
   it('RUN_STYLE / STOP_STYLE が whitespace-nowrap と shrink-0 を含む', () => {
@@ -45,11 +39,12 @@ describe('ヘッダーの潰れ・折り返し防止クラス', () => {
 // index.html の初期class（静的マークアップ）がTS定数とずれると、パネル切替や実行操作の
 // たびに潰れ・折り返し防止が巻き戻ってしまう。
 describe('index.html とヘッダークラス定数の整合性', () => {
-  const html = readFileSync(fileURLToPath(new URL('../../index.html', import.meta.url)), 'utf-8')
-
+  // id と class を同一タグ内（次の">"まで）に限定してマッチさせる。
+  // タグ境界を跨ぐ緩い正規表現だと、属性順が変わった際に別要素のclassを
+  // 誤って拾って黙って比較してしまうため、見つからない場合は例外を投げる。
   function extractClass(id: string): string {
-    const match = html.match(new RegExp(`id="${id}"[\\s\\S]*?class="([^"]*)"`))
-    if (!match) throw new Error(`index.html に id="${id}" の要素が見つかりません`)
+    const match = indexHtml.match(new RegExp(`<[a-z]+[^>]*\\bid="${id}"[^>]*\\bclass="([^"]*)"[^>]*>`, 'i'))
+    if (!match) throw new Error(`index.html に <タグ id="${id}" ... class="..."> の形で一致する要素が見つかりません`)
     return match[1]
   }
 

@@ -27,7 +27,7 @@ export const BTN_ACTIVE: Record<'blockly' | 'python' | 'log', string> = {
   python:  `${BTN_BASE} bg-violet-500/15 text-violet-300 border border-violet-600/40`,
   log:     `${BTN_BASE} bg-emerald-500/15 text-emerald-300 border border-emerald-600/40`,
 }
-export const BTN_INACTIVE = `${BTN_BASE} text-slate-600 border border-transparent hover:text-slate-400`
+const BTN_INACTIVE = `${BTN_BASE} text-slate-600 border border-transparent hover:text-slate-400`
 
 // Blocklyパネルの表示状態（Python→Blockly変換を行うべきかの判定に使う）
 let blocklyPanelHidden = false

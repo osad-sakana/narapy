@@ -15,17 +15,17 @@
   </head>
   <body class="bg-[#08080d] text-slate-100 min-h-screen flex flex-col font-sans">
 
-    <header class="flex items-center justify-between px-6 py-3 bg-[#110826] border-b border-purple-900/50 shrink-0">
-      <div class="flex items-center gap-3">
-        <img src="/favicon.svg" alt="Narapy" class="w-8 h-8 select-none" draggable="false" />
-        <span class="text-lg font-bold tracking-tight text-purple-100">Narapy</span>
-        <span class="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+    <header class="flex items-center justify-between px-3 lg:px-6 py-3 gap-2 bg-[#110826] border-b border-purple-900/50 shrink-0">
+      <div class="flex items-center gap-3 min-w-0 shrink-0">
+        <img src="/favicon.svg" alt="Narapy" class="w-8 h-8 select-none shrink-0 hidden sm:block" draggable="false" />
+        <span class="text-lg font-bold tracking-tight text-purple-100 shrink-0 whitespace-nowrap hidden sm:inline">Narapy</span>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30 shrink-0 whitespace-nowrap">
           共有リンクを作る
         </span>
       </div>
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 shrink-0">
         <!-- フォントサイズ制御 -->
-        <div class="flex items-center gap-0.5 border border-slate-700/60 rounded-lg overflow-hidden">
+        <div class="flex items-center gap-0.5 border border-slate-700/60 rounded-lg overflow-hidden shrink-0">
           <button
             id="fontDecrease"
             title="文字を小さく"
@@ -38,7 +38,7 @@
             class="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700/40 transition-colors cursor-pointer select-none"
           >A+</button>
         </div>
-        <a href="./index.html" class="text-xs text-slate-400 hover:text-slate-100 transition-colors">← エディタに戻る</a>
+        <a href="./index.html" class="text-xs text-slate-400 hover:text-slate-100 transition-colors shrink-0 whitespace-nowrap">← エディタに戻る</a>
       </div>
     </header>
 

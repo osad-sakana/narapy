@@ -9,8 +9,6 @@ import { showInputModal, type InputModalHandle } from './inputModal'
 import { encodeInputValue } from './encodeInput'
 import { RUN_STYLE, STOP_STYLE } from './buttonStyles'
 
-export { RUN_STYLE, STOP_STYLE }
-
 // 60 秒間応答がなければ Worker を強制終了する
 const EXECUTION_TIMEOUT_MS = 60_000
 // KeyboardInterrupt 後、800ms 以内に完了しなければ強制終了にフォールバック

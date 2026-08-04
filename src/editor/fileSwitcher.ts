@@ -1,13 +1,11 @@
 import type { OpenMode } from './modelRegistry'
 
 export interface FileSwitcherDeps {
-  getEditorValue: () => string
   // ファイルをエディタで開く（モデルごと差し替え。undoスタックにファイル切替を積まない）
   openEditorFile: (path: string, content: string, mode: OpenMode) => void
   // 表示中のモデルを in-place で書き換える（Blockly同期用。undo履歴を保つ）
   writeEditorContent: (content: string) => void
   setSyncingEditor: (syncing: boolean) => void
-  updateFileContent: (path: string, content: string) => void
   setActiveFile: (path: string) => boolean
   getActiveContent: () => string
   setFileName: (path: string) => void
@@ -23,11 +21,19 @@ export interface FileSwitcher {
   switchToFile: (path: string) => void
 }
 
-// エディタが「今実際に表示している」ファイルパス(editorPath)を追跡し、
-// ファイル切替時の退避先選択ロジックを提供する(issue #45)。
-// getActiveFile()（ストア側のアクティブファイル）は loadProject や deleteFile 等で
-// エディタ更新より先に書き換わることがあるため、退避先の判定には必ず
-// このモジュールが内部で保持する editorPath を使い、getActiveFile() は使わない。
+// エディタが「今実際に表示している」ファイルパス(editorPath)を追跡する(issue #45)。
+// 呼び出し側（打鍵時の保存・Blockly生成コードの反映・実行前同期・エクスポート時同期）は
+// 書き込み先パスとしてこの editorPath を使う。getActiveFile()（ストア側のアクティブファイル）は
+// loadProject や deleteFile 等でエディタ更新より先に書き換わることがあるため使わない。
+//
+// 切替時にエディタ内容をストアへ退避する処理は持たない(issue #48)。
+// エディタ内容の変更は打鍵時の onDidChangeModelContent と Blockly 生成コードの反映が
+// いずれもその場でストアへ書き込むため、切替時の退避は冗長であるうえ、
+// アップロード等でストアが先に更新されているケースで古いバッファが新しい内容を潰す。
+//
+// エディタへの書き込みは「モデルごと差し替える切替」と「表示中モデルの in-place 書き換え」の
+// 2種類に分かれる。切替を in-place で行うと undo スタックに積まれ、Ctrl+Z で切替前の
+// ファイルの内容が現在のファイルへ書き戻されてしまう(issue #47)。
 export function createFileSwitcher(deps: FileSwitcherDeps): FileSwitcher {
   let editorPath = ''
 
@@ -57,16 +63,11 @@ export function createFileSwitcher(deps: FileSwitcherDeps): FileSwitcher {
   }
 
   function switchToFile(path: string): void {
-    // 同一パスへの切替（アップロード等でストアの内容が既に更新済みのケース）では、
-    // エディタの古いバッファを書き戻すと上書きしてしまうため保存自体をスキップする。
+    // 同一パスへの切替はアップロード等でストアが外部から上書きされたケース。既存モデルの
+    // undo 履歴には上書き前の内容が残っているため、モデルを作り直して履歴ごと捨てる(issue #47)。
     const isSamePath = path === editorPath
-    if (!isSamePath) {
-      deps.updateFileContent(editorPath, deps.getEditorValue())
-    }
     if (!deps.setActiveFile(path)) return
     const content = deps.getActiveContent()
-    // 同一パスへの切替はストアが外部から上書きされたケース。既存モデルの undo 履歴には
-    // 上書き前の内容が残っているため、モデルを作り直して履歴ごと捨てる(issue #47)。
     applyToEditor(path, () => deps.openEditorFile(path, content, isSamePath ? 'fresh' : 'reuse'))
     deps.setFileName(path)
     deps.runValidation(content)

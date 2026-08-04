@@ -92,22 +92,20 @@ let debouncedConvert: { call: (source: string) => void; cancel: () => void } = {
 }
 
 // --- ファイル切替 ---
-// エディタが「今実際に表示している」ファイルパス(editorPath)の追跡と、
-// ファイル切替時の退避先選択ロジックは fileSwitcher に集約する。
+// エディタが「今実際に表示している」ファイルパス(editorPath)の追跡は fileSwitcher に集約する。
 // getActiveFile()（ストア側のアクティブファイル）は loadProject や deleteFile 等で
-// エディタ更新より先に書き換わることがあるため、退避先の判定には使わない(issue #45)。
+// エディタ更新より先に書き換わることがあるため、ストアへの書き込み先には使わない(issue #45)。
+// 切替時の退避は fileSwitcher では行わない（打鍵時とBlockly反映時に保存済みのため、issue #48）。
 // ファイルごとにエディタモデルを持たせ、切替がundoスタックに積まれないようにする(issue #47)
 const modelRegistry = createModelRegistry(createEditorModelHost(editor))
 const listFilePaths = (): string[] => getFiles().map(f => f.path)
 
 const fileSwitcher = createFileSwitcher({
-  getEditorValue: () => getValue(editor),
   // ストアから消えたファイルのモデルを破棄してから開く。残しておくと、同名ファイルが
   // 再作成されたときに削除済みファイルの undo 履歴が復活してしまう(issue #47)
   openEditorFile: createFileOpener(modelRegistry, listFilePaths),
   writeEditorContent: (content) => setValue(editor, content),
   setSyncingEditor: (syncing) => { isSyncingEditor = syncing },
-  updateFileContent,
   setActiveFile,
   getActiveContent,
   setFileName: (path) => { editorFileName.textContent = path },
@@ -192,6 +190,9 @@ if (blocklyEnabled) {
 }
 
 // --- エディタ変更 ---
+// issue #48 で切替時の退避を削除したため、ここでのストア(メモリ上のstate)への書き込みは
+// 同期・非デバウンスに保つこと。下の debouncedConvert に合わせてデバウンスすると、
+// ファイル切替直前の編集が失われる。（IndexedDBへの永続化タイミングは store 側の関心事）
 editor.onDidChangeModelContent(() => {
   if (isSyncingEditor) return
   const path = fileSwitcher.getEditorPath()

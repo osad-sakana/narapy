@@ -60,7 +60,7 @@ describe('createFileSwitcher', () => {
     const buffer = createEditorBuffer()
     const switcher = createFileSwitcher(buildDeps(buffer))
     // main.py を表示中として editorPath を確定させる
-    switcher.openFile('main.py', 'メインの内容')
+    switcher.openProjectFile('main.py', 'メインの内容')
 
     expect(deleteFile('main.py')).toBe(true)
     const next = getActiveFile() // 削除により 'sub.py' へ自動的に切り替わる
@@ -77,7 +77,7 @@ describe('createFileSwitcher', () => {
     const deps = buildDeps(buffer)
     const updateFileContentSpy = vi.fn(updateFileContent)
     const switcher = createFileSwitcher({ ...deps, updateFileContent: updateFileContentSpy })
-    switcher.openFile('main.py', '古いエディタ内容')
+    switcher.openProjectFile('main.py', '古いエディタ内容')
 
     // アップロードによりストアの内容が直接上書きされる（main.tsのアップロード処理を模す）
     upsertFile('main.py', { kind: 'text', data: 'アップロードされた新しい内容' })
@@ -92,7 +92,7 @@ describe('createFileSwitcher', () => {
   it('要件3: プロジェクト読込直後の switchToFile で新内容が保持される', () => {
     const buffer = createEditorBuffer()
     const switcher = createFileSwitcher(buildDeps(buffer))
-    switcher.openFile('main.py', '元の内容')
+    switcher.openProjectFile('main.py', '元の内容')
 
     // applyProjectLoad 相当の処理: loadProject → openProjectFile で editorPath を新ファイルへ更新
     loadProject([{ path: 'new.py', content: { kind: 'text', data: '読み込んだ新しい内容' } }], [], 'new.py')
@@ -105,7 +105,7 @@ describe('createFileSwitcher', () => {
     expect(buffer.get()).toBe('読み込んだ新しい内容')
   })
 
-  it('M1: openFileが例外を投げてもsetSyncingEditor(false)が呼ばれ、editorPathは更新される', () => {
+  it('M1: openProjectFileが例外を投げてもsetSyncingEditor(false)が呼ばれ、editorPathは更新される', () => {
     const setSyncingEditor = vi.fn()
     const switcher = createFileSwitcher({
       getEditorValue: () => '',
@@ -121,7 +121,7 @@ describe('createFileSwitcher', () => {
       convert: vi.fn(),
     })
 
-    expect(() => switcher.openFile('new.py', 'x')).toThrow('boom')
+    expect(() => switcher.openProjectFile('new.py', 'x')).toThrow('boom')
     expect(setSyncingEditor).toHaveBeenNthCalledWith(1, true)
     expect(setSyncingEditor).toHaveBeenNthCalledWith(2, false)
     expect(switcher.getEditorPath()).toBe('new.py')
@@ -140,7 +140,7 @@ describe('createFileSwitcher', () => {
     const setFileName = vi.fn()
     const runValidation = vi.fn()
     const switcher = createFileSwitcher({ ...buildDeps(buffer), setFileName, runValidation })
-    switcher.openFile('main.py', 'メインの内容(編集後)')
+    switcher.openProjectFile('main.py', 'メインの内容(編集後)')
 
     switcher.switchToFile('sub.py')
 
@@ -166,14 +166,14 @@ describe('createFileSwitcher', () => {
     )
     const buffer = createEditorBuffer()
     const switcher = createFileSwitcher(buildDeps(buffer))
-    switcher.openFile('main.py', 'メインの内容')
+    switcher.openProjectFile('main.py', 'メインの内容')
 
     switcher.switchToFile('sub.py')
 
     // 切替が undo 可能な編集操作にならないよう、writeEditorContent は使わない
     expect(buffer.written).toEqual([])
     expect(buffer.opened).toEqual([
-      { path: 'main.py', mode: 'reuse' },
+      { path: 'main.py', mode: 'reset' },
       { path: 'sub.py', mode: 'reuse' },
     ])
   })
@@ -181,7 +181,7 @@ describe('createFileSwitcher', () => {
   it("issue #47: 同一パスへの切替（外部からの上書き）は mode 'fresh' で開く", () => {
     const buffer = createEditorBuffer()
     const switcher = createFileSwitcher(buildDeps(buffer))
-    switcher.openFile('main.py', '古いエディタ内容')
+    switcher.openProjectFile('main.py', '古いエディタ内容')
 
     upsertFile('main.py', { kind: 'text', data: 'アップロードされた新しい内容' })
     switcher.switchToFile('main.py')
@@ -201,13 +201,13 @@ describe('createFileSwitcher', () => {
   it('issue #47: Blockly同期は undo 履歴を保つため in-place 書き込みを使う', () => {
     const buffer = createEditorBuffer()
     const switcher = createFileSwitcher(buildDeps(buffer))
-    switcher.openFile('main.py', '')
+    switcher.openProjectFile('main.py', '')
 
     switcher.syncEditorContent('main.py', 'print("blockly")')
 
     expect(buffer.written).toEqual(['print("blockly")'])
     // モデル差し替えは初回の openFile のみ
-    expect(buffer.opened).toEqual([{ path: 'main.py', mode: 'reuse' }])
+    expect(buffer.opened).toEqual([{ path: 'main.py', mode: 'reset' }])
     expect(switcher.getEditorPath()).toBe('main.py')
   })
 })

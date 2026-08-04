@@ -18,7 +18,6 @@ export interface FileSwitcherDeps {
 
 export interface FileSwitcher {
   getEditorPath: () => string
-  openFile: (path: string, content: string) => void
   openProjectFile: (path: string, content: string) => void
   syncEditorContent: (path: string, content: string) => void
   switchToFile: (path: string) => void
@@ -45,13 +44,7 @@ export function createFileSwitcher(deps: FileSwitcherDeps): FileSwitcher {
     }
   }
 
-  // ファイルを開く（モデル差し替え）。既存モデルがあれば再利用され、
-  // ファイルごとの undo 履歴が保たれる(issue #47)。
-  function openFile(path: string, content: string): void {
-    applyToEditor(path, () => deps.openEditorFile(path, content, 'reuse'))
-  }
-
-  // プロジェクト読込では全ファイルが入れ替わるため、既存モデルを全破棄する。
+  // 起動時とプロジェクト読込後の初回オープン。全ファイルが入れ替わるため既存モデルを全破棄する。
   // 再利用すると、読込前の内容が undo で復元され現在のファイルへ保存されてしまう(issue #47)。
   function openProjectFile(path: string, content: string): void {
     applyToEditor(path, () => deps.openEditorFile(path, content, 'reset'))
@@ -84,7 +77,6 @@ export function createFileSwitcher(deps: FileSwitcherDeps): FileSwitcher {
 
   return {
     getEditorPath: () => editorPath,
-    openFile,
     openProjectFile,
     syncEditorContent,
     switchToFile,

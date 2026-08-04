@@ -84,6 +84,8 @@ export function createModelRegistry<M extends ManagedModel>(
     const existing = models[path]
     // reuse でも内容がストアとずれている場合は外部から上書きされた証拠なので作り直す。
     // 作り直さないと、上書き前の内容が undo で復元されてしまう(issue #47)。
+    // 改行コードは正規化せず厳密比較する。改行混在などで誤って不一致と判定されても
+    // 結果はモデルの作り直し（＝そのファイルのundo履歴の破棄）で、内容は壊れない安全側のため。
     const canReuse = mode === 'reuse' && existing !== undefined && existing.getValue() === content
 
     if (canReuse) {

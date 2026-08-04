@@ -233,8 +233,10 @@ try {
   window.alert(err instanceof Error ? err.message : String(err))
 }
 
-// エディタを永続化済みの内容で初期化
-fileSwitcher.openFile(getActiveFile(), getActiveContent())
+// エディタを永続化済みの内容で初期化。
+// ?project=<URL> の読込待ちの間にユーザーがファイルを選択するとモデルが作られうるため、
+// ここでは既存モデルを全破棄して開き、旧プロジェクトの undo 履歴を持ち越さない(issue #47)
+fileSwitcher.openProjectFile(getActiveFile(), getActiveContent())
 editorFileName.textContent = getActiveFile()
 
 
@@ -262,7 +264,7 @@ importProjectBtn.addEventListener('click', () => {
           refreshExplorer,
           getActiveFile,
           getActiveContent,
-          openEditorFile: fileSwitcher.openProjectFile,
+          openProjectFile: fileSwitcher.openProjectFile,
           setEditorFileName: (path) => { editorFileName.textContent = path },
           runValidation,
           isEditorActive: () => activeSource === 'editor',

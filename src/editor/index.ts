@@ -109,7 +109,13 @@ export function createEditorModelHost(
   let initialModel: monaco.editor.ITextModel | null = editor.getModel()
 
   return {
-    createModel: (content) => monaco.editor.createModel(content, 'python'),
+    createModel: (content) => {
+      const model = monaco.editor.createModel(content, 'python')
+      // createModel は内容からインデントを推測する（detectIndentation の既定値が true）ため、
+      // ファイルごとにタブ幅が変わらないよう createEditor と同じ設定を明示的に適用する
+      model.updateOptions({ tabSize: 4, insertSpaces: true })
+      return model
+    },
     setModel: (model) => {
       editor.setModel(model)
       if (initialModel && initialModel !== model) {

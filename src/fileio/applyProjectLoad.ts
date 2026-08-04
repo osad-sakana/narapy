@@ -11,7 +11,7 @@ export interface ApplyProjectLoadDeps {
   refreshExplorer: () => void
   getActiveFile: () => string
   getActiveContent: () => string
-  openEditorFile: (path: string, content: string) => void
+  openProjectFile: (path: string, content: string) => void
   setEditorFileName: (path: string) => void
   runValidation: (source: string) => void
   isEditorActive: () => boolean
@@ -29,7 +29,7 @@ export function applyProjectLoad(input: ProjectLoadInput, deps: ApplyProjectLoad
 
   const path = deps.getActiveFile()
   const content = deps.getActiveContent()
-  deps.openEditorFile(path, content)
+  deps.openProjectFile(path, content)
   deps.setEditorFileName(path)
   deps.runValidation(content)
   if (deps.isEditorActive()) {

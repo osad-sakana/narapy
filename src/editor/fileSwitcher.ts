@@ -40,6 +40,8 @@ export function createFileSwitcher(deps: FileSwitcherDeps): FileSwitcher {
   // エディタへの書き込みを行う唯一の入り口。書き込みが例外を投げても
   // isSyncingEditor が true のまま固着しないよう try/finally で保護し、
   // editorPath は書き込みの成否に関わらず先に確定させる。
+  // switchToFile では setActiveFile が既に成功しているため、書き込みが失敗しても
+  // editorPath をストアの activeFile と一致させておく方が食い違いが小さい。
   function applyToEditor(path: string, write: () => void): void {
     deps.setSyncingEditor(true)
     editorPath = path
@@ -63,12 +65,12 @@ export function createFileSwitcher(deps: FileSwitcherDeps): FileSwitcher {
   }
 
   function switchToFile(path: string): void {
-    // 同一パスへの切替はアップロード等でストアが外部から上書きされたケース。既存モデルの
-    // undo 履歴には上書き前の内容が残っているため、モデルを作り直して履歴ごと捨てる(issue #47)。
-    const isSamePath = path === editorPath
     if (!deps.setActiveFile(path)) return
     const content = deps.getActiveContent()
-    applyToEditor(path, () => deps.openEditorFile(path, content, isSamePath ? 'fresh' : 'reuse'))
+    // 同一パスへの切替（アップロード等でストアが外部から上書きされたケース）も reuse でよい。
+    // 内容がストアとずれていればモデルは作り直され、一致する場合に残る undo 履歴は
+    // 同じファイル自身のものなので、issue #47 のクロスファイル混入にはならない。
+    applyToEditor(path, () => deps.openEditorFile(path, content, 'reuse'))
     deps.setFileName(path)
     deps.runValidation(content)
     if (deps.isEditorActive()) {

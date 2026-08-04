@@ -57,13 +57,14 @@ describe('createModelRegistry', () => {
     expect(created).toHaveLength(3)
   })
 
-  it("mode 'fresh' は内容が一致していてもモデルを作り直す", () => {
+  it('同一パスを開き直すときも、ストア内容とずれていればモデルを作り直す', () => {
     const { host, current } = createFakeHost()
     const registry = createModelRegistry(host)
 
-    registry.openFile('a.py', '同じ内容')
+    registry.openFile('a.py', '元の内容')
     const before = current()
-    registry.openFile('a.py', '同じ内容', 'fresh')
+    // アップロードで表示中のファイルが外部から上書きされたケース
+    registry.openFile('a.py', '外部から上書きされた内容')
 
     expect(current()).not.toBe(before)
     // 表示中だったモデルは差し替え後に破棄される

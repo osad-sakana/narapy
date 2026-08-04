@@ -15,10 +15,10 @@ export interface ModelRegistryHost<M extends ManagedModel> {
   restoreViewState?: (state: unknown) => void
 }
 
-// reuse: 既存モデルを再利用してファイル別の undo 履歴を保つ（通常のファイル切替）
-// fresh: 対象パスのモデルを作り直す（アップロード等でストアが外部から上書きされた場合）
-// reset: 全モデルを破棄して作り直す（プロジェクト読込で全ファイルが入れ替わる場合）
-export type OpenMode = 'reuse' | 'fresh' | 'reset'
+// reuse: 既存モデルを再利用してファイル別の undo 履歴を保つ（通常のファイル切替）。
+//        ストアの内容とずれていれば外部から上書きされたケースなので作り直す。
+// reset: 全モデルを破棄して作り直す（起動時・プロジェクト読込で全ファイルが入れ替わる場合）
+export type OpenMode = 'reuse' | 'reset'
 
 export interface ModelRegistry {
   openFile: (path: string, content: string, mode?: OpenMode) => void

@@ -220,7 +220,7 @@ describe('createFileSwitcher', () => {
     ])
   })
 
-  it("issue #47: 同一パスへの切替（外部からの上書き）は mode 'fresh' で開く", () => {
+  it('issue #47: 同一パスへの切替も mode reuse で開き、ストアの新内容が渡される', () => {
     const buffer = createEditorBuffer()
     const switcher = createFileSwitcher(buildDeps(buffer))
     switcher.openProjectFile('main.py', '古いエディタ内容')
@@ -228,7 +228,9 @@ describe('createFileSwitcher', () => {
     upsertFile('main.py', { kind: 'text', data: 'アップロードされた新しい内容' })
     switcher.switchToFile('main.py')
 
-    expect(buffer.opened.at(-1)).toEqual({ path: 'main.py', mode: 'fresh' })
+    // 内容がずれていればモデル側（modelRegistry）が作り直す
+    expect(buffer.opened.at(-1)).toEqual({ path: 'main.py', mode: 'reuse' })
+    expect(buffer.get()).toBe('アップロードされた新しい内容')
   })
 
   it("issue #47: 起動時・プロジェクト読込は mode 'reset' で開く", () => {

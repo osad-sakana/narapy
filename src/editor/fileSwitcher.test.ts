@@ -155,7 +155,7 @@ describe('createFileSwitcher', () => {
       [],
       'main.py',
     )
-    const buffer = createEditorBuffer('メインの内容(編集後)')
+    const buffer = createEditorBuffer()
     const setFileName = vi.fn()
     const runValidation = vi.fn()
     const switcher = createFileSwitcher({ ...buildDeps(buffer), setFileName, runValidation })

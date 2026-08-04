@@ -1,8 +1,6 @@
 export interface FileSwitcherDeps {
-  getEditorValue: () => string
   setEditorValue: (content: string) => void
   setSyncingEditor: (syncing: boolean) => void
-  updateFileContent: (path: string, content: string) => void
   setActiveFile: (path: string) => boolean
   getActiveContent: () => string
   setFileName: (path: string) => void
@@ -17,11 +15,15 @@ export interface FileSwitcher {
   switchToFile: (path: string) => void
 }
 
-// エディタが「今実際に表示している」ファイルパス(editorPath)を追跡し、
-// ファイル切替時の退避先選択ロジックを提供する(issue #45)。
-// getActiveFile()（ストア側のアクティブファイル）は loadProject や deleteFile 等で
-// エディタ更新より先に書き換わることがあるため、退避先の判定には必ず
-// このモジュールが内部で保持する editorPath を使い、getActiveFile() は使わない。
+// エディタが「今実際に表示している」ファイルパス(editorPath)を追跡する(issue #45)。
+// 呼び出し側（打鍵時の保存・Blockly生成コードの反映・実行前同期・エクスポート時同期）は
+// 書き込み先パスとしてこの editorPath を使う。getActiveFile()（ストア側のアクティブファイル）は
+// loadProject や deleteFile 等でエディタ更新より先に書き換わることがあるため使わない。
+//
+// 切替時にエディタ内容をストアへ退避する処理は持たない(issue #48)。
+// エディタ内容の変更は打鍵時の onDidChangeModelContent と Blockly 生成コードの反映が
+// いずれもその場でストアへ書き込むため、切替時の退避は冗長であるうえ、
+// アップロード等でストアが先に更新されているケースで古いバッファが新しい内容を潰す。
 export function createFileSwitcher(deps: FileSwitcherDeps): FileSwitcher {
   let editorPath = ''
 
@@ -39,11 +41,6 @@ export function createFileSwitcher(deps: FileSwitcherDeps): FileSwitcher {
   }
 
   function switchToFile(path: string): void {
-    // 同一パスへの切替（アップロード等でストアの内容が既に更新済みのケース）では、
-    // エディタの古いバッファを書き戻すと上書きしてしまうため保存自体をスキップする。
-    if (path !== editorPath) {
-      deps.updateFileContent(editorPath, deps.getEditorValue())
-    }
     if (!deps.setActiveFile(path)) return
     const content = deps.getActiveContent()
     setEditorContent(path, content)

@@ -91,15 +91,13 @@ let debouncedConvert: { call: (source: string) => void; cancel: () => void } = {
 }
 
 // --- ファイル切替 ---
-// エディタが「今実際に表示している」ファイルパス(editorPath)の追跡と、
-// ファイル切替時の退避先選択ロジックは fileSwitcher に集約する。
+// エディタが「今実際に表示している」ファイルパス(editorPath)の追跡は fileSwitcher に集約する。
 // getActiveFile()（ストア側のアクティブファイル）は loadProject や deleteFile 等で
-// エディタ更新より先に書き換わることがあるため、退避先の判定には使わない(issue #45)。
+// エディタ更新より先に書き換わることがあるため、ストアへの書き込み先には使わない(issue #45)。
+// 切替時の退避は fileSwitcher では行わない（打鍵時とBlockly反映時に保存済みのため、issue #48）。
 const fileSwitcher = createFileSwitcher({
-  getEditorValue: () => getValue(editor),
   setEditorValue: (content) => setValue(editor, content),
   setSyncingEditor: (syncing) => { isSyncingEditor = syncing },
-  updateFileContent,
   setActiveFile,
   getActiveContent,
   setFileName: (path) => { editorFileName.textContent = path },

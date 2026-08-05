@@ -7,18 +7,18 @@
 
   /* カラートークン（ダーク = 既定）。src/theme/palette.ts と同じ値を持つ
      （CSS から TS を import できないため）。ずれると palette.test.ts が落ちる。 */
-  --color-canvas: #1b1c1f;
-  --color-panel: #212226;
-  --color-line: #33343a;
+  --color-canvas: #08080a;
+  --color-panel: #151519;
+  --color-line: #33333b;
   --color-ink: #e6e6ea;
   --color-muted: #8c8d94;
-  --color-hover: #2c2d33;
+  --color-hover: #232329;
   --color-accent: #00b5ce;
   --color-accent-ink: #0d1117;
   --color-danger: #ed5350;
   --color-success: #45b164;
   --color-warn: #f1944f;
-  --color-editor: #191a1d;
+  --color-editor: #000000;
   --color-code: #d7d8dd;
   --color-code-keyword: #b28fef;
   --color-code-string: #6dba70;

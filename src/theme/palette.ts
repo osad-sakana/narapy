@@ -44,18 +44,18 @@ export interface Palette {
 }
 
 export const DARK_PALETTE: Palette = {
-  canvas: '#1b1c1f',
-  panel: '#212226',
-  line: '#33343a',
+  canvas: '#08080a',
+  panel: '#151519',
+  line: '#33333b',
   ink: '#e6e6ea',
   muted: '#8c8d94',
-  hover: '#2c2d33',
+  hover: '#232329',
   accent: '#00b5ce',
   accentInk: '#0d1117',
   danger: '#ed5350',
   success: '#45b164',
   warn: '#f1944f',
-  editor: '#191a1d',
+  editor: '#000000',
   code: '#d7d8dd',
   codeKeyword: '#b28fef',
   codeString: '#6dba70',

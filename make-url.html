@@ -13,41 +13,41 @@
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body class="bg-[#08080d] text-slate-100 min-h-screen flex flex-col font-sans">
+  <body class="bg-canvas text-ink min-h-screen flex flex-col font-sans">
 
-    <header class="flex items-center justify-between px-3 lg:px-6 py-3 gap-2 bg-[#110826] border-b border-purple-900/50 shrink-0">
+    <header class="flex items-center justify-between px-3 lg:px-4 py-2.5 gap-2 bg-panel border-b border-line shrink-0">
       <div class="flex items-center gap-3 shrink-0">
-        <img src="/favicon.svg" alt="Narapy" class="w-8 h-8 select-none shrink-0 hidden sm:block" draggable="false" />
-        <span class="text-lg font-bold tracking-tight text-purple-100 shrink-0 whitespace-nowrap hidden sm:inline">Narapy</span>
-        <span class="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30 shrink-0 whitespace-nowrap">
+        <img src="/favicon.svg" alt="Narapy" class="w-7 h-7 select-none shrink-0 hidden sm:block" draggable="false" />
+        <span class="text-[15px] font-bold tracking-tight text-ink shrink-0 whitespace-nowrap hidden sm:inline">Narapy</span>
+        <span class="text-[11px] font-mono px-1.5 py-0.5 rounded-md text-muted border border-line shrink-0 whitespace-nowrap">
           共有リンクを作る
         </span>
       </div>
       <div class="flex items-center gap-3 shrink-0">
         <!-- フォントサイズ制御 -->
-        <div class="flex items-center gap-0.5 border border-slate-700/60 rounded-lg overflow-hidden shrink-0">
+        <div class="flex items-center gap-0.5 border border-line rounded-lg overflow-hidden shrink-0">
           <button
             id="fontDecrease"
             title="文字を小さく"
-            class="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700/40 transition-colors cursor-pointer select-none"
+            class="px-2 py-1.5 text-xs text-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer select-none"
           >A-</button>
-          <span id="fontSizeLabel" class="px-1 text-xs text-slate-500 select-none tabular-nums w-6 text-center">13</span>
+          <span id="fontSizeLabel" class="px-1 text-xs font-mono text-muted select-none tabular-nums w-6 text-center">13</span>
           <button
             id="fontIncrease"
             title="文字を大きく"
-            class="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700/40 transition-colors cursor-pointer select-none"
+            class="px-2 py-1.5 text-xs text-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer select-none"
           >A+</button>
         </div>
-        <a href="./index.html" class="text-xs text-slate-400 hover:text-slate-100 transition-colors shrink-0 whitespace-nowrap">← エディタに戻る</a>
+        <a href="./index.html" class="text-xs text-muted hover:text-ink transition-colors shrink-0 whitespace-nowrap">← エディタに戻る</a>
       </div>
     </header>
 
     <main class="flex-1 overflow-y-auto p-3 lg:p-6">
       <div class="space-y-6">
 
-        <p class="text-sm text-slate-400 leading-relaxed">
+        <p class="text-sm text-muted leading-relaxed">
           Pythonコードや複数ファイルのプロジェクトから、開くだけで内容が復元されるURLを作成します。
-          生成されるリンクはURLのハッシュ(<code class="font-mono text-slate-300">#</code>以降)に埋め込まれるため、
+          生成されるリンクはURLのハッシュ(<code class="font-mono text-code">#</code>以降)に埋め込まれるため、
           サーバーには送信されません。
         </p>
 
@@ -56,74 +56,74 @@
           <button
             id="modeCodeBtn"
             type="button"
-            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer bg-violet-500/20 text-violet-200 border border-violet-500/40"
+            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer bg-accent/15 text-accent border border-accent/40"
           >単一コード (#code=)</button>
           <button
             id="modeProjectBtn"
             type="button"
-            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-slate-400 border border-transparent hover:bg-slate-700/40"
+            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-muted border border-transparent hover:bg-hover hover:text-ink"
           >複数ファイル (#project=)</button>
         </div>
 
         <!-- 単一コードモード -->
         <section id="codeModeSection" class="space-y-1.5">
-          <span class="text-xs text-slate-400 block">Pythonコード (main.py として開かれます)</span>
-          <div id="codeEditor" class="h-72 rounded-lg overflow-hidden border border-violet-800/40"></div>
+          <span class="text-xs text-muted block">Pythonコード (main.py として開かれます)</span>
+          <div id="codeEditor" class="h-72 rounded-lg overflow-hidden border border-line"></div>
         </section>
 
         <!-- 複数ファイルモード -->
         <section id="projectModeSection" class="hidden space-y-3">
-          <p class="text-xs text-slate-500">ラジオボタンを選択した状態のファイルが、開いた状態（アクティブなファイル）になります。</p>
+          <p class="text-xs text-muted">ラジオボタンを選択した状態のファイルが、開いた状態（アクティブなファイル）になります。</p>
           <div id="fileRows" class="space-y-4"></div>
           <button
             id="addFileRowBtn"
             type="button"
-            class="text-xs text-violet-300 hover:text-violet-100 transition-colors cursor-pointer"
+            class="text-xs text-accent hover:opacity-80 transition-opacity cursor-pointer"
           >+ ファイルを追加</button>
         </section>
 
         <!-- ベースURL -->
         <section class="space-y-1.5">
-          <label for="baseUrlInput" class="text-xs text-slate-400 block">NarapyのURL（配布先のドメインに書き換えてください）</label>
+          <label for="baseUrlInput" class="text-xs text-muted block">NarapyのURL（配布先のドメインに書き換えてください）</label>
           <input
             id="baseUrlInput"
             type="text"
             spellcheck="false"
-            class="w-full font-mono text-xs bg-[#0c0818] border border-violet-800/40 rounded-lg p-2 focus:outline-none focus:border-violet-500"
+            class="w-full font-mono text-xs bg-editor border border-line rounded-lg p-2 focus:outline-none focus:border-accent"
           />
         </section>
 
         <button
           id="generateBtn"
           type="button"
-          class="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-bold transition-colors cursor-pointer"
+          class="px-4 py-2 rounded-lg bg-accent text-accent-ink hover:opacity-90 active:opacity-80 text-sm font-bold transition-opacity cursor-pointer"
         >リンクを生成</button>
 
-        <p id="errorMessage" class="hidden text-xs text-rose-400"></p>
+        <p id="errorMessage" class="hidden text-xs text-danger"></p>
 
         <!-- 結果 -->
-        <section id="resultSection" class="hidden space-y-2 border-t border-purple-900/40 pt-4">
-          <label for="resultUrl" class="text-xs text-slate-400 block">生成されたリンク</label>
+        <section id="resultSection" class="hidden space-y-2 border-t border-line pt-4">
+          <label for="resultUrl" class="text-xs text-muted block">生成されたリンク</label>
           <div class="flex gap-2">
             <input
               id="resultUrl"
               type="text"
               readonly
-              class="flex-1 font-mono text-xs bg-[#0c0818] border border-emerald-700/40 rounded-lg p-2"
+              class="flex-1 font-mono text-xs bg-editor border border-success/40 rounded-lg p-2"
             />
             <button
               id="copyResultBtn"
               type="button"
-              class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
+              class="px-3 py-2 rounded-lg bg-success text-accent-ink hover:opacity-90 text-xs font-bold transition-opacity cursor-pointer shrink-0"
             >コピー</button>
             <button
               id="openResultBtn"
               type="button"
               title="生成されたリンクを新しいタブで開く(動作確認用)"
-              class="px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
+              class="px-3 py-2 rounded-lg border border-line text-muted hover:text-ink hover:bg-hover text-xs font-bold transition-colors cursor-pointer shrink-0"
             >開く</button>
           </div>
-          <p id="resultSize" class="text-xs text-slate-500"></p>
+          <p id="resultSize" class="text-xs text-muted"></p>
         </section>
 
       </div>

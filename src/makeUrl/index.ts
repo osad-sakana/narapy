@@ -45,10 +45,10 @@ function init(): void {
       [modeCodeBtn, mode === 'code'],
       [modeProjectBtn, mode === 'project'],
     ] as const) {
-      btn.classList.toggle('bg-violet-500/20', active)
-      btn.classList.toggle('text-violet-200', active)
-      btn.classList.toggle('border-violet-500/40', active)
-      btn.classList.toggle('text-slate-400', !active)
+      btn.classList.toggle('bg-accent/15', active)
+      btn.classList.toggle('text-accent', active)
+      btn.classList.toggle('border-accent/40', active)
+      btn.classList.toggle('text-muted', !active)
       btn.classList.toggle('border-transparent', !active)
     }
   }
@@ -63,7 +63,7 @@ function init(): void {
     fileRowsContainer.replaceChildren()
     rows.forEach((row, index) => {
       const wrapper = document.createElement('div')
-      wrapper.className = 'border border-violet-900/40 rounded-lg p-3 space-y-2 bg-[#0c0818]'
+      wrapper.className = 'border border-line rounded-lg p-3 space-y-2 bg-panel'
 
       const topRow = document.createElement('div')
       topRow.className = 'flex items-center gap-2'
@@ -73,7 +73,7 @@ function init(): void {
       activeRadio.name = 'activeFile'
       activeRadio.checked = index === activeIndex
       activeRadio.title = '開いた状態にするファイル'
-      activeRadio.className = 'accent-violet-500 shrink-0'
+      activeRadio.className = 'accent-accent shrink-0'
       activeRadio.addEventListener('change', () => {
         activeIndex = index
       })
@@ -82,7 +82,7 @@ function init(): void {
       pathInput.type = 'text'
       pathInput.value = row.path
       pathInput.placeholder = 'path/to/file.py'
-      pathInput.className = 'flex-1 font-mono text-xs bg-[#08080d] border border-violet-800/40 rounded px-2 py-1 focus:outline-none focus:border-violet-500'
+      pathInput.className = 'flex-1 font-mono text-xs bg-editor border border-line rounded px-2 py-1 focus:outline-none focus:border-accent'
       pathInput.addEventListener('input', () => {
         rows = updateRow(rows, index, { path: pathInput.value })
       })
@@ -93,8 +93,8 @@ function init(): void {
       removeBtn.textContent = '削除'
       removeBtn.disabled = !removable
       removeBtn.className = removable
-        ? 'text-xs text-rose-400 hover:text-rose-200 transition-colors cursor-pointer shrink-0'
-        : 'text-xs text-rose-900 cursor-not-allowed shrink-0'
+        ? 'text-xs text-danger hover:opacity-80 transition-opacity cursor-pointer shrink-0'
+        : 'text-xs text-danger/30 cursor-not-allowed shrink-0'
       removeBtn.addEventListener('click', () => {
         if (rows.length <= 1) return
         rows = removeRow(rows, index)
@@ -105,7 +105,7 @@ function init(): void {
       topRow.append(activeRadio, pathInput, removeBtn)
 
       const editorContainer = document.createElement('div')
-      editorContainer.className = 'h-40 rounded overflow-hidden border border-violet-800/40'
+      editorContainer.className = 'h-40 rounded overflow-hidden border border-line'
 
       wrapper.append(topRow, editorContainer)
       fileRowsContainer.appendChild(wrapper)

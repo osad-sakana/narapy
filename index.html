@@ -121,7 +121,7 @@
             <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
               <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
             </svg>
-            <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">ブロックエディタ</span>
+            <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em] shrink-0 whitespace-nowrap">ブロックエディタ</span>
           </div>
           <div class="flex items-center gap-2">
           <span
@@ -158,15 +158,15 @@
           <!-- テキストエディタ -->
           <div id="editorPanel" class="flex flex-col overflow-hidden border-b border-line bg-editor">
             <div id="editorHeader" class="flex items-center justify-between px-4 py-2.5 bg-panel border-b border-line shrink-0 transition-opacity duration-200 opacity-50">
-              <div class="flex items-center gap-2.5">
+              <div class="flex items-center gap-2.5 min-w-0">
                 <span id="editorActiveDot" class="w-1.5 h-1.5 rounded-full bg-muted shrink-0"></span>
                 <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                   <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
                 </svg>
-                <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Python エディタ</span>
-                <span id="editorFileName" class="text-[11px] text-muted font-mono">main.py</span>
+                <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em] shrink-0 whitespace-nowrap">Python エディタ</span>
+                <span id="editorFileName" class="text-[11px] text-muted font-mono truncate">main.py</span>
               </div>
-              <span id="validationBadge" class="text-xs px-2 py-0.5 rounded-md bg-hover text-muted transition-all">
+              <span id="validationBadge" class="text-xs px-2 py-0.5 rounded-md shrink-0 whitespace-nowrap bg-hover text-muted transition-all">
                 待機中
               </span>
             </div>
@@ -180,7 +180,7 @@
                 <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                   <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
                 </svg>
-                <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">実行ログ</span>
+                <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em] shrink-0 whitespace-nowrap">実行ログ</span>
               </div>
               <button
                 id="copyLogBtn"

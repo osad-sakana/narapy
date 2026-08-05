@@ -12,7 +12,7 @@ const BADGE_CLASSES: Record<BadgeState, string> = {
 export function setBadge(text: string, state: BadgeState): void {
   const badge = document.getElementById('validationBadge') as HTMLSpanElement
   badge.textContent = text
-  badge.className = `text-xs px-2 py-0.5 rounded-md transition-all ${BADGE_CLASSES[state]}`
+  badge.className = `text-xs px-2 py-0.5 rounded-md shrink-0 whitespace-nowrap transition-all ${BADGE_CLASSES[state]}`
   badge.onclick = null
   badge.style.cursor = ''
 }
@@ -20,6 +20,6 @@ export function setBadge(text: string, state: BadgeState): void {
 export function setBadgeWithDetail(text: string, state: BadgeState, detail: string): void {
   const badge = document.getElementById('validationBadge') as HTMLSpanElement
   badge.textContent = text
-  badge.className = `text-xs px-2 py-0.5 rounded-md transition-all cursor-pointer underline decoration-dotted hover:opacity-75 ${BADGE_CLASSES[state]}`
+  badge.className = `text-xs px-2 py-0.5 rounded-md shrink-0 whitespace-nowrap transition-all cursor-pointer underline decoration-dotted hover:opacity-75 ${BADGE_CLASSES[state]}`
   badge.onclick = () => showConversionErrorModal(detail)
 }

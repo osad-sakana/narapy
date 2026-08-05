@@ -4,6 +4,80 @@
 @theme {
   --font-sans: 'BIZ UDPGothic', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
   --font-mono: '0xProto', ui-monospace, SFMono-Regular, 'SF Mono', Consolas, monospace;
+
+  /* カラートークン（ダーク = 既定）。src/theme/palette.ts と同じ値を持つ
+     （CSS から TS を import できないため）。ずれると palette.test.ts が落ちる。 */
+  --color-canvas: #08080a;
+  --color-panel: #151519;
+  --color-line: #33333b;
+  --color-ink: #e6e6ea;
+  --color-muted: #8c8d94;
+  --color-hover: #232329;
+  --color-accent: #00b5ce;
+  --color-accent-ink: #0d1117;
+  --color-danger: #ed5350;
+  --color-success: #45b164;
+  --color-warn: #f1944f;
+  --color-editor: #000000;
+  --color-code: #d7d8dd;
+  --color-code-keyword: #b28fef;
+  --color-code-string: #6dba70;
+  --color-code-number: #f1944f;
+  --color-code-comment: #6b6c73;
+  --color-code-builtin: #00bad1;
+  --color-code-func: #d8b349;
+}
+
+/* ─── ライトモード ──────────────────────────────────────────
+   CSP でインラインスクリプトを禁止しているため、JS が走る前のちらつきは
+   CSS だけで防ぐ必要がある。テーマ未選択（data-theme なし = システム追従）の
+   ときはメディアクエリで、明示選択時は data-theme で切り替える。
+   ダークは @theme の既定値そのままなので上書きブロックを持たない。
+   src/theme/palette.ts の LIGHT_PALETTE と同じ値。 */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --color-canvas: #f6f6f7;
+    --color-panel: #ffffff;
+    --color-line: #e3e3e6;
+    --color-ink: #202124;
+    --color-muted: #75767d;
+    --color-hover: #eef0f2;
+    --color-accent: #0086a1;
+    --color-accent-ink: #ffffff;
+    --color-danger: #be222a;
+    --color-success: #00722e;
+    --color-warn: #9a3e00;
+    --color-editor: #fbfbfc;
+    --color-code: #2a2b2f;
+    --color-code-keyword: #6d41a9;
+    --color-code-string: #045e17;
+    --color-code-number: #9a3e00;
+    --color-code-comment: #9a9ba1;
+    --color-code-builtin: #006a83;
+    --color-code-func: #734e00;
+  }
+}
+
+:root[data-theme='light'] {
+  --color-canvas: #f6f6f7;
+  --color-panel: #ffffff;
+  --color-line: #e3e3e6;
+  --color-ink: #202124;
+  --color-muted: #75767d;
+  --color-hover: #eef0f2;
+  --color-accent: #0086a1;
+  --color-accent-ink: #ffffff;
+  --color-danger: #be222a;
+  --color-success: #00722e;
+  --color-warn: #9a3e00;
+  --color-editor: #fbfbfc;
+  --color-code: #2a2b2f;
+  --color-code-keyword: #6d41a9;
+  --color-code-string: #045e17;
+  --color-code-number: #9a3e00;
+  --color-code-comment: #9a9ba1;
+  --color-code-builtin: #006a83;
+  --color-code-func: #734e00;
 }
 
 /* Blockly インジェクト先の SVG が height:100% を要求するため明示的に指定 */
@@ -20,7 +94,7 @@
 
 /* ─── split.js リサイズハンドル ─────────────────────────────── */
 .gutter {
-  background-color: #14112a;
+  background-color: var(--color-canvas);
   flex-shrink: 0;
   transition: background-color 0.15s;
   position: relative;
@@ -30,12 +104,12 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(109, 40, 217, 0);
+  background: transparent;
   transition: background 0.15s;
 }
 
 .gutter:hover::after {
-  background: rgba(109, 40, 217, 0.45);
+  background: color-mix(in srgb, var(--color-accent) 55%, transparent);
 }
 
 .gutter.gutter-horizontal {
@@ -48,7 +122,7 @@
   height: 6px !important;
 }
 
-/* スクロールバーをパープルテーマに合わせる */
+/* スクロールバーをテーマに合わせる */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -57,20 +131,20 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #4c1d95;
+  background: var(--color-line);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #6d28d9;
+  background: var(--color-muted);
 }
 
 /* ─── Blockly フィールド入力（テキスト・数値編集時のHTML input）────── */
 .blocklyHtmlInput {
-  background-color: #1e1030 !important;
-  color: #e2e8f0 !important;
-  border: 1px solid #7c3aed !important;
+  background-color: var(--color-editor) !important;
+  color: var(--color-ink) !important;
+  border: 1px solid var(--color-accent) !important;
   border-radius: 3px !important;
-  caret-color: #a78bfa !important;
+  caret-color: var(--color-accent) !important;
 }
 
 /* ─── ブロックホバーツールチップ ───────────────────────────── */
@@ -79,13 +153,11 @@
   z-index: 9999;
   pointer-events: none;
   width: 280px;
-  background: #0d0618;
-  border: 1px solid rgba(139, 92, 246, 0.45);
-  border-radius: 10px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow:
-    0 16px 48px rgba(0, 0, 0, 0.75),
-    0 0 0 1px rgba(139, 92, 246, 0.08);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
   font-family: 'BIZ UDPGothic', 'Hiragino Kaku Gothic ProN', sans-serif;
 }
 
@@ -94,19 +166,19 @@
   font-family: '0xProto', monospace;
   font-size: 12.5px;
   font-weight: bold;
-  color: #c4b5fd;
-  background: rgba(109, 40, 217, 0.18);
-  border-bottom: 1px solid rgba(139, 92, 246, 0.25);
+  color: var(--color-ink);
+  background: var(--color-hover);
+  border-bottom: 1px solid var(--color-line);
   letter-spacing: 0.01em;
 }
 
 .bt-desc {
   padding: 8px 14px 9px;
   font-size: 11.5px;
-  color: #94a3b8;
+  color: var(--color-muted);
   line-height: 1.65;
   margin: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--color-line);
 }
 
 .bt-section {
@@ -117,10 +189,10 @@
   padding: 5px 14px 2px;
   font-size: 9.5px;
   font-weight: bold;
-  color: rgba(110, 231, 183, 0.6);
+  color: var(--color-muted);
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  background: #050e0a;
+  background: var(--color-editor);
 }
 
 .bt-code {
@@ -128,20 +200,15 @@
   padding: 4px 14px 10px;
   font-family: '0xProto', monospace;
   font-size: 10.5px;
-  color: #6ee7b7;
-  background: #050e0a;
+  color: var(--color-code-string);
+  background: var(--color-editor);
   margin: 0;
   line-height: 1.75;
   white-space: pre;
 }
 
 .bt-section-out {
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.bt-section-out .bt-section-label {
-  color: rgba(148, 163, 184, 0.5);
-  background: #070707;
+  border-top: 1px solid var(--color-line);
 }
 
 .bt-out {
@@ -149,8 +216,8 @@
   padding: 4px 14px 10px;
   font-family: '0xProto', monospace;
   font-size: 10.5px;
-  color: #475569;
-  background: #070707;
+  color: var(--color-muted);
+  background: var(--color-editor);
   margin: 0;
   line-height: 1.75;
   white-space: pre;
@@ -164,7 +231,7 @@
 }
 .monaco-editor .suggest-widget .suggest-status-bar .right::after {
   content: 'Tab で確定';
-  color: #94a3b8;
+  color: var(--color-muted);
   font-size: 11px;
   padding: 0 8px;
   white-space: nowrap;

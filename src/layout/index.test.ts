@@ -51,10 +51,9 @@ describe('index.html とヘッダークラス定数の整合性', () => {
     expect(extractClass('runBtn')).toBe(RUN_STYLE)
   })
 
-  it('パネルトグル3個の class が BTN_ACTIVE のいずれかと完全一致する（初期状態は全パネル表示）', () => {
-    const activeValues = Object.values(BTN_ACTIVE)
-    expect(activeValues).toContain(extractClass('panelToggleBlockly'))
-    expect(activeValues).toContain(extractClass('panelTogglePython'))
-    expect(activeValues).toContain(extractClass('panelToggleLog'))
+  it('パネルトグル3個の class が BTN_ACTIVE と完全一致する（初期状態は全パネル表示）', () => {
+    expect(extractClass('panelToggleBlockly')).toBe(BTN_ACTIVE)
+    expect(extractClass('panelTogglePython')).toBe(BTN_ACTIVE)
+    expect(extractClass('panelToggleLog')).toBe(BTN_ACTIVE)
   })
 })

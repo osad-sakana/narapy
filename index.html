@@ -16,84 +16,96 @@
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body class="bg-[#08080d] text-slate-100 h-screen flex flex-col overflow-hidden font-sans">
+  <body class="bg-canvas text-ink h-screen flex flex-col overflow-hidden font-sans">
 
     <!-- ヘッダー -->
-    <header class="flex items-center justify-between px-3 lg:px-6 py-3 gap-2 bg-[#110826] border-b border-purple-900/50 shrink-0">
-      <div class="flex items-center gap-3 shrink-0">
-        <img src="/favicon.svg" alt="Narapy" class="w-8 h-8 select-none shrink-0 hidden sm:block" draggable="false" />
-        <span class="text-lg font-bold tracking-tight text-purple-100 shrink-0 hidden sm:inline">Narapy</span>
-        <span class="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30 shrink-0 hidden lg:inline-block">
+    <header class="flex items-center justify-between px-3 lg:px-4 py-2.5 gap-2 bg-panel border-b border-line shrink-0">
+      <div class="flex items-center gap-2.5 shrink-0">
+        <img src="/favicon.svg" alt="Narapy" class="w-7 h-7 select-none shrink-0 hidden sm:block" draggable="false" />
+        <span class="text-[15px] font-bold tracking-tight text-ink shrink-0 hidden sm:inline">Narapy</span>
+        <span class="text-[11px] font-mono px-1.5 py-0.5 rounded-md text-muted border border-line shrink-0 hidden lg:inline-block">
           Python Learning
         </span>
-        <div class="w-px h-4 bg-purple-800/60 mx-1 shrink-0 hidden lg:block"></div>
+        <div class="w-px h-4 bg-line mx-1 shrink-0 hidden lg:block"></div>
         <!-- パネル表示トグル -->
         <div class="flex items-center gap-1 shrink-0">
           <button
             id="panelToggleBlockly"
-            class="text-xs px-2 lg:px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 bg-sky-500/15 text-sky-300 border border-sky-600/40"
+            class="text-xs px-2 lg:px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 bg-accent/15 text-accent border border-accent/40"
           >ブロック</button>
           <button
             id="panelTogglePython"
-            class="text-xs px-2 lg:px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 bg-violet-500/15 text-violet-300 border border-violet-600/40"
+            class="text-xs px-2 lg:px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 bg-accent/15 text-accent border border-accent/40"
           >Python</button>
           <button
             id="panelToggleLog"
-            class="text-xs px-2 lg:px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 bg-emerald-500/15 text-emerald-300 border border-emerald-600/40"
+            class="text-xs px-2 lg:px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 bg-accent/15 text-accent border border-accent/40"
           >実行</button>
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
         <!-- フォントサイズ制御 -->
-        <div class="hidden md:flex items-center gap-0.5 border border-slate-700/60 rounded-lg overflow-hidden mr-1 shrink-0">
+        <div class="hidden md:flex items-center gap-0.5 border border-line rounded-lg overflow-hidden mr-1 shrink-0">
           <button
             id="fontDecrease"
             title="文字を小さく"
-            class="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700/40 transition-colors cursor-pointer select-none"
+            class="px-2 py-1.5 text-xs text-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer select-none"
           >A-</button>
-          <span id="fontSizeLabel" class="px-1 text-xs text-slate-500 select-none tabular-nums w-6 text-center">13</span>
+          <span id="fontSizeLabel" class="px-1 text-xs font-mono text-muted select-none tabular-nums w-6 text-center">13</span>
           <button
             id="fontIncrease"
             title="文字を大きく"
-            class="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700/40 transition-colors cursor-pointer select-none"
+            class="px-2 py-1.5 text-xs text-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer select-none"
           >A+</button>
         </div>
         <button
           id="importProjectBtn"
           title="プロジェクトを開く（.narapy形式）"
           aria-label="プロジェクトを開く（.narapy形式）"
-          class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-amber-300 hover:text-amber-100 hover:bg-amber-500/20 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+          class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-line text-xs text-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer shrink-0 whitespace-nowrap"
         >
           <svg class="w-3.5 h-3.5 shrink-0" aria-hidden="true" focusable="false" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75z"/>
           </svg>
-          <span class="hidden xl:inline">プロジェクトを開く</span>
+          <span class="hidden xl:inline">開く</span>
         </button>
         <button
           id="exportProjectBtn"
           title="プロジェクトを保存（.narapy形式）"
           aria-label="プロジェクトを保存（.narapy形式）"
-          class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-amber-300 hover:text-amber-100 hover:bg-amber-500/20 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+          class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-line text-xs text-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer shrink-0 whitespace-nowrap"
         >
           <svg class="w-3.5 h-3.5 shrink-0" aria-hidden="true" focusable="false" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 0 1-2.25 2.25M16.5 7.5V18a2.25 2.25 0 0 0 2.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 0 0 2.25 2.25h13.5M6 7.5h3v3H6v-3z"/>
           </svg>
-          <span class="hidden xl:inline">プロジェクトを保存</span>
+          <span class="hidden xl:inline">保存</span>
         </button>
+        <!-- テーマ切替（ボタンは src/theme/index.ts が生成する） -->
+        <div
+          id="themeSwitcher"
+          role="group"
+          aria-label="テーマ"
+          class="hidden lg:flex items-center gap-0.5 border border-line rounded-lg p-0.5 shrink-0"
+        ></div>
         <button
           id="aboutBtn"
           title="オープンソースライセンス"
           aria-label="オープンソースライセンス"
-          class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-700/40 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+          class="hidden md:flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs text-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer shrink-0 whitespace-nowrap"
         >
           <svg class="w-3.5 h-3.5 shrink-0" aria-hidden="true" focusable="false" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
           </svg>
           <span class="hidden xl:inline">ライセンス</span>
         </button>
+        <!-- 実行ステータス -->
+        <div class="hidden lg:flex items-center gap-1.5 px-1 text-xs font-mono text-muted shrink-0 whitespace-nowrap">
+          <span id="runStatusDot" class="w-1.5 h-1.5 rounded-full bg-muted shrink-0"></span>
+          <span id="runStatusLabel">待機中</span>
+        </div>
         <button
           id="runBtn"
-          class="flex items-center gap-2 px-4 py-1.5 rounded-lg whitespace-nowrap shrink-0 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-bold transition-colors shadow-md shadow-violet-900/50 cursor-pointer"
+          class="flex items-center gap-2 px-4 py-1.5 rounded-lg whitespace-nowrap shrink-0 text-sm font-bold transition-opacity cursor-pointer hover:opacity-90 active:opacity-80 bg-accent text-accent-ink"
         >
           ▶ 実行
         </button>
@@ -104,29 +116,29 @@
     <main class="flex flex-1 overflow-hidden relative">
 
       <!-- 全パネル非表示時のメッセージ -->
-      <div id="emptyMessage" class="hidden absolute inset-0 z-10 flex-col items-center justify-center bg-[#08080d]">
-        <span class="text-slate-700 text-sm select-none">何もありません</span>
+      <div id="emptyMessage" class="hidden absolute inset-0 z-10 flex-col items-center justify-center bg-canvas">
+        <span class="text-muted text-sm select-none">何もありません</span>
       </div>
 
-      <!-- 左カラム: Blockly ワークスペース（アクセント: sky-blue） -->
-      <section id="blocklyPanel" class="flex flex-col overflow-hidden border-sky-700/50 bg-[#060d16]">
-        <div id="blocklyHeader" class="flex items-center justify-between px-4 py-2.5 bg-[#0c1e30] border-b border-sky-700/50 border-l-4 border-l-sky-400 shrink-0 transition-opacity duration-200">
+      <!-- 左カラム: Blockly ワークスペース -->
+      <section id="blocklyPanel" class="flex flex-col overflow-hidden bg-editor">
+        <div id="blocklyHeader" class="flex items-center justify-between px-4 py-2.5 bg-panel border-b border-line shrink-0 transition-opacity duration-200">
           <div class="flex items-center gap-2.5">
-            <span id="blocklyActiveDot" class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse shrink-0"></span>
-            <svg class="w-3.5 h-3.5 text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <span id="blocklyActiveDot" class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0"></span>
+            <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
               <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
             </svg>
-            <span class="text-xs font-bold text-sky-300 uppercase tracking-widest">ブロックエディタ</span>
+            <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em] shrink-0 whitespace-nowrap">ブロックエディタ</span>
           </div>
           <div class="flex items-center gap-2">
           <span
             id="blocklyUnsupportedBanner"
-            class="hidden text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30"
+            class="hidden text-xs px-2 py-0.5 rounded-md bg-warn/15 text-warn border border-warn/30"
           >⚠ 未対応構文あり（編集不可）</span>
           <button
             id="hintToggleBtn"
             title="ブロックのヒント表示をオン/オフ"
-            class="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-200 transition-colors cursor-pointer"
+            class="flex items-center gap-1 text-xs text-accent hover:opacity-80 transition-opacity cursor-pointer"
           >
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m1.343-5.657-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
@@ -136,7 +148,7 @@
           </div>
         </div>
         <div class="relative flex-1 min-h-0">
-          <div id="blocklyDiv" class="w-full h-full bg-[#060d16]"></div>
+          <div id="blocklyDiv" class="w-full h-full bg-editor"></div>
           <div id="blocklyOverlay" class="hidden absolute inset-0 z-10 cursor-not-allowed"></div>
         </div>
       </section>
@@ -145,42 +157,42 @@
       <section id="rightPanel" class="flex overflow-hidden min-w-0">
 
         <!-- ファイルエクスプローラー -->
-        <aside id="fileExplorer" class="flex flex-col w-44 shrink-0 border-r border-violet-700/50 bg-[#0c0818]"></aside>
+        <aside id="fileExplorer" class="flex flex-col w-44 shrink-0 border-r border-line bg-panel"></aside>
 
         <!-- エディタ + ログ（split.js 縦分割対象） -->
         <div class="flex flex-col flex-1 min-w-0">
 
-          <!-- テキストエディタ（アクセント: violet） -->
-          <div id="editorPanel" class="flex flex-col overflow-hidden border-b border-violet-700/50 bg-[#0c0818]">
-            <div id="editorHeader" class="flex items-center justify-between px-4 py-2.5 bg-[#180a2e] border-b border-violet-700/50 border-l-4 border-l-violet-400 shrink-0 transition-opacity duration-200 opacity-50">
-              <div class="flex items-center gap-2.5">
-                <span id="editorActiveDot" class="w-1.5 h-1.5 rounded-full bg-slate-600 shrink-0"></span>
-                <svg class="w-3.5 h-3.5 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <!-- テキストエディタ -->
+          <div id="editorPanel" class="flex flex-col overflow-hidden border-b border-line bg-editor">
+            <div id="editorHeader" class="flex items-center justify-between px-4 py-2.5 bg-panel border-b border-line shrink-0 transition-opacity duration-200 opacity-50">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <span id="editorActiveDot" class="w-1.5 h-1.5 rounded-full bg-muted shrink-0"></span>
+                <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                   <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
                 </svg>
-                <span class="text-xs font-bold text-violet-300 uppercase tracking-widest">Python エディタ</span>
-                <span id="editorFileName" class="text-xs text-violet-400/70 font-mono">main.py</span>
+                <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em] shrink-0 whitespace-nowrap">Python エディタ</span>
+                <span id="editorFileName" class="text-[11px] text-muted font-mono truncate">main.py</span>
               </div>
-              <span id="validationBadge" class="text-xs px-2 py-0.5 rounded-full bg-violet-900/50 text-violet-300 transition-all">
+              <span id="validationBadge" class="text-xs px-2 py-0.5 rounded-md shrink-0 whitespace-nowrap bg-hover text-muted transition-all">
                 待機中
               </span>
             </div>
             <div id="codeEditor" class="flex-1 w-full min-h-0"></div>
           </div>
 
-          <!-- 実行ログ（アクセント: emerald） -->
-          <div id="logPanel" class="flex flex-col overflow-hidden bg-[#060f0b]">
-            <div class="flex items-center justify-between px-4 py-2.5 bg-[#091c12] border-b border-emerald-700/50 border-l-4 border-l-emerald-400 shrink-0">
+          <!-- 実行ログ -->
+          <div id="logPanel" class="flex flex-col overflow-hidden bg-panel">
+            <div class="flex items-center justify-between px-4 py-2.5 bg-panel border-b border-line shrink-0">
               <div class="flex items-center gap-2.5">
-                <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                   <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
                 </svg>
-                <span class="text-xs font-bold text-emerald-300 uppercase tracking-widest">実行ログ</span>
+                <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em] shrink-0 whitespace-nowrap">実行ログ</span>
               </div>
               <button
                 id="copyLogBtn"
                 title="実行結果をクリップボードにコピー"
-                class="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-300 transition-colors cursor-pointer"
+                class="flex items-center gap-1 text-xs text-muted hover:text-ink transition-colors cursor-pointer"
               >
                 <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -190,9 +202,9 @@
             </div>
             <div
               id="outputLog"
-              class="flex-1 overflow-y-auto p-4 font-mono text-sm text-slate-300 bg-[#060f0b] leading-relaxed"
+              class="flex-1 overflow-y-auto p-4 font-mono text-sm text-code bg-panel leading-relaxed"
             >
-              <span class="text-emerald-900 italic">実行結果がここに表示されます…</span>
+              <span class="text-muted italic">実行結果がここに表示されます…</span>
             </div>
           </div>
 

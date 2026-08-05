@@ -27,6 +27,10 @@ import {
 import { applyUrlLoad } from './urlload/applyUrlLoad'
 import { applyProjectLoad } from './fileio/applyProjectLoad'
 import { createFileSwitcher } from './editor/fileSwitcher'
+import { initTheme } from './theme/index'
+
+// createEditor / createWorkspace が解決済みテーマを読むため、他の初期化より先に実行する
+initTheme()
 
 // Blocklyはデフォルトで無効。?blockly=1 のときのみ初期化・変換を行う（issue #31）
 const blocklyEnabled = isBlocklyEnabled()
@@ -57,6 +61,10 @@ const editorActiveDot  = document.getElementById('editorActiveDot')  as HTMLElem
 const editorFileName   = document.getElementById('editorFileName')   as HTMLElement
 const validationBadge  = document.getElementById('validationBadge')  as HTMLElement
 
+// パネルヘッダーの「今どちらを編集しているか」を示すドット
+const DOT_ACTIVE = 'w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0'
+const DOT_IDLE   = 'w-1.5 h-1.5 rounded-full bg-muted shrink-0'
+
 function setActiveSource(source: ActiveSource): void {
   if (activeSource === source) return
   activeSource = source
@@ -64,13 +72,13 @@ function setActiveSource(source: ActiveSource): void {
   if (source === 'blockly') {
     blocklyHeader.classList.remove('opacity-50')
     editorHeader.classList.add('opacity-50')
-    blocklyActiveDot.className = 'w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse shrink-0'
-    editorActiveDot.className  = 'w-1.5 h-1.5 rounded-full bg-slate-600 shrink-0'
+    blocklyActiveDot.className = DOT_ACTIVE
+    editorActiveDot.className  = DOT_IDLE
   } else {
     editorHeader.classList.remove('opacity-50')
     blocklyHeader.classList.add('opacity-50')
-    editorActiveDot.className  = 'w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse shrink-0'
-    blocklyActiveDot.className = 'w-1.5 h-1.5 rounded-full bg-slate-600 shrink-0'
+    editorActiveDot.className  = DOT_ACTIVE
+    blocklyActiveDot.className = DOT_IDLE
   }
 }
 
@@ -184,8 +192,8 @@ if (blocklyEnabled) {
     const next = !isTooltipsEnabled()
     setTooltipsEnabled(next)
     hintToggleBtn.className = next
-      ? 'flex items-center gap-1 text-xs text-sky-400 hover:text-sky-200 transition-colors cursor-pointer'
-      : 'flex items-center gap-1 text-xs text-sky-800 hover:text-sky-600 transition-colors cursor-pointer'
+      ? 'flex items-center gap-1 text-xs text-accent hover:opacity-80 transition-opacity cursor-pointer'
+      : 'flex items-center gap-1 text-xs text-muted hover:text-ink transition-colors cursor-pointer'
   })
 }
 

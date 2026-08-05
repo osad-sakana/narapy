@@ -3,17 +3,17 @@ export function showFigureModal(base64: string, title: string): void {
   backdrop.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4'
 
   const card = document.createElement('div')
-  card.className = 'bg-slate-800 rounded-xl shadow-2xl overflow-hidden max-w-3xl w-full flex flex-col'
+  card.className = 'bg-panel border border-line rounded-xl shadow-2xl overflow-hidden max-w-3xl w-full flex flex-col'
 
   const header = document.createElement('div')
-  header.className = 'flex items-center justify-between px-4 py-2 bg-slate-700 flex-shrink-0'
+  header.className = 'flex items-center justify-between px-4 py-2 bg-panel border-b border-line flex-shrink-0'
 
   const titleEl = document.createElement('span')
-  titleEl.className = 'text-slate-200 text-sm font-medium'
+  titleEl.className = 'text-ink text-sm font-medium'
   titleEl.textContent = `📊 ${title}`
 
   const closeBtn = document.createElement('button')
-  closeBtn.className = 'text-slate-400 hover:text-white text-xl font-bold transition-colors w-7 h-7 flex items-center justify-center rounded hover:bg-slate-600'
+  closeBtn.className = 'text-muted hover:text-ink text-xl font-bold transition-colors w-7 h-7 flex items-center justify-center rounded hover:bg-hover'
   closeBtn.textContent = '×'
   closeBtn.setAttribute('aria-label', '閉じる')
 

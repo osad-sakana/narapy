@@ -8,6 +8,7 @@ import { showTurtleModal } from './turtleModal'
 import { showInputModal, type InputModalHandle } from './inputModal'
 import { encodeInputValue } from './encodeInput'
 import { RUN_STYLE, STOP_STYLE } from './buttonStyles'
+import { setRunStatus, type RunStatus } from './runStatus'
 
 // 60 秒間応答がなければ Worker を強制終了する
 const EXECUTION_TIMEOUT_MS = 60_000
@@ -58,7 +59,8 @@ export function initRunner(
     }, EXECUTION_TIMEOUT_MS)
   }
 
-  function setRunning(state: boolean): void {
+  // outcome は停止後にヘッダーへ残すステータス（停止操作なら idle、完了なら done、失敗なら error）
+  function setRunning(state: boolean, outcome: RunStatus = 'idle'): void {
     running = state
     if (state) {
       runGeneration++
@@ -70,6 +72,7 @@ export function initRunner(
       runBtn.textContent = '▶ 実行'
       clearExecutionTimeout()
     }
+    setRunStatus(state ? 'running' : outcome)
   }
 
   // Worker を終了して再生成する（メモリ枯渇・タイムアウト・フォールバック用）
@@ -179,10 +182,11 @@ export function initRunner(
         if (msg.payload !== null) {
           appendLog(`=> ${msg.payload}`, 'result')
         }
-        setRunning(false)
+        setRunning(false, 'done')
       } else if (msg.type === 'error') {
         // KeyboardInterrupt は停止操作によるものなので通常のエラー表示をしない
-        if (msg.payload.includes('KeyboardInterrupt')) {
+        const interrupted = msg.payload.includes('KeyboardInterrupt')
+        if (interrupted) {
           appendLog('--- 実行を停止しました ---', 'info')
         } else {
           const translated = translatePythonError(msg.payload)
@@ -192,13 +196,13 @@ export function initRunner(
             appendLog(`[エラー] ${msg.payload}`, 'error')
           }
         }
-        setRunning(false)
+        setRunning(false, interrupted ? 'idle' : 'error')
       }
     }
 
     worker.onerror = (err: ErrorEvent) => {
       appendLog(`[Worker エラー] ${err.message}`, 'error')
-      setRunning(false)
+      setRunning(false, 'error')
     }
   }
 
@@ -226,10 +230,10 @@ export function initRunner(
     await navigator.clipboard.writeText(text)
     const originalHTML = copyLogBtn.innerHTML
     copyLogBtn.textContent = '✓ コピーしました'
-    copyLogBtn.classList.add('text-emerald-300')
+    copyLogBtn.classList.add('text-success')
     setTimeout(() => {
       copyLogBtn.innerHTML = originalHTML
-      copyLogBtn.classList.remove('text-emerald-300')
+      copyLogBtn.classList.remove('text-success')
     }, 1500)
   })
 }

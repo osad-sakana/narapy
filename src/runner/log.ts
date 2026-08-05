@@ -1,14 +1,14 @@
 export type LogKind = 'output' | 'result' | 'error' | 'info' | 'warn'
 
 const LOG_CLASSES: Record<LogKind, string> = {
-  output: 'text-slate-200',
-  result: 'text-sky-300',
-  error:  'text-red-400',
-  info:   'text-slate-500',
-  warn:   'text-amber-400',
+  output: 'text-code',
+  result: 'text-accent',
+  error:  'text-danger',
+  info:   'text-muted',
+  warn:   'text-warn',
 }
 
-const PLACEHOLDER_HTML = '<span class="text-slate-600 italic">実行結果がここに表示されます…</span>'
+const PLACEHOLDER_HTML = '<span class="text-muted italic">実行結果がここに表示されます…</span>'
 
 function getOutputLog(): HTMLDivElement {
   return document.getElementById('outputLog') as HTMLDivElement
@@ -42,19 +42,19 @@ export function appendErrorBlock(block: ErrorBlock): void {
   removePlaceholder(log)
 
   const wrapper = document.createElement('div')
-  wrapper.className = 'mt-1 mb-1 border-l-2 border-red-500/60 pl-3 space-y-0.5'
+  wrapper.className = 'mt-1 mb-1 border-l-2 border-danger/60 pl-3 space-y-0.5'
 
   // ヘッドライン: エラー種類 + 行番号
   const headline = document.createElement('div')
   const lineLabel = block.line !== null ? ` — ${block.line}行目` : ''
   headline.textContent = `[エラー] ${block.errorType}${lineLabel}`
-  headline.className = 'text-red-400 font-bold text-xs'
+  headline.className = 'text-danger font-bold text-xs'
   wrapper.appendChild(headline)
 
   // 日本語説明
   const desc = document.createElement('div')
   desc.textContent = block.description
-  desc.className = 'text-red-300 text-sm'
+  desc.className = 'text-danger text-sm'
   wrapper.appendChild(desc)
 
   // ヒント（任意）
@@ -62,7 +62,7 @@ export function appendErrorBlock(block: ErrorBlock): void {
     for (const hintLine of block.hint.split('\n')) {
       const hintEl = document.createElement('div')
       hintEl.textContent = `💡 ${hintLine}`
-      hintEl.className = 'text-amber-300 text-xs'
+      hintEl.className = 'text-warn text-xs'
       wrapper.appendChild(hintEl)
     }
   }
@@ -72,10 +72,10 @@ export function appendErrorBlock(block: ErrorBlock): void {
   details.className = 'mt-0.5'
   const summary = document.createElement('summary')
   summary.textContent = '元のエラーを表示'
-  summary.className = 'text-slate-600 text-xs cursor-pointer hover:text-slate-400'
+  summary.className = 'text-muted text-xs cursor-pointer hover:text-ink'
   const raw = document.createElement('pre')
   raw.textContent = block.raw
-  raw.className = 'text-slate-600 text-xs mt-1 whitespace-pre-wrap break-all'
+  raw.className = 'text-muted text-xs mt-1 whitespace-pre-wrap break-all'
   details.appendChild(summary)
   details.appendChild(raw)
   wrapper.appendChild(details)

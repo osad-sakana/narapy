@@ -68,17 +68,17 @@ function showAboutModal(): void {
   backdrop.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4'
 
   const card = document.createElement('div')
-  card.className = 'bg-[#110826] border border-purple-800/50 rounded-xl shadow-2xl max-w-lg w-full flex flex-col max-h-[80vh] overflow-hidden'
+  card.className = 'bg-panel border border-line rounded-xl shadow-2xl max-w-lg w-full flex flex-col max-h-[80vh] overflow-hidden'
 
   const header = document.createElement('div')
-  header.className = 'flex items-center justify-between px-5 py-3 border-b border-purple-800/40 shrink-0'
+  header.className = 'flex items-center justify-between px-5 py-3 border-b border-line shrink-0'
 
   const title = document.createElement('span')
-  title.className = 'text-sm font-bold text-purple-100'
+  title.className = 'text-sm font-bold text-ink'
   title.textContent = 'オープンソースライセンス'
 
   const closeBtn = document.createElement('button')
-  closeBtn.className = 'text-slate-400 hover:text-white transition-colors w-7 h-7 flex items-center justify-center rounded hover:bg-slate-700 cursor-pointer'
+  closeBtn.className = 'text-muted hover:text-ink transition-colors w-7 h-7 flex items-center justify-center rounded hover:bg-hover cursor-pointer'
   closeBtn.textContent = '×'
   closeBtn.setAttribute('aria-label', '閉じる')
 
@@ -90,24 +90,24 @@ function showAboutModal(): void {
 
   for (const pkg of LICENSES) {
     const row = document.createElement('div')
-    row.className = 'border border-purple-900/40 rounded-lg px-4 py-3 bg-[#0c0818]'
+    row.className = 'border border-line rounded-lg px-4 py-3 bg-canvas'
 
     const topRow = document.createElement('div')
     topRow.className = 'flex items-baseline justify-between gap-2'
 
     const nameEl = document.createElement('span')
-    nameEl.className = 'text-sm font-semibold text-purple-200'
+    nameEl.className = 'text-sm font-semibold text-ink'
     nameEl.textContent = pkg.name + (pkg.version ? ` v${pkg.version}` : '')
 
     const licenseEl = document.createElement('span')
-    licenseEl.className = 'text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30 shrink-0'
+    licenseEl.className = 'text-xs px-2 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30 shrink-0'
     licenseEl.textContent = pkg.license
 
     topRow.appendChild(nameEl)
     topRow.appendChild(licenseEl)
 
     const copy = document.createElement('p')
-    copy.className = 'text-xs text-slate-500 mt-1'
+    copy.className = 'text-xs text-muted mt-1'
     copy.textContent = pkg.copyright
 
     row.appendChild(topRow)
@@ -117,7 +117,7 @@ function showAboutModal(): void {
 
   // Narapy 自身の著作権表示
   const selfNote = document.createElement('p')
-  selfNote.className = 'text-xs text-slate-600 pt-1 text-center'
+  selfNote.className = 'text-xs text-muted pt-1 text-center'
   selfNote.textContent = `Narapy — Python Learning Environment`
   body.appendChild(selfNote)
 

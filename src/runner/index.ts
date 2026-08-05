@@ -7,9 +7,7 @@ import { showFigureModal } from './figureModal'
 import { showTurtleModal } from './turtleModal'
 import { showInputModal, type InputModalHandle } from './inputModal'
 import { encodeInputValue } from './encodeInput'
-
-const RUN_STYLE  = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-bold transition-colors shadow-md shadow-violet-900/50 cursor-pointer'
-const STOP_STYLE = 'flex items-center gap-2 px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 text-white text-sm font-bold transition-colors shadow-md shadow-red-900/50 cursor-pointer'
+import { RUN_STYLE, STOP_STYLE } from './buttonStyles'
 
 // 60 秒間応答がなければ Worker を強制終了する
 const EXECUTION_TIMEOUT_MS = 60_000

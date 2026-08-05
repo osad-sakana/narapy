@@ -89,16 +89,16 @@ export function createExplorer(
 
   function buildHeader(): HTMLElement {
     const header = document.createElement('div')
-    header.className = 'flex items-center justify-between px-3 py-2.5 bg-[#180a2e] border-b border-violet-700/50 border-l-4 border-l-violet-400 shrink-0'
+    header.className = 'flex items-center justify-between px-3 py-2.5 bg-panel border-b border-line shrink-0'
     header.innerHTML = `
       <div class="flex items-center gap-1.5">
         ${buildIcon(ICON_FILE)}
-        <span class="text-xs font-bold text-violet-300 uppercase tracking-widest select-none">ファイル</span>
+        <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em] select-none">ファイル</span>
       </div>
       <button
         id="explorerNewBtn"
         title="新規 .py ファイル"
-        class="text-violet-500 hover:text-violet-200 transition-colors cursor-pointer"
+        class="text-muted hover:text-ink transition-colors cursor-pointer"
       >${buildIcon(ICON_PLUS)}</button>
     `
     header.querySelector('#explorerNewBtn')!.addEventListener('click', () => {
@@ -115,11 +115,11 @@ export function createExplorer(
 
   function buildToolbar(): HTMLElement {
     const bar = document.createElement('div')
-    bar.className = 'flex items-center justify-between gap-1 px-2 py-1.5 border-b border-violet-700/30 shrink-0'
+    bar.className = 'flex items-center justify-between gap-1 px-2 py-1.5 border-b border-line shrink-0'
     bar.innerHTML = `
-      <button id="explorerNewDirBtn"   title="新規フォルダ"      class="flex-1 flex items-center justify-center text-violet-500 hover:text-violet-200 transition-colors cursor-pointer py-1 rounded hover:bg-violet-500/10">${buildIcon(ICON_FOLDER_PLUS)}</button>
-      <button id="explorerUploadBtn"   title="ファイルをアップロード" class="flex-1 flex items-center justify-center text-violet-500 hover:text-violet-200 transition-colors cursor-pointer py-1 rounded hover:bg-violet-500/10">${buildIcon(ICON_UPLOAD)}</button>
-      <button id="explorerUploadDirBtn" title="フォルダをアップロード" class="flex-1 flex items-center justify-center text-violet-500 hover:text-violet-200 transition-colors cursor-pointer py-1 rounded hover:bg-violet-500/10">${buildIcon(ICON_DIR_UP)}</button>
+      <button id="explorerNewDirBtn"   title="新規フォルダ"      class="flex-1 flex items-center justify-center text-muted hover:text-ink transition-colors cursor-pointer py-1 rounded hover:bg-hover">${buildIcon(ICON_FOLDER_PLUS)}</button>
+      <button id="explorerUploadBtn"   title="ファイルをアップロード" class="flex-1 flex items-center justify-center text-muted hover:text-ink transition-colors cursor-pointer py-1 rounded hover:bg-hover">${buildIcon(ICON_UPLOAD)}</button>
+      <button id="explorerUploadDirBtn" title="フォルダをアップロード" class="flex-1 flex items-center justify-center text-muted hover:text-ink transition-colors cursor-pointer py-1 rounded hover:bg-hover">${buildIcon(ICON_DIR_UP)}</button>
     `
 
     bar.querySelector('#explorerNewDirBtn')!.addEventListener('click', () => {
@@ -211,8 +211,8 @@ export function createExplorer(
 
   function attachDropHandlers(root: HTMLElement, list: HTMLElement): void {
     const overlay = document.createElement('div')
-    overlay.className = 'hidden absolute inset-0 z-20 bg-violet-500/10 border-2 border-dashed border-violet-400 pointer-events-none flex items-center justify-center'
-    overlay.innerHTML = `<span class="text-xs text-violet-200 font-bold">ここにドロップしてアップロード</span>`
+    overlay.className = 'hidden absolute inset-0 z-20 bg-accent/10 border-2 border-dashed border-accent pointer-events-none flex items-center justify-center'
+    overlay.innerHTML = `<span class="text-xs text-accent font-bold">ここにドロップしてアップロード</span>`
     list.appendChild(overlay)
 
     function showOverlay(visible: boolean): void {
@@ -267,7 +267,7 @@ export function createExplorer(
     row.className = 'group relative flex items-center'
 
     const btn = document.createElement('button')
-    btn.className = 'flex-1 min-w-0 flex items-center gap-1 text-left px-2 py-1 text-xs font-mono text-slate-400 hover:bg-violet-500/10 hover:text-slate-200 transition-colors cursor-pointer'
+    btn.className = 'flex-1 min-w-0 flex items-center gap-1 text-left px-2 py-1 text-xs font-mono text-muted hover:bg-hover hover:text-ink transition-colors cursor-pointer'
     btn.style.paddingLeft = `${depth * 12 + 8}px`
     btn.innerHTML = `${buildIcon(isOpen ? ICON_CHEVRON_DOWN : ICON_CHEVRON_RIGHT)}<span class="truncate">${escapeHtml(node.name)}/</span>`
     btn.title = node.path
@@ -278,7 +278,7 @@ export function createExplorer(
     })
 
     const delBtn = document.createElement('button')
-    delBtn.className = 'shrink-0 mr-1.5 opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 transition-all cursor-pointer p-0.5 rounded'
+    delBtn.className = 'shrink-0 mr-1.5 opacity-0 group-hover:opacity-100 text-muted hover:text-danger transition-all cursor-pointer p-0.5 rounded'
     delBtn.title = `${node.path}/ を削除`
     delBtn.innerHTML = buildIcon(ICON_CLOSE)
     delBtn.addEventListener('click', (e) => {
@@ -311,10 +311,10 @@ export function createExplorer(
     btn.className = [
       'flex-1 min-w-0 flex items-center gap-1 text-left px-2 py-1 text-xs font-mono truncate transition-colors cursor-pointer',
       isActive
-        ? 'bg-violet-500/20 text-violet-100'
+        ? 'bg-accent/15 text-accent'
         : node.kind === 'binary'
-          ? 'text-slate-500 hover:bg-violet-500/10 hover:text-slate-300'
-          : 'text-slate-400 hover:bg-violet-500/10 hover:text-slate-200',
+          ? 'text-muted/70 hover:bg-hover hover:text-muted'
+          : 'text-muted hover:bg-hover hover:text-ink',
     ].join(' ')
     btn.style.paddingLeft = `${depth * 12 + 8}px`
     btn.innerHTML = `${buildIcon(node.kind === 'binary' ? ICON_IMG : ICON_DOC)}<span class="truncate">${escapeHtml(node.name)}</span>`
@@ -330,7 +330,7 @@ export function createExplorer(
     })
 
     const delBtn = document.createElement('button')
-    delBtn.className = 'shrink-0 mr-1.5 opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 transition-all cursor-pointer p-0.5 rounded'
+    delBtn.className = 'shrink-0 mr-1.5 opacity-0 group-hover:opacity-100 text-muted hover:text-danger transition-all cursor-pointer p-0.5 rounded'
     delBtn.title = `${node.path} を削除`
     delBtn.innerHTML = buildIcon(ICON_CLOSE)
     delBtn.addEventListener('click', (e) => {

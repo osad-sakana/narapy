@@ -1,4 +1,5 @@
 import { inject, Theme, Themes, Events, svgResize, Names, ShortcutRegistry } from 'blockly'
+import { PALETTE } from '../theme/palette'
 import { pythonGenerator, Order } from 'blockly/python'
 import type { WorkspaceSvg } from 'blockly'
 import { TOOLBOX_CONFIG } from './toolbox'
@@ -132,15 +133,19 @@ export function createWorkspace(onCodeChange: (code: string) => void): Workspace
       name: 'narapy',
       base: Themes.Classic,
       componentStyles: {
-        workspaceBackgroundColour: '#060d16',
-        toolboxBackgroundColour: '#0c1e30',
-        flyoutBackgroundColour: '#0c1e30',
+        workspaceBackgroundColour: PALETTE.editor,
+        toolboxBackgroundColour: PALETTE.panel,
+        toolboxForegroundColour: PALETTE.ink,
+        flyoutBackgroundColour: PALETTE.panel,
+        flyoutForegroundColour: PALETTE.ink,
+        scrollbarColour: PALETTE.line,
+        insertionMarkerColour: PALETTE.accent,
       },
     }),
     grid: {
       spacing: 20,
       length: 3,
-      colour: '#1e293b',
+      colour: PALETTE.line,
       snap: true,
     },
     sounds: false,

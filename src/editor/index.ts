@@ -1,6 +1,7 @@
 import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { getFontSize } from './fontSize'
+import { PALETTE, bareHex } from '../theme/palette'
 import { registerPythonCompletion } from './completion'
 import type { ModelRegistryHost } from './modelRegistry'
 
@@ -20,28 +21,38 @@ export function createEditor(container: HTMLElement): EditorInstance {
   monaco.editor.defineTheme('narapy-dark', {
     base: 'vs-dark',
     inherit: true,
+    // rules の foreground は先頭 '#' を受け付けないため bareHex を使う
     rules: [
-      { token: 'keyword', foreground: 'c084fc' },       // violet-400
-      { token: 'string', foreground: '86efac' },         // green-300
-      { token: 'number', foreground: 'fb923c' },         // orange-400
-      { token: 'comment', foreground: '475569', fontStyle: 'italic' }, // slate-600
-      { token: 'identifier', foreground: 'e2e8f0' },     // slate-200
-      { token: 'delimiter', foreground: '94a3b8' },      // slate-400
-      { token: 'type', foreground: '67e8f9' },           // cyan-300
+      { token: 'keyword', foreground: bareHex('codeKeyword') },
+      { token: 'string', foreground: bareHex('codeString') },
+      { token: 'number', foreground: bareHex('codeNumber') },
+      { token: 'comment', foreground: bareHex('codeComment'), fontStyle: 'italic' },
+      { token: 'identifier', foreground: bareHex('code') },
+      { token: 'delimiter', foreground: bareHex('muted') },
+      { token: 'type', foreground: bareHex('codeBuiltin') },
     ],
     colors: {
-      'editor.background': '#0c0818',
-      'editor.foreground': '#e2e8f0',
-      'editor.lineHighlightBackground': '#1e1030',
-      'editor.selectionBackground': '#4c1d95',
-      'editor.inactiveSelectionBackground': '#2e1065',
-      'editorLineNumber.foreground': '#334155',
-      'editorLineNumber.activeForeground': '#7c3aed',
-      'editorCursor.foreground': '#a78bfa',
-      'editorIndentGuide.background1': '#1e293b',
-      'editorIndentGuide.activeBackground1': '#4c1d95',
-      'scrollbarSlider.background': '#1e293b80',
-      'scrollbarSlider.hoverBackground': '#334155',
+      'editor.background': PALETTE.editor,
+      'editor.foreground': PALETTE.code,
+      'editor.lineHighlightBackground': PALETTE.canvas,
+      // 選択範囲はアクセントの薄い重ね（末尾2桁は不透明度）
+      'editor.selectionBackground': `${PALETTE.accent}3d`,
+      'editor.inactiveSelectionBackground': `${PALETTE.accent}1f`,
+      'editorLineNumber.foreground': PALETTE.codeComment,
+      'editorLineNumber.activeForeground': PALETTE.ink,
+      'editorCursor.foreground': PALETTE.accent,
+      'editorIndentGuide.background1': PALETTE.line,
+      'editorIndentGuide.activeBackground1': PALETTE.muted,
+      'scrollbarSlider.background': `${PALETTE.line}80`,
+      'scrollbarSlider.hoverBackground': PALETTE.muted,
+      // 補完ウィジェットも同じ面色に揃える
+      'editorWidget.background': PALETTE.panel,
+      'editorWidget.border': PALETTE.line,
+      'editorSuggestWidget.background': PALETTE.panel,
+      'editorSuggestWidget.border': PALETTE.line,
+      'editorSuggestWidget.foreground': PALETTE.ink,
+      'editorSuggestWidget.selectedBackground': PALETTE.hover,
+      'editorSuggestWidget.highlightForeground': PALETTE.accent,
     },
   })
 

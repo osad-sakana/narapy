@@ -75,6 +75,24 @@ Blockly 12 は CJS モジュールのため `optimizeDeps.include` に追加し�
 
 `type: 'module'` の Worker では `importScripts()` が禁止。`/* @vite-ignore */` コメント付きの dynamic `import()` で CDN から読み込んでいる。
 
+### カラーパレットとテーマ
+
+配色の単一の真実は `src/theme/palette.ts`（`DARK_PALETTE` / `LIGHT_PALETTE`）。
+`src/style.css` が同じ値を `@theme`（ダーク＝既定）と `:root[data-theme='light']` /
+`@media (prefers-color-scheme: light) :root:not([data-theme])` にミラーし、
+Tailwind ユーティリティ（`bg-panel` / `text-muted` / `border-line` …）を生成する。
+
+- **CSS から TS は import できない**ため、この 2 箇所の重複だけは避けられない。
+  ずれると `src/theme/palette.test.ts` が落ちる（両方を必ず同時に直すこと）。
+- Monaco と Blockly のテーマ定義は CSS 変数を解釈できず **hex を要求する**。
+  リファレンスの oklch 値は hex に変換して `palette.ts` に持っている。oklch を書かないこと。
+- テーマ選択は `src/theme/index.ts`。`system` のときは `data-theme` 属性を**外し**、
+  CSS のメディアクエリに任せる（CSP でインラインスクリプトを禁止しているため、
+  JS 実行前のちらつきを CSS だけで防ぐ必要がある）。
+- Monaco / Blockly には `onThemeChange()` で通知して `setTheme()` させる。
+  Blockly の方眼（`grid.colour`）だけは `inject()` 時にしか読まれないため、
+  両テーマで成立する固定の中間グレーを使っている。
+
 ### WASM モジュールの利用パターン
 
 ```typescript

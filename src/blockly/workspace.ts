@@ -1,5 +1,6 @@
 import { inject, Theme, Themes, Events, svgResize, Names, ShortcutRegistry } from 'blockly'
-import { PALETTE } from '../theme/palette'
+import type { Palette, ResolvedTheme } from '../theme/palette'
+import { getPalette, getResolvedTheme, onThemeChange } from '../theme/index'
 import { pythonGenerator, Order } from 'blockly/python'
 import type { WorkspaceSvg } from 'blockly'
 import { TOOLBOX_CONFIG } from './toolbox'
@@ -124,28 +125,36 @@ pythonGenerator.init = function (ws: WorkspaceSvg) {
 }
 
 
+function buildTheme(name: ResolvedTheme, c: Palette): Theme {
+  return Theme.defineTheme(`narapy-${name}`, {
+    name: `narapy-${name}`,
+    base: Themes.Classic,
+    componentStyles: {
+      workspaceBackgroundColour: c.editor,
+      toolboxBackgroundColour: c.panel,
+      toolboxForegroundColour: c.ink,
+      flyoutBackgroundColour: c.panel,
+      flyoutForegroundColour: c.ink,
+      scrollbarColour: c.line,
+      insertionMarkerColour: c.accent,
+    },
+  })
+}
+
+// 方眼は inject 時のオプションで、setTheme() では更新されない。
+// ライト/ダークどちらの背景でも成立する中間グレーを薄く重ねる。
+const GRID_COLOUR = '#8c8d9459'
+
 export function createWorkspace(onCodeChange: (code: string) => void): WorkspaceSvg {
   const workspace: WorkspaceSvg = inject('blocklyDiv', {
     // COEP 制約により外部 CDN をブロックされるためローカル配信パスを指定
     media: '/blockly-media/',
     toolbox: TOOLBOX_CONFIG,
-    theme: Theme.defineTheme('narapy', {
-      name: 'narapy',
-      base: Themes.Classic,
-      componentStyles: {
-        workspaceBackgroundColour: PALETTE.editor,
-        toolboxBackgroundColour: PALETTE.panel,
-        toolboxForegroundColour: PALETTE.ink,
-        flyoutBackgroundColour: PALETTE.panel,
-        flyoutForegroundColour: PALETTE.ink,
-        scrollbarColour: PALETTE.line,
-        insertionMarkerColour: PALETTE.accent,
-      },
-    }),
+    theme: buildTheme(getResolvedTheme(), getPalette()),
     grid: {
       spacing: 20,
       length: 3,
-      colour: PALETTE.line,
+      colour: GRID_COLOUR,
       snap: true,
     },
     sounds: false,
@@ -186,6 +195,8 @@ export function createWorkspace(onCodeChange: (code: string) => void): Workspace
       block.setDeletable(false)
     }
   })
+
+  onThemeChange((name, palette) => workspace.setTheme(buildTheme(name, palette)))
 
   const blocklyDiv = document.getElementById('blocklyDiv') as HTMLElement
   initBlockTooltips(blocklyDiv, workspace)

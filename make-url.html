@@ -38,6 +38,13 @@
             class="px-2 py-1.5 text-xs text-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer select-none"
           >A+</button>
         </div>
+        <!-- テーマ切替（ボタンは src/theme/index.ts が生成する） -->
+        <div
+          id="themeSwitcher"
+          role="group"
+          aria-label="テーマ"
+          class="flex items-center gap-0.5 border border-line rounded-lg p-0.5 shrink-0"
+        ></div>
         <a href="./index.html" class="text-xs text-muted hover:text-ink transition-colors shrink-0 whitespace-nowrap">← エディタに戻る</a>
       </div>
     </header>
@@ -56,12 +63,12 @@
           <button
             id="modeCodeBtn"
             type="button"
-            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer bg-accent/15 text-accent border border-accent/40"
+            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer border bg-accent/15 text-accent border-accent/40"
           >単一コード (#code=)</button>
           <button
             id="modeProjectBtn"
             type="button"
-            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-muted border border-transparent hover:bg-hover hover:text-ink"
+            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer border text-muted border-transparent hover:bg-hover hover:text-ink"
           >複数ファイル (#project=)</button>
         </div>
 

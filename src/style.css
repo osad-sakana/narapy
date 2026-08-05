@@ -5,8 +5,8 @@
   --font-sans: 'BIZ UDPGothic', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
   --font-mono: '0xProto', ui-monospace, SFMono-Regular, 'SF Mono', Consolas, monospace;
 
-  /* カラートークン。src/theme/palette.ts と同じ値を持つ（CSS から TS を import できないため）。
-     ずれると palette.test.ts が落ちる。 */
+  /* カラートークン（ダーク = 既定）。src/theme/palette.ts と同じ値を持つ
+     （CSS から TS を import できないため）。ずれると palette.test.ts が落ちる。 */
   --color-canvas: #1b1c1f;
   --color-panel: #212226;
   --color-line: #33343a;
@@ -26,6 +26,58 @@
   --color-code-comment: #6b6c73;
   --color-code-builtin: #00bad1;
   --color-code-func: #d8b349;
+}
+
+/* ─── ライトモード ──────────────────────────────────────────
+   CSP でインラインスクリプトを禁止しているため、JS が走る前のちらつきは
+   CSS だけで防ぐ必要がある。テーマ未選択（data-theme なし = システム追従）の
+   ときはメディアクエリで、明示選択時は data-theme で切り替える。
+   ダークは @theme の既定値そのままなので上書きブロックを持たない。
+   src/theme/palette.ts の LIGHT_PALETTE と同じ値。 */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --color-canvas: #f6f6f7;
+    --color-panel: #ffffff;
+    --color-line: #e3e3e6;
+    --color-ink: #202124;
+    --color-muted: #75767d;
+    --color-hover: #eef0f2;
+    --color-accent: #0086a1;
+    --color-accent-ink: #ffffff;
+    --color-danger: #be222a;
+    --color-success: #00722e;
+    --color-warn: #9a3e00;
+    --color-editor: #fbfbfc;
+    --color-code: #2a2b2f;
+    --color-code-keyword: #6d41a9;
+    --color-code-string: #045e17;
+    --color-code-number: #9a3e00;
+    --color-code-comment: #9a9ba1;
+    --color-code-builtin: #006a83;
+    --color-code-func: #734e00;
+  }
+}
+
+:root[data-theme='light'] {
+  --color-canvas: #f6f6f7;
+  --color-panel: #ffffff;
+  --color-line: #e3e3e6;
+  --color-ink: #202124;
+  --color-muted: #75767d;
+  --color-hover: #eef0f2;
+  --color-accent: #0086a1;
+  --color-accent-ink: #ffffff;
+  --color-danger: #be222a;
+  --color-success: #00722e;
+  --color-warn: #9a3e00;
+  --color-editor: #fbfbfc;
+  --color-code: #2a2b2f;
+  --color-code-keyword: #6d41a9;
+  --color-code-string: #045e17;
+  --color-code-number: #9a3e00;
+  --color-code-comment: #9a9ba1;
+  --color-code-builtin: #006a83;
+  --color-code-func: #734e00;
 }
 
 /* Blockly インジェクト先の SVG が height:100% を要求するため明示的に指定 */

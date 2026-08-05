@@ -1,7 +1,8 @@
 import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { getFontSize } from './fontSize'
-import { PALETTE, bareHex } from '../theme/palette'
+import { PALETTES, bareHex, type Palette, type ResolvedTheme } from '../theme/palette'
+import { getResolvedTheme, onThemeChange } from '../theme/index'
 import { registerPythonCompletion } from './completion'
 import type { ModelRegistryHost } from './modelRegistry'
 
@@ -17,49 +18,65 @@ window.MonacoEnvironment = {
 
 registerPythonCompletion()
 
+const THEME_NAMES: Record<ResolvedTheme, string> = {
+  dark: 'narapy-dark',
+  light: 'narapy-light',
+}
+
+// Monaco は CSS 変数を解釈できないため、テーマごとに hex を焼き込んだ定義を用意して
+// 切替時に setTheme() で差し替える
+function defineThemes(): void {
+  for (const theme of ['dark', 'light'] as const) {
+    const c: Palette = PALETTES[theme]
+    monaco.editor.defineTheme(THEME_NAMES[theme], {
+      base: theme === 'dark' ? 'vs-dark' : 'vs',
+      inherit: true,
+      // rules の foreground は先頭 '#' を受け付けないため bareHex を使う
+      rules: [
+        { token: 'keyword', foreground: bareHex(c, 'codeKeyword') },
+        { token: 'string', foreground: bareHex(c, 'codeString') },
+        { token: 'number', foreground: bareHex(c, 'codeNumber') },
+        { token: 'comment', foreground: bareHex(c, 'codeComment'), fontStyle: 'italic' },
+        { token: 'identifier', foreground: bareHex(c, 'code') },
+        { token: 'delimiter', foreground: bareHex(c, 'muted') },
+        { token: 'type', foreground: bareHex(c, 'codeBuiltin') },
+      ],
+      colors: {
+        'editor.background': c.editor,
+        'editor.foreground': c.code,
+        'editor.lineHighlightBackground': c.panel,
+        // 選択範囲はアクセントの薄い重ね（末尾2桁は不透明度）
+        'editor.selectionBackground': `${c.accent}3d`,
+        'editor.inactiveSelectionBackground': `${c.accent}1f`,
+        'editorLineNumber.foreground': c.codeComment,
+        'editorLineNumber.activeForeground': c.ink,
+        'editorCursor.foreground': c.accent,
+        'editorIndentGuide.background1': c.line,
+        'editorIndentGuide.activeBackground1': c.muted,
+        'scrollbarSlider.background': `${c.line}80`,
+        'scrollbarSlider.hoverBackground': c.muted,
+        // 補完ウィジェットも同じ面色に揃える
+        'editorWidget.background': c.panel,
+        'editorWidget.border': c.line,
+        'editorSuggestWidget.background': c.panel,
+        'editorSuggestWidget.border': c.line,
+        'editorSuggestWidget.foreground': c.ink,
+        'editorSuggestWidget.selectedBackground': c.hover,
+        'editorSuggestWidget.highlightForeground': c.accent,
+      },
+    })
+  }
+}
+
 export function createEditor(container: HTMLElement): EditorInstance {
-  monaco.editor.defineTheme('narapy-dark', {
-    base: 'vs-dark',
-    inherit: true,
-    // rules の foreground は先頭 '#' を受け付けないため bareHex を使う
-    rules: [
-      { token: 'keyword', foreground: bareHex('codeKeyword') },
-      { token: 'string', foreground: bareHex('codeString') },
-      { token: 'number', foreground: bareHex('codeNumber') },
-      { token: 'comment', foreground: bareHex('codeComment'), fontStyle: 'italic' },
-      { token: 'identifier', foreground: bareHex('code') },
-      { token: 'delimiter', foreground: bareHex('muted') },
-      { token: 'type', foreground: bareHex('codeBuiltin') },
-    ],
-    colors: {
-      'editor.background': PALETTE.editor,
-      'editor.foreground': PALETTE.code,
-      'editor.lineHighlightBackground': PALETTE.canvas,
-      // 選択範囲はアクセントの薄い重ね（末尾2桁は不透明度）
-      'editor.selectionBackground': `${PALETTE.accent}3d`,
-      'editor.inactiveSelectionBackground': `${PALETTE.accent}1f`,
-      'editorLineNumber.foreground': PALETTE.codeComment,
-      'editorLineNumber.activeForeground': PALETTE.ink,
-      'editorCursor.foreground': PALETTE.accent,
-      'editorIndentGuide.background1': PALETTE.line,
-      'editorIndentGuide.activeBackground1': PALETTE.muted,
-      'scrollbarSlider.background': `${PALETTE.line}80`,
-      'scrollbarSlider.hoverBackground': PALETTE.muted,
-      // 補完ウィジェットも同じ面色に揃える
-      'editorWidget.background': PALETTE.panel,
-      'editorWidget.border': PALETTE.line,
-      'editorSuggestWidget.background': PALETTE.panel,
-      'editorSuggestWidget.border': PALETTE.line,
-      'editorSuggestWidget.foreground': PALETTE.ink,
-      'editorSuggestWidget.selectedBackground': PALETTE.hover,
-      'editorSuggestWidget.highlightForeground': PALETTE.accent,
-    },
-  })
+  defineThemes()
+  // setTheme はエディタ単位ではなくグローバルに効くため、インスタンスは参照しない
+  onThemeChange((theme) => monaco.editor.setTheme(THEME_NAMES[theme]))
 
   const editor = monaco.editor.create(container, {
     value: '',
     language: 'python',
-    theme: 'narapy-dark',
+    theme: THEME_NAMES[getResolvedTheme()],
     fontSize: getFontSize(),
     fontFamily: '"0xProto", "Fira Code", "Cascadia Code", monospace',
     fontLigatures: true,

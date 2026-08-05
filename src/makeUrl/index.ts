@@ -3,10 +3,19 @@ import { initFontSizeControls } from '../editor/fontSize'
 import { encodeCodeParam, encodeProjectParam } from '../urlload/encode'
 import { buildProjectFromRows } from './buildProject'
 import { addRow, removeRow, updateRow, type FileRowState } from './fileRows'
+import { initTheme } from '../theme/index'
 
 type Mode = 'code' | 'project'
 
+// make-url.html の #modeCodeBtn / #modeProjectBtn の初期 class と一致させること
+const MODE_BTN_BASE = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer border'
+const MODE_BTN_ACTIVE = `${MODE_BTN_BASE} bg-accent/15 text-accent border-accent/40`
+const MODE_BTN_INACTIVE = `${MODE_BTN_BASE} text-muted border-transparent hover:bg-hover hover:text-ink`
+
 function init(): void {
+  // createEditor が解決済みテーマを読むため先に実行する
+  initTheme()
+
   const modeCodeBtn = document.getElementById('modeCodeBtn') as HTMLButtonElement
   const modeProjectBtn = document.getElementById('modeProjectBtn') as HTMLButtonElement
   const codeSection = document.getElementById('codeModeSection') as HTMLElement
@@ -45,11 +54,9 @@ function init(): void {
       [modeCodeBtn, mode === 'code'],
       [modeProjectBtn, mode === 'project'],
     ] as const) {
-      btn.classList.toggle('bg-accent/15', active)
-      btn.classList.toggle('text-accent', active)
-      btn.classList.toggle('border-accent/40', active)
-      btn.classList.toggle('text-muted', !active)
-      btn.classList.toggle('border-transparent', !active)
+      // className を丸ごと差し替える。個別クラスの付け外しだと、非選択時用の
+      // hover: 修飾が選択後も残り、カーソルを乗せたままだと選択状態が見えなくなる。
+      btn.className = active ? MODE_BTN_ACTIVE : MODE_BTN_INACTIVE
     }
   }
 

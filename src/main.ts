@@ -27,6 +27,10 @@ import {
 import { applyUrlLoad } from './urlload/applyUrlLoad'
 import { applyProjectLoad } from './fileio/applyProjectLoad'
 import { createFileSwitcher } from './editor/fileSwitcher'
+import { initTheme } from './theme/index'
+
+// createEditor / createWorkspace が解決済みテーマを読むため、他の初期化より先に実行する
+initTheme()
 
 // Blocklyはデフォルトで無効。?blockly=1 のときのみ初期化・変換を行う（issue #31）
 const blocklyEnabled = isBlocklyEnabled()

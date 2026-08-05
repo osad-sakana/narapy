@@ -55,14 +55,29 @@ function defineThemes(): void {
         'editorIndentGuide.activeBackground1': c.muted,
         'scrollbarSlider.background': `${c.line}80`,
         'scrollbarSlider.hoverBackground': c.muted,
-        // 補完ウィジェットも同じ面色に揃える
+        // 補完ウィジェット。前景色を省くとベーステーマ（vs / vs-dark）の既定値が残り、
+        // ライトでは選択行が白文字 × ほぼ白背景になって読めなくなるため、
+        // 背景を指定した項目は対になる前景色も必ず指定すること。
         'editorWidget.background': c.panel,
         'editorWidget.border': c.line,
+        'editorWidget.foreground': c.ink,
         'editorSuggestWidget.background': c.panel,
         'editorSuggestWidget.border': c.line,
         'editorSuggestWidget.foreground': c.ink,
-        'editorSuggestWidget.selectedBackground': c.hover,
-        'editorSuggestWidget.highlightForeground': c.accent,
+        // 選択行はアクセントの薄い重ね（末尾2桁は不透明度）。ホバーの hover 色だけだと
+        // ライトでは panel との差がほとんど無く、どれが選択中か分からない
+        'editorSuggestWidget.selectedBackground': `${c.accent}26`,
+        'editorSuggestWidget.selectedForeground': c.ink,
+        'editorSuggestWidget.selectedIconForeground': c.ink,
+        // 入力と一致した部分。accent は面色に対して 3.5:1 程度しか出ず 13px では不足するため、
+        // 同系色で「コード面の上で読ませる」ために調整済みの codeBuiltin を使う（5:1 以上）
+        'editorSuggestWidget.highlightForeground': c.codeBuiltin,
+        'editorSuggestWidget.focusHighlightForeground': c.codeBuiltin,
+        'editorSuggestWidgetStatus.foreground': c.muted,
+        // 型名などの補足テキストと、マウスホバー中の行
+        'descriptionForeground': c.muted,
+        'list.hoverBackground': c.hover,
+        'list.hoverForeground': c.ink,
       },
     })
   }

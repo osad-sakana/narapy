@@ -10,7 +10,6 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38BDF8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![Pyodide](https://img.shields.io/badge/Pyodide-0.27-3776AB?logo=python&logoColor=white)](https://pyodide.org/)
-[![Rust → WASM](https://img.shields.io/badge/Rust-WASM-000000?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 
 </div>
 
@@ -22,7 +21,7 @@
 コードの実行結果やタートルグラフィックスの描画をその場で確認しながら、
 「書いて理解する」体験を提供します。
 
-サーバーは不要。**すべてブラウザの中で完結**します。Python の実行も、コードの検証も、
+サーバーは不要。**すべてブラウザの中で完結**します。Python の実行も、
 タートルグラフィックスの描画も、すべてあなたの手元のブラウザで動きます。
 
 > 💡 標準ライブラリの `turtle` 互換モジュールを内蔵。`import turtle` で図形描画の授業がそのまま動きます。
@@ -37,7 +36,6 @@
 | ⌨️ **コード補完** | Pyodide を使った Web Worker 上での Python コード補完（Monaco エディタ） |
 | 🐢 **タートルグラフィックス** | Tkinter 不要の Canvas 独自実装。アニメーション付きで図形を描画 |
 | 📊 **matplotlib 画像表示** | `plt.show()` の出力をモーダルで表示 |
-| ⚡ **高速な構文検証** | Rust 製エンジンを WebAssembly 化し、リアルタイムにコードを検証 |
 | 📂 **プロジェクト保存・復元** | 複数ファイル・ディレクトリを `.narapy` 形式で書き出し／読み込み、フォルダごとアップロードも可能 |
 | 🔗 **共有リンク** | Python コードやプロジェクトをURLのハッシュに埋め込んで共有（サーバー送信なし）。`/make-url` で生成可能 |
 | 🎨 **パネル UI** | エディタ・実行ログを自由に表示／非表示、サイズ調整も自在 |
@@ -47,20 +45,18 @@
 
 ## 🚀 クイックスタート
 
-> **前提:** [Node.js](https://nodejs.org/) 22+ / [pnpm](https://pnpm.io/) 10+ / [Rust](https://www.rust-lang.org/) + [wasm-pack](https://rustwasm.github.io/wasm-pack/)
+> **前提:** [Node.js](https://nodejs.org/) 22+ / [pnpm](https://pnpm.io/) 10+
 > パッケージ管理は **pnpm のみ**（npm / yarn は使用しないでください）
 
 ```bash
 # 依存関係をインストール
 pnpm install
 
-# Rust → WASM ビルド + 開発サーバー起動（初回はこれだけで OK）
+# 開発サーバー起動
 pnpm dev
 ```
 
 ブラウザで表示された URL（通常 `http://localhost:5173`）を開けば、すぐに使い始められます。
-
-> ⚠️ `src/wasm/` は gitignore 済みです。クローン直後は必ず `pnpm dev`（または `pnpm build:wasm`）を実行して WASM を生成してください。
 
 ---
 
@@ -68,9 +64,8 @@ pnpm dev
 
 | コマンド | 内容 |
 | --- | --- |
-| `pnpm dev` | WASM ビルド → 開発サーバー起動 |
-| `pnpm build` | WASM ビルド → プロダクションビルド |
-| `pnpm build:wasm` | Rust コア（`core/`）のみ WASM 再ビルド |
+| `pnpm dev` | 開発サーバー起動 |
+| `pnpm build` | プロダクションビルド |
 | `pnpm preview` | プロダクションビルドのプレビュー |
 | `pnpm typecheck` | TypeScript 型チェック（`tsc --noEmit`） |
 | `pnpm test` | Vitest でテスト実行 |
@@ -81,7 +76,7 @@ pnpm dev
 ## 🏗️ アーキテクチャ
 
 Narapy は **フロントエンド完結型**。バックエンドサーバーを持たず、
-重い処理（Python 実行・構文検証）は Web Worker と WebAssembly に逃がしています。
+重い処理（Python 実行）は Web Worker（WebAssembly 上の Pyodide）に逃がしています。
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -90,10 +85,10 @@ Narapy は **フロントエンド完結型**。バックエンドサーバー�
 │        🐍 Monaco エディタ ⇄ 🐢 Turtle/📊 matplotlib             │
 │                   │                                           │
 │                   ▼                                           │
-│        ┌──────────────────┐      ┌──────────────────┐         │
-│        │  Rust → WASM      │      │  Pyodide Worker   │         │
-│        │  構文検証          │      │  Python 実行      │         │
-│        └──────────────────┘      └──────────────────┘         │
+│        ┌──────────────────┐                                   │
+│        │  Pyodide Worker  │                                   │
+│        │  Python 実行      │                                   │
+│        └──────────────────┘                                   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -105,20 +100,16 @@ Narapy は **フロントエンド完結型**。バックエンドサーバー�
 | スタイル | Tailwind CSS v4（`@tailwindcss/vite`、設定ファイル不要） |
 | コードエディタ | Monaco Editor |
 | Python 実行 | Pyodide 0.27（Web Worker 経由） |
-| コアエンジン | Rust → wasm-pack → WebAssembly |
 
 ### ディレクトリ構成
 
 ```
 narapy/
-├── core/                  # Rust 製パーサー / バリデーター
-│   └── src/
-│       └── lib.rs         #   WASM API エントリ（JS から呼ぶ）
 ├── src/
 │   ├── main.ts            # エントリポイント（初期化・各モジュール連携）
 │   ├── editor/            # Monaco エディタ・コード補完・フォントサイズ
 │   ├── completion.worker.ts # Pyodide を使ったコード補完 Web Worker
-│   ├── runner/            # 実行・検証・Turtle/matplotlib 描画・エラー翻訳
+│   ├── runner/            # 実行・Turtle/matplotlib 描画・エラー翻訳
 │   ├── pyodide/           # Pyodide 連携（Turtle互換モジュール）
 │   ├── lib/               # Pyodide ローダーなど共通ユーティリティ
 │   ├── explorer/          # ファイルエクスプローラー・アップロード
@@ -127,8 +118,7 @@ narapy/
 │   ├── makeUrl/           # /make-url（共有リンク生成ページ）のロジック
 │   ├── layout/            # パネルレイアウト（split.js）
 │   ├── about/             # ライセンス表示
-│   ├── pyodide.worker.ts  # Pyodide 初期化 Web Worker
-│   └── wasm/              # wasm-pack ビルド成果物（gitignore 済み）
+│   └── pyodide.worker.ts  # Pyodide 初期化 Web Worker
 ├── docs/
 │   ├── turtle-reference.md # 教材作成者向け Turtle リファレンス
 │   └── url-loading.md      # 外部サイト連携・共有リンクの仕組み

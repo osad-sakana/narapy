@@ -3,7 +3,6 @@ import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
 import wasm from 'vite-plugin-wasm'
 import topLevelAwait from 'vite-plugin-top-level-await'
-import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 const root = fileURLToPath(new URL('.', import.meta.url))
 
@@ -15,15 +14,6 @@ export default defineConfig({
     tailwindcss(),
     wasm(),
     topLevelAwait(),
-    // COEP 環境でも Blockly メディアを同一オリジンから配信するためにコピー
-    viteStaticCopy({
-      targets: [
-        {
-          src: 'node_modules/blockly/media/*',
-          dest: 'blockly-media',
-        },
-      ],
-    }),
     // Monaco ワーカーは editor/index.ts で MonacoEnvironment を直接セットして管理する
     // (vite-plugin-monaco-editor のinlineスクリプト注入はCSPに違反するため不使用)
   ],
@@ -66,11 +56,6 @@ export default defineConfig({
         makeUrl: `${root}make-url.html`,
       },
     },
-  },
-
-  optimizeDeps: {
-    // blockly は CJS モジュールのため esbuild でプリバンドル（ESM 変換）させる
-    include: ['blockly', 'blockly/python'],
   },
 
   worker: {

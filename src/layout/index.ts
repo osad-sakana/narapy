@@ -1,18 +1,5 @@
 import Split from 'split.js'
-
-const STORAGE_KEY = 'narapy-layout-v1'
-
-interface LayoutState {
-  vertical: [number, number]
-  editorCollapsed: boolean
-  logCollapsed: boolean
-}
-
-const DEFAULT_STATE: LayoutState = {
-  vertical: [60, 40],
-  editorCollapsed: false,
-  logCollapsed: false,
-}
+import { DEFAULT_STATE, load, save } from './persistence'
 
 // ヘッダー幅が狭くなってもラベルが潰れたり縦積みに折り返したりしないよう、
 // whitespace-nowrap + shrink-0 を全パネルトグル共通で必須にする
@@ -27,21 +14,6 @@ const BTN_INACTIVE = `${BTN_BASE} text-muted border border-transparent hover:tex
 // 守られていない（初期状態では常にACTIVE側が使われるため）。回帰ガード用に
 // パネルトグルの全スタイルをまとめて公開する。
 export const HEADER_BTN_STYLES = [BTN_INACTIVE, BTN_ACTIVE]
-
-function load(): LayoutState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { ...DEFAULT_STATE }
-    return { ...DEFAULT_STATE, ...(JSON.parse(raw) as Partial<LayoutState>) }
-  } catch {
-    return { ...DEFAULT_STATE }
-  }
-}
-
-function save(patch: Partial<LayoutState>): void {
-  const { vertical, editorCollapsed, logCollapsed } = { ...load(), ...patch }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ vertical, editorCollapsed, logCollapsed }))
-}
 
 export function initLayout(): void {
   const state = load()

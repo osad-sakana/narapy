@@ -3,17 +3,13 @@ import Split from 'split.js'
 const STORAGE_KEY = 'narapy-layout-v1'
 
 interface LayoutState {
-  horizontal: [number, number]
   vertical: [number, number]
-  blocklyCollapsed: boolean
   editorCollapsed: boolean
   logCollapsed: boolean
 }
 
 const DEFAULT_STATE: LayoutState = {
-  horizontal: [50, 50],
   vertical: [60, 40],
-  blocklyCollapsed: false,
   editorCollapsed: false,
   logCollapsed: false,
 }
@@ -32,25 +28,6 @@ const BTN_INACTIVE = `${BTN_BASE} text-muted border border-transparent hover:tex
 // パネルトグルの全スタイルをまとめて公開する。
 export const HEADER_BTN_STYLES = [BTN_INACTIVE, BTN_ACTIVE]
 
-// Blocklyパネルの表示状態（Python→Blockly変換を行うべきかの判定に使う）
-let blocklyPanelHidden = false
-let blocklyVisibilityListener: ((hidden: boolean) => void) | null = null
-
-export function isBlocklyPanelHidden(): boolean {
-  return blocklyPanelHidden
-}
-
-// initLayout() の呼び出しタイミングを変えずに済むよう、
-// 可視性変化の通知先はコールバック引数ではなくリスナー登録で分離する
-export function onBlocklyPanelVisibilityChange(listener: (hidden: boolean) => void): void {
-  blocklyVisibilityListener = listener
-}
-
-// Blockly無効時はパネル自体が存在しないため、保存状態によらず常に折りたたみ扱いにする
-export function resolveBlocklyCollapsed(blocklyEnabled: boolean, savedCollapsed: boolean): boolean {
-  return blocklyEnabled ? savedCollapsed : true
-}
-
 function load(): LayoutState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -66,45 +43,11 @@ function save(patch: Partial<LayoutState>): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, ...patch }))
 }
 
-export function initLayout(blocklyEnabled: boolean): void {
+export function initLayout(): void {
   const state = load()
 
-  blocklyPanelHidden = resolveBlocklyCollapsed(blocklyEnabled, state.blocklyCollapsed)
-
-  const blocklyPanel = document.getElementById('blocklyPanel') as HTMLElement
   const rightPanel   = document.getElementById('rightPanel')   as HTMLElement
   const emptyMessage = document.getElementById('emptyMessage') as HTMLElement
-  const mainEl       = document.querySelector('main')          as HTMLElement
-
-  function setBlocklyCollapsed(next: boolean): void {
-    blocklyCollapsed = next
-    if (blocklyPanelHidden === next) return
-    blocklyPanelHidden = next
-    blocklyVisibilityListener?.(next)
-  }
-
-  // Blockly無効時はパネル自体を初期化せず、右パネル（エディタ+ログ）を全幅表示する
-  let hSplit: ReturnType<typeof Split> | null = null
-  if (blocklyEnabled) {
-    hSplit = Split(['#blocklyPanel', '#rightPanel'], {
-      sizes: state.horizontal,
-      minSize: [0, 0],
-      snapOffset: 30,
-      gutterSize: 6,
-      direction: 'horizontal',
-      cursor: 'col-resize',
-      gutterStyle: () => ({ 'flex-shrink': '0' }),
-      onDragEnd: (sizes) => {
-        setBlocklyCollapsed(sizes[0] < 5)
-        save({ horizontal: [sizes[0], sizes[1]], blocklyCollapsed })
-        updateAll()
-        window.dispatchEvent(new Event('resize'))
-      },
-    })
-  } else {
-    blocklyPanel.style.display = 'none'
-    rightPanel.style.flex = '1 1 auto'
-  }
 
   const vSplit = Split(['#editorPanel', '#logPanel'], {
     sizes: state.vertical,
@@ -121,34 +64,23 @@ export function initLayout(blocklyEnabled: boolean): void {
     },
   })
 
-  const hGutter = mainEl.querySelector<HTMLElement>('.gutter.gutter-horizontal')
+  let { editorCollapsed, logCollapsed } = state
 
-  let { blocklyCollapsed, editorCollapsed, logCollapsed } = state
-  blocklyCollapsed = resolveBlocklyCollapsed(blocklyEnabled, blocklyCollapsed)
-
-  const blocklyBtn = document.getElementById('panelToggleBlockly') as HTMLElement
   const pythonBtn  = document.getElementById('panelTogglePython')  as HTMLElement
   const logBtn     = document.getElementById('panelToggleLog')      as HTMLElement
 
-  if (!blocklyEnabled) blocklyBtn.style.display = 'none'
-
   function updateBtnStyles(): void {
-    blocklyBtn.className = blocklyCollapsed ? BTN_INACTIVE : BTN_ACTIVE
     pythonBtn.className  = editorCollapsed  ? BTN_INACTIVE : BTN_ACTIVE
     logBtn.className     = logCollapsed     ? BTN_INACTIVE : BTN_ACTIVE
   }
 
   function updateEmptyMessage(): void {
-    const allGone = blocklyCollapsed && editorCollapsed && logCollapsed
+    const allGone = editorCollapsed && logCollapsed
     if (allGone) {
-      blocklyPanel.style.visibility = 'hidden'
       rightPanel.style.visibility   = 'hidden'
-      if (hGutter) hGutter.style.visibility = 'hidden'
       emptyMessage.style.display = 'flex'
     } else {
-      blocklyPanel.style.visibility = ''
       rightPanel.style.visibility   = ''
-      if (hGutter) hGutter.style.visibility = ''
       emptyMessage.style.display = 'none'
     }
   }
@@ -172,22 +104,6 @@ export function initLayout(blocklyEnabled: boolean): void {
     updateEmptyMessage()
   }
 
-  // --- ブロックトグル ---
-  if (blocklyEnabled) {
-    blocklyBtn.addEventListener('click', () => {
-      setBlocklyCollapsed(!blocklyCollapsed)
-      if (blocklyCollapsed) {
-        hSplit!.collapse(0)
-      } else {
-        const saved = load()
-        hSplit!.setSizes(saved.horizontal[0] < 5 ? DEFAULT_STATE.horizontal : saved.horizontal)
-      }
-      save({ blocklyCollapsed })
-      updateAll()
-      window.dispatchEvent(new Event('resize'))
-    })
-  }
-
   // --- Python エディタトグル ---
   pythonBtn.addEventListener('click', () => {
     editorCollapsed = !editorCollapsed
@@ -205,10 +121,6 @@ export function initLayout(blocklyEnabled: boolean): void {
   })
 
   // 初期状態を適用
-  if (blocklyEnabled && blocklyCollapsed) {
-    hSplit!.collapse(0)
-    window.dispatchEvent(new Event('resize'))
-  }
   syncVSplit()
   updateAll()
 }

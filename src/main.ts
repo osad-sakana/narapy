@@ -1,11 +1,7 @@
 import { KeyMod, KeyCode } from 'monaco-editor'
-import { initLayout, isBlocklyPanelHidden, onBlocklyPanelVisibilityChange } from './layout/index'
-import { isBlocklyEnabled } from './blockly/featureFlag'
-import { loadWasm, triggerValidation } from './runner/validator'
+import { initLayout } from './layout/index'
 import { initRunner } from './runner/index'
-import { createDebounced } from './converter/debounce'
-import { shouldConvert, shouldResyncOnReveal, shouldReportConversionError, type ActiveSource } from './converter/conversionGuard'
-import { createEditor, createEditorModelHost, getValue, setValue } from './editor/index'
+import { createEditor, createEditorModelHost, getValue } from './editor/index'
 import { createFileOpener, createModelRegistry } from './editor/modelRegistry'
 import { initFontSizeControls } from './editor/fontSize'
 import { downloadNarapyProject, openNarapyFilePicker } from './fileio/index'
@@ -32,15 +28,9 @@ import { initTheme } from './theme/index'
 // createEditor / createWorkspace が解決済みテーマを読むため、他の初期化より先に実行する
 initTheme()
 
-// Blocklyはデフォルトで無効。?blockly=1 のときのみ初期化・変換を行う（issue #31）
-const blocklyEnabled = isBlocklyEnabled()
-
-initLayout(blocklyEnabled)
-
-// 構文チェックはBlockly変換の前段としての役割が主なため、Blockly無効時は行わない（issue #37）
-function runValidation(source: string): void {
-  if (blocklyEnabled) void triggerValidation(source)
-}
+// initLayout() は createEditor() より先に呼ぶこと。
+// Monaco は生成時にコンテナを実測するため、順序を入れ替えると初期サイズが崩れる
+initLayout()
 
 await initStore()
 
@@ -48,62 +38,16 @@ await initStore()
 const editorContainer = document.getElementById('codeEditor') as HTMLElement
 const editor = createEditor(editorContainer)
 
-// --- アクティブパネル管理 ---
-let activeSource: ActiveSource = 'blockly'
-
-// プログラム的なエディタ書き込み中フラグ（Blocklyやファイル切替など）
-let isSyncingEditor = false
-
-const blocklyHeader    = document.getElementById('blocklyHeader')    as HTMLElement
-const editorHeader     = document.getElementById('editorHeader')     as HTMLElement
-const blocklyActiveDot = document.getElementById('blocklyActiveDot') as HTMLElement
-const editorActiveDot  = document.getElementById('editorActiveDot')  as HTMLElement
 const editorFileName   = document.getElementById('editorFileName')   as HTMLElement
-const validationBadge  = document.getElementById('validationBadge')  as HTMLElement
 
-// パネルヘッダーの「今どちらを編集しているか」を示すドット
-const DOT_ACTIVE = 'w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0'
-const DOT_IDLE   = 'w-1.5 h-1.5 rounded-full bg-muted shrink-0'
-
-function setActiveSource(source: ActiveSource): void {
-  if (activeSource === source) return
-  activeSource = source
-
-  if (source === 'blockly') {
-    blocklyHeader.classList.remove('opacity-50')
-    editorHeader.classList.add('opacity-50')
-    blocklyActiveDot.className = DOT_ACTIVE
-    editorActiveDot.className  = DOT_IDLE
-  } else {
-    editorHeader.classList.remove('opacity-50')
-    blocklyHeader.classList.add('opacity-50')
-    editorActiveDot.className  = DOT_ACTIVE
-    blocklyActiveDot.className = DOT_IDLE
-  }
-}
-
-// Blockly無効時はパネルが存在しないため、常にエディタをアクティブ扱いにする
-// また構文チェックを行わないため、バッジ自体も表示しない（issue #37）
-if (!blocklyEnabled) {
-  setActiveSource('editor')
-  validationBadge.style.display = 'none'
-}
-
-function codeEqual(a: string, b: string): boolean {
-  return a.trimEnd() === b.trimEnd()
-}
-
-// Python→Blockly変換（300msデバウンス）。Blockly無効時は常にno-op
-let debouncedConvert: { call: (source: string) => void; cancel: () => void } = {
-  call: () => {},
-  cancel: () => {},
-}
+// プログラム的なエディタ書き込み中フラグ（ファイル切替などで立てる）
+let isSyncingEditor = false
 
 // --- ファイル切替 ---
 // エディタが「今実際に表示している」ファイルパス(editorPath)の追跡は fileSwitcher に集約する。
 // getActiveFile()（ストア側のアクティブファイル）は loadProject や deleteFile 等で
 // エディタ更新より先に書き換わることがあるため、ストアへの書き込み先には使わない(issue #45)。
-// 切替時の退避は fileSwitcher では行わない（打鍵時とBlockly反映時に保存済みのため、issue #48）。
+// 切替時の退避は fileSwitcher では行わない（打鍵時に保存済みのため、issue #48）。
 // ファイルごとにエディタモデルを持たせ、切替がundoスタックに積まれないようにする(issue #47)
 const modelRegistry = createModelRegistry(createEditorModelHost(editor))
 const listFilePaths = (): string[] => getFiles().map(f => f.path)
@@ -112,107 +56,28 @@ const fileSwitcher = createFileSwitcher({
   // ストアから消えたファイルのモデルを破棄してから開く。残しておくと、同名ファイルが
   // 再作成されたときに削除済みファイルの undo 履歴が復活してしまう(issue #47)
   openEditorFile: createFileOpener(modelRegistry, listFilePaths),
-  writeEditorContent: (content) => setValue(editor, content),
   setSyncingEditor: (syncing) => { isSyncingEditor = syncing },
   setActiveFile,
   getActiveContent,
   setFileName: (path) => { editorFileName.textContent = path },
-  runValidation,
-  isEditorActive: () => activeSource === 'editor',
-  convert: (source) => debouncedConvert.call(source),
 })
 
 function switchToFile(path: string): void {
   fileSwitcher.switchToFile(path)
 }
 
-// --- Blockly ワークスペース（?blockly=1 のときのみ初期化・変換を行う） ---
-if (blocklyEnabled) {
-  const { applyBlocklyMessages } = await import('./blockly/messages')
-  const { createWorkspace, isSyncingFromPython } = await import('./blockly/workspace')
-  const { applyPythonToWorkspace } = await import('./converter/index')
-  const { setTooltipsEnabled, isTooltipsEnabled } = await import('./blockly/tooltips')
-
-  applyBlocklyMessages()
-
-  const workspace = createWorkspace((code) => {
-    if (activeSource === 'editor') return
-    if (codeEqual(getValue(editor), code)) return
-    const path = fileSwitcher.getEditorPath()
-    // 起動シーケンス完了前（editorPath未確定、"" のまま）にBlocklyが操作されると、
-    // 反映先のファイルが定まらないため無視する（issue #45 M2）
-    if (!path) return
-    fileSwitcher.syncEditorContent(path, code)
-    // Blockly 生成コードをストアにも反映（ファイル切替は発生しないため editorPath と同義）
-    updateFileContent(path, code)
-    runValidation(code)
-  })
-
-  // Blocklyパネルが非表示の間は無駄な変換を行わない
-  // 呼び出し時点のactiveSourceは常に'editor'（'blockly'への遷移は必ずdebouncedConvert.cancel()を伴うため）
-  // なのでshouldReportConversionErrorは常にfalseになる。Python編集起点の変換エラーで
-  // 構文検証結果を表示する共有バッジを上書きしないための意図的な挙動（issue #37）
-  debouncedConvert = createDebounced((source: string) => {
-    if (!shouldConvert(isBlocklyPanelHidden())) return
-    void applyPythonToWorkspace(source, workspace, shouldReportConversionError(activeSource))
-  }, 300)
-
-  // Blocklyパネルが再表示された時、非表示中に編集された可能性のある
-  // 最新のPythonコードで一度だけ再同期する
-  onBlocklyPanelVisibilityChange((hidden) => {
-    if (shouldResyncOnReveal(hidden, activeSource)) {
-      // 非表示中に仕込まれた保留中の変換と二重実行にならないようキャンセルする
-      debouncedConvert.cancel()
-      void applyPythonToWorkspace(getValue(editor), workspace, shouldReportConversionError(activeSource))
-    }
-  })
-
-  // capture: true でBlockly内部のstopPropagationを回避して確実に捕捉する
-  const blocklyDiv = document.getElementById('blocklyDiv') as HTMLElement
-  blocklyDiv.addEventListener('mousedown', () => {
-    setActiveSource('blockly')
-    debouncedConvert.cancel()
-  }, { capture: true })
-  blocklyDiv.addEventListener('touchstart', () => {
-    setActiveSource('blockly')
-    debouncedConvert.cancel()
-  }, { capture: true, passive: true })
-
-  // Blocklyの実際の変更（値変更・移動・追加・削除）でアクティブを確定してデバウンスをキャンセル
-  workspace.addChangeListener((event) => {
-    if (!event.isUiEvent && !isSyncingFromPython()) {
-      setActiveSource('blockly')
-      debouncedConvert.cancel()
-    }
-  })
-
-  // --- ヒントトグル ---
-  const hintToggleBtn = document.getElementById('hintToggleBtn') as HTMLButtonElement
-  hintToggleBtn.addEventListener('click', () => {
-    const next = !isTooltipsEnabled()
-    setTooltipsEnabled(next)
-    hintToggleBtn.className = next
-      ? 'flex items-center gap-1 text-xs text-accent hover:opacity-80 transition-opacity cursor-pointer'
-      : 'flex items-center gap-1 text-xs text-muted hover:text-ink transition-colors cursor-pointer'
-  })
-}
-
 // --- エディタ変更 ---
 // issue #48 で切替時の退避を削除したため、ここでのストア(メモリ上のstate)への書き込みは
-// 同期・非デバウンスに保つこと。下の debouncedConvert に合わせてデバウンスすると、
-// ファイル切替直前の編集が失われる。（IndexedDBへの永続化タイミングは store 側の関心事）
+// 同期・非デバウンスに保つこと。（IndexedDBへの永続化タイミングは store 側の関心事）
 editor.onDidChangeModelContent(() => {
   if (isSyncingEditor) return
   const path = fileSwitcher.getEditorPath()
   // 起動シーケンス完了前（editorPath未確定、"" のまま）の変更は保存先が
   // 定まらないため無視する（issue #45 M2）
   if (!path) return
-  setActiveSource('editor')
   const source = getValue(editor)
   // 変更をストアに保存（エディタが実際に表示しているパスへ、issue #45 L1）
   updateFileContent(path, source)
-  runValidation(source)
-  debouncedConvert.call(source)
 })
 
 // --- キーボードショートカット ---
@@ -275,9 +140,6 @@ importProjectBtn.addEventListener('click', () => {
           getActiveContent,
           openProjectFile: fileSwitcher.openProjectFile,
           setEditorFileName: (path) => { editorFileName.textContent = path },
-          runValidation,
-          isEditorActive: () => activeSource === 'editor',
-          convert: (source) => debouncedConvert.call(source),
         },
       )
     },
@@ -304,5 +166,4 @@ exportProjectBtn.addEventListener('click', async () => {
   })
 })
 
-void loadWasm()
 initAbout()

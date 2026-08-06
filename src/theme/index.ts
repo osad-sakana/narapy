@@ -46,7 +46,7 @@ export function getPalette(): Palette {
   return PALETTES[current]
 }
 
-/** Monaco / Blockly など CSS 変数を解釈できない描画系へテーマ変更を伝える */
+/** Monaco など CSS 変数を解釈できない描画系へテーマ変更を伝える */
 export function onThemeChange(listener: (theme: ResolvedTheme, palette: Palette) => void): void {
   listeners.add(listener)
 }

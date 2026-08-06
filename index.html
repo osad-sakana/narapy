@@ -30,10 +30,6 @@
         <!-- パネル表示トグル -->
         <div class="flex items-center gap-1 shrink-0">
           <button
-            id="panelToggleBlockly"
-            class="text-xs px-2 lg:px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 bg-accent/15 text-accent border border-accent/40"
-          >ブロック</button>
-          <button
             id="panelTogglePython"
             class="text-xs px-2 lg:px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 bg-accent/15 text-accent border border-accent/40"
           >Python</button>
@@ -112,7 +108,7 @@
       </div>
     </header>
 
-    <!-- メインエリア（2カラム） -->
+    <!-- メインエリア（単一カラム） -->
     <main class="flex flex-1 overflow-hidden relative">
 
       <!-- 全パネル非表示時のメッセージ -->
@@ -120,41 +116,8 @@
         <span class="text-muted text-sm select-none">何もありません</span>
       </div>
 
-      <!-- 左カラム: Blockly ワークスペース -->
-      <section id="blocklyPanel" class="flex flex-col overflow-hidden bg-editor">
-        <div id="blocklyHeader" class="flex items-center justify-between px-4 py-2.5 bg-panel border-b border-line shrink-0 transition-opacity duration-200">
-          <div class="flex items-center gap-2.5">
-            <span id="blocklyActiveDot" class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0"></span>
-            <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
-            </svg>
-            <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em] shrink-0 whitespace-nowrap">ブロックエディタ</span>
-          </div>
-          <div class="flex items-center gap-2">
-          <span
-            id="blocklyUnsupportedBanner"
-            class="hidden text-xs px-2 py-0.5 rounded-md bg-warn/15 text-warn border border-warn/30"
-          >⚠ 未対応構文あり（編集不可）</span>
-          <button
-            id="hintToggleBtn"
-            title="ブロックのヒント表示をオン/オフ"
-            class="flex items-center gap-1 text-xs text-accent hover:opacity-80 transition-opacity cursor-pointer"
-          >
-            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m1.343-5.657-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-            </svg>
-            ヒント
-          </button>
-          </div>
-        </div>
-        <div class="relative flex-1 min-h-0">
-          <div id="blocklyDiv" class="w-full h-full bg-editor"></div>
-          <div id="blocklyOverlay" class="hidden absolute inset-0 z-10 cursor-not-allowed"></div>
-        </div>
-      </section>
-
-      <!-- 右カラム: ファイルエクスプローラー + テキストエディタ + 実行ログ -->
-      <section id="rightPanel" class="flex overflow-hidden min-w-0">
+      <!-- ファイルエクスプローラー + テキストエディタ + 実行ログ -->
+      <section id="rightPanel" class="flex overflow-hidden min-w-0 flex-1">
 
         <!-- ファイルエクスプローラー -->
         <aside id="fileExplorer" class="flex flex-col w-44 shrink-0 border-r border-line bg-panel"></aside>
@@ -164,18 +127,14 @@
 
           <!-- テキストエディタ -->
           <div id="editorPanel" class="flex flex-col overflow-hidden border-b border-line bg-editor">
-            <div id="editorHeader" class="flex items-center justify-between px-4 py-2.5 bg-panel border-b border-line shrink-0 transition-opacity duration-200 opacity-50">
+            <div id="editorHeader" class="flex items-center justify-between px-4 py-2.5 bg-panel border-b border-line shrink-0">
               <div class="flex items-center gap-2.5 min-w-0">
-                <span id="editorActiveDot" class="w-1.5 h-1.5 rounded-full bg-muted shrink-0"></span>
                 <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                   <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
                 </svg>
                 <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em] shrink-0 whitespace-nowrap">Python エディタ</span>
                 <span id="editorFileName" class="text-[11px] text-muted font-mono truncate">main.py</span>
               </div>
-              <span id="validationBadge" class="text-xs px-2 py-0.5 rounded-md shrink-0 whitespace-nowrap bg-hover text-muted transition-all">
-                待機中
-              </span>
             </div>
             <div id="codeEditor" class="flex-1 w-full min-h-0"></div>
           </div>

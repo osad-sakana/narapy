@@ -3,24 +3,17 @@ import { deleteFile, getActiveContent, getActiveFile, getFile, loadProject, setA
 import { createFileSwitcher, type FileSwitcherDeps } from './fileSwitcher'
 import type { OpenMode } from './modelRegistry'
 
-// エディタバッファを模した簡易ハーネス。ファイルを開く操作(openEditorFile)と
-// 表示中モデルへの in-place 書き込み(writeEditorContent)を区別して記録する。
+// エディタバッファを模した簡易ハーネス。ファイルを開く操作(openEditorFile)を記録する。
 function createEditorBuffer(initial = '') {
   let value = initial
   const opened: { path: string; mode: OpenMode }[] = []
-  const written: string[] = []
   return {
     get: () => value,
     set: (v: string) => { value = v },
     opened,
-    written,
     openFile: (path: string, content: string, mode: OpenMode) => {
       value = content
       opened.push({ path, mode })
-    },
-    write: (content: string) => {
-      value = content
-      written.push(content)
     },
   }
 }
@@ -30,14 +23,10 @@ type EditorBuffer = ReturnType<typeof createEditorBuffer>
 function buildDeps(buffer: EditorBuffer): FileSwitcherDeps {
   return {
     openEditorFile: buffer.openFile,
-    writeEditorContent: buffer.write,
     setSyncingEditor: vi.fn(),
     setActiveFile,
     getActiveContent,
     setFileName: vi.fn(),
-    runValidation: vi.fn(),
-    isEditorActive: () => false,
-    convert: vi.fn(),
   }
 }
 
@@ -129,12 +118,10 @@ describe('createFileSwitcher', () => {
   it('切替先が非テキスト等で setActiveFile が false を返す場合、エディタもeditorPathも変更されない', () => {
     const buffer = createEditorBuffer()
     const setFileName = vi.fn()
-    const runValidation = vi.fn()
     const switcher = createFileSwitcher({
       ...buildDeps(buffer),
       setActiveFile: () => false,
       setFileName,
-      runValidation,
     })
     switcher.openProjectFile('main.py', 'main.pyの内容')
 
@@ -143,21 +130,16 @@ describe('createFileSwitcher', () => {
     expect(switcher.getEditorPath()).toBe('main.py')
     expect(buffer.get()).toBe('main.pyの内容')
     expect(setFileName).not.toHaveBeenCalled()
-    expect(runValidation).not.toHaveBeenCalled()
   })
 
   it('M1: openProjectFileが例外を投げてもsetSyncingEditor(false)が呼ばれ、editorPathは更新される', () => {
     const setSyncingEditor = vi.fn()
     const switcher = createFileSwitcher({
       openEditorFile: () => { throw new Error('boom') },
-      writeEditorContent: vi.fn(),
       setSyncingEditor,
       setActiveFile: vi.fn(() => true),
       getActiveContent: () => '',
       setFileName: vi.fn(),
-      runValidation: vi.fn(),
-      isEditorActive: () => false,
-      convert: vi.fn(),
     })
 
     expect(() => switcher.openProjectFile('new.py', 'x')).toThrow('boom')
@@ -177,8 +159,7 @@ describe('createFileSwitcher', () => {
     )
     const buffer = createEditorBuffer()
     const setFileName = vi.fn()
-    const runValidation = vi.fn()
-    const switcher = createFileSwitcher({ ...buildDeps(buffer), setFileName, runValidation })
+    const switcher = createFileSwitcher({ ...buildDeps(buffer), setFileName })
     switcher.openProjectFile('main.py', 'メインの内容(編集後)')
     // 打鍵時の onDidChangeModelContent 相当。ユーザー編集はこの経路で必ずストアへ届く。
     updateFileContent('main.py', 'メインの内容(編集後)')
@@ -189,7 +170,6 @@ describe('createFileSwitcher', () => {
 
     expect(buffer.get()).toBe('サブの内容')
     expect(setFileName).toHaveBeenCalledWith('sub.py')
-    expect(runValidation).toHaveBeenCalledWith('サブの内容')
     expect(getActiveFile()).toBe('sub.py')
 
     // 切替元は打鍵時に保存された値のまま。switchToFile はストアへ書き込まない。
@@ -212,8 +192,6 @@ describe('createFileSwitcher', () => {
 
     switcher.switchToFile('sub.py')
 
-    // 切替が undo 可能な編集操作にならないよう、writeEditorContent は使わない
-    expect(buffer.written).toEqual([])
     expect(buffer.opened).toEqual([
       { path: 'main.py', mode: 'reset' },
       { path: 'sub.py', mode: 'reuse' },
@@ -240,18 +218,5 @@ describe('createFileSwitcher', () => {
     switcher.openProjectFile('new.py', '読み込んだ新しい内容')
 
     expect(buffer.opened).toEqual([{ path: 'new.py', mode: 'reset' }])
-  })
-
-  it('issue #47: Blockly同期は undo 履歴を保つため in-place 書き込みを使う', () => {
-    const buffer = createEditorBuffer()
-    const switcher = createFileSwitcher(buildDeps(buffer))
-    switcher.openProjectFile('main.py', '')
-
-    switcher.syncEditorContent('main.py', 'print("blockly")')
-
-    expect(buffer.written).toEqual(['print("blockly")'])
-    // モデル差し替えは初回の openProjectFile のみ
-    expect(buffer.opened).toEqual([{ path: 'main.py', mode: 'reset' }])
-    expect(switcher.getEditorPath()).toBe('main.py')
   })
 })

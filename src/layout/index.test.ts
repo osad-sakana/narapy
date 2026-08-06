@@ -1,19 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import indexHtml from '../../index.html?raw'
-import { resolveBlocklyCollapsed, BTN_ACTIVE, HEADER_BTN_STYLES } from './index'
+import { BTN_ACTIVE, HEADER_BTN_STYLES } from './index'
 import { RUN_STYLE, STOP_STYLE } from '../runner/buttonStyles'
-
-describe('resolveBlocklyCollapsed', () => {
-  it('Blockly有効時は保存された折りたたみ状態をそのまま使う', () => {
-    expect(resolveBlocklyCollapsed(true, false)).toBe(false)
-    expect(resolveBlocklyCollapsed(true, true)).toBe(true)
-  })
-
-  it('Blockly無効時はパネルが存在しないため常に折りたたみ扱いにする', () => {
-    expect(resolveBlocklyCollapsed(false, false)).toBe(true)
-    expect(resolveBlocklyCollapsed(false, true)).toBe(true)
-  })
-})
 
 // ヘッダー幅が狭くなった際にラベルが潰れたり縦積みに折り返したりしないための回帰ガード。
 // issue #51: shrink-0/whitespace-nowrapが欠けるとボタンが折り返してヘッダー高さが伸び、
@@ -51,9 +39,32 @@ describe('index.html とヘッダークラス定数の整合性', () => {
     expect(extractClass('runBtn')).toBe(RUN_STYLE)
   })
 
-  it('パネルトグル3個の class が BTN_ACTIVE と完全一致する（初期状態は全パネル表示）', () => {
-    expect(extractClass('panelToggleBlockly')).toBe(BTN_ACTIVE)
+  it('パネルトグル2個の class が BTN_ACTIVE と完全一致する（初期状態は全パネル表示）', () => {
     expect(extractClass('panelTogglePython')).toBe(BTN_ACTIVE)
     expect(extractClass('panelToggleLog')).toBe(BTN_ACTIVE)
+  })
+
+  it('#editorHeader の class に opacity-50 が含まれない（Blockly廃止によりエディタ単独構成のため常時表示）', () => {
+    expect(extractClass('editorHeader')).not.toContain('opacity-50')
+  })
+})
+
+// Blockly廃止（issue #52）の回帰ガード: 関連id が index.html に復活していないことを検査する。
+describe('Blockly関連idの非存在', () => {
+  const blocklyIds = [
+    'blocklyPanel',
+    'blocklyDiv',
+    'blocklyHeader',
+    'blocklyOverlay',
+    'blocklyUnsupportedBanner',
+    'panelToggleBlockly',
+    'validationBadge',
+    'hintToggleBtn',
+    'blocklyActiveDot',
+    'editorActiveDot',
+  ]
+
+  it.each(blocklyIds)('id="%s" が存在しない', (id) => {
+    expect(indexHtml).not.toMatch(new RegExp(`id="${id}"`))
   })
 })

@@ -23,7 +23,7 @@ function extractBlock(selector: string): string {
   return block
 }
 
-// palette.ts（Monaco / Blockly が参照）と style.css のトークン定義（Tailwind ユーティリティを生成）は
+// palette.ts（Monaco が参照）と style.css のトークン定義（Tailwind ユーティリティを生成）は
 // 同じ色を二重に定義している。CSS から TS を import できないため避けられない重複なので、
 // 片方だけ書き換えて配色がちぐはぐになる事故をここで防ぐ。
 // index.html とヘッダークラス定数の整合性テスト（layout/index.test.ts）と同じ流儀。
@@ -52,7 +52,7 @@ describe('palette.ts と style.css のカラートークン', () => {
     })
   }
 
-  it('全トークンが小文字6桁の hex である（Monaco / Blockly が oklch を解釈できないため）', () => {
+  it('全トークンが小文字6桁の hex である（Monaco が oklch を解釈できないため）', () => {
     for (const palette of [DARK_PALETTE, LIGHT_PALETTE]) {
       for (const [key, hex] of Object.entries(palette)) {
         expect(hex, key).toMatch(/^#[0-9a-f]{6}$/)

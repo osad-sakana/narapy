@@ -1,12 +1,5 @@
 const LICENSES = [
   {
-    name: 'Google Blockly',
-    version: '12',
-    license: 'Apache-2.0',
-    copyright: 'Copyright 2012 Google LLC',
-    url: 'https://github.com/google/blockly',
-  },
-  {
     name: 'Monaco Editor',
     version: '0.55',
     license: 'MIT',

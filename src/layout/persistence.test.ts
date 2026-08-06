@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_STATE, STORAGE_KEY, load, save } from './persistence'
 
 // environment: 'node' のため localStorage が存在しない。テストに必要な最小限の
@@ -21,8 +21,20 @@ describe('layout persistence: save / load', () => {
     vi.stubGlobal('localStorage', createLocalStorageStub())
   })
 
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('load: localStorage 未設定時は DEFAULT_STATE を返す', () => {
     expect(load()).toEqual(DEFAULT_STATE)
+  })
+
+  it('load: 部分的なレコードは DEFAULT_STATE とマージされる', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ vertical: [30, 70] }))
+    const state = load()
+    expect(state.vertical).toEqual([30, 70])
+    expect(state.editorCollapsed).toBe(false) // DEFAULT_STATE から補完される
+    expect(state.logCollapsed).toBe(false)
   })
 
   it('load: 壊れたJSONを読んだ場合は例外を投げず DEFAULT_STATE にフォールバックする', () => {

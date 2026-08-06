@@ -1,6 +1,6 @@
 export const STORAGE_KEY = 'narapy-layout-v1'
 
-export interface LayoutState {
+interface LayoutState {
   vertical: [number, number]
   editorCollapsed: boolean
   logCollapsed: boolean

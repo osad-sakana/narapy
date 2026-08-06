@@ -29,7 +29,7 @@ narapy/
 │   ├── fileio/             # .narapy プロジェクト入出力
 │   ├── urlload/            # URLの #code= / #project= / ?project=<URL> 読み込み
 │   ├── makeUrl/            # /make-url（共有リンク生成ページ）のロジック
-│   ├── layout/             # パネルレイアウト（split.js）
+│   ├── layout/             # パネルレイアウト（split.js、状態をlocalStorageに永続化）
 │   ├── about/              # ライセンス表示
 │   ├── theme/              # カラーパレット・テーマ切り替え
 │   └── style.css           # Tailwind v4 向けグローバルスタイル
@@ -50,6 +50,9 @@ pnpm build
 
 # 型チェック
 pnpm typecheck
+
+# テスト実行
+pnpm test
 ```
 
 ## アーキテクチャ上の重要事項
@@ -67,6 +70,12 @@ Cross-Origin-Embedder-Policy: require-corp
 ### Pyodide Web Worker
 
 `type: 'module'` の Worker では `importScripts()` が禁止。`/* @vite-ignore */` コメント付きの dynamic `import()` で CDN から読み込んでいる。
+
+### ビルドターゲット（`esnext`）
+
+`vite-plugin-top-level-await` を廃止したため、`vite.config.ts` の `build.target: 'esnext'` が
+`src/main.ts` のトップレベル `await`（`initStore()` / `applyUrlLoad()`）をネイティブESMのトップレベル
+awaitとしてそのまま出力する唯一の手段になっている。`target` を下げるとビルドが壊れる。
 
 ### カラーパレットとテーマ
 

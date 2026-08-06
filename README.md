@@ -116,8 +116,9 @@ narapy/
 │   ├── fileio/            # .narapy プロジェクト入出力
 │   ├── urlload/           # URLの #code= / #project= / ?project=<URL> 読み込み
 │   ├── makeUrl/           # /make-url（共有リンク生成ページ）のロジック
-│   ├── layout/            # パネルレイアウト（split.js）
+│   ├── layout/            # パネルレイアウト（split.js、状態をlocalStorageに永続化）
 │   ├── about/             # ライセンス表示
+│   ├── theme/             # カラーパレット・テーマ切り替え
 │   └── pyodide.worker.ts  # Pyodide 初期化 Web Worker
 ├── docs/
 │   ├── turtle-reference.md # 教材作成者向け Turtle リファレンス

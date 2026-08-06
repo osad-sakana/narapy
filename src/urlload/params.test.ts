@@ -29,8 +29,8 @@ describe('parseUrlLoadParams', () => {
       .toEqual({ project: 'xyz', projectUrl: 'https://example.com/p.narapy' })
   })
 
-  it('blockly=1 など他のクエリと併存していても影響しない(issue #31との整合性)', () => {
-    expect(parseUrlLoadParams('#code=abc', '?blockly=1'))
+  it('無関係なクエリパラメータが併存していても影響しない', () => {
+    expect(parseUrlLoadParams('#code=abc', '?foo=1'))
       .toEqual({ code: 'abc' })
   })
 

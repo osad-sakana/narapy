@@ -30,9 +30,6 @@ describe('applyProjectLoad', () => {
         getActiveContent: () => contents[active],
         openProjectFile,
         setEditorFileName: vi.fn(),
-        runValidation: vi.fn(),
-        isEditorActive: () => false,
-        convert: vi.fn(),
       },
     )
 
@@ -41,12 +38,11 @@ describe('applyProjectLoad', () => {
     expect(openProjectFile).not.toHaveBeenCalledWith('new.py', '古いエディタ内容(未保存)')
   })
 
-  it('呼び出し順序はloadProject → refreshExplorer → エディタ反映(内容/ファイル名/バリデーション)であること', () => {
+  it('呼び出し順序はloadProject → refreshExplorer → エディタ反映(内容/ファイル名)であること', () => {
     const loadProject = vi.fn()
     const refreshExplorer = vi.fn()
     const openProjectFile = vi.fn()
     const setEditorFileName = vi.fn()
-    const runValidation = vi.fn()
     applyProjectLoad(
       buildInput('new.py', [{ path: 'new.py', content: { kind: 'text', data: 'print(1)' } }]),
       {
@@ -56,15 +52,11 @@ describe('applyProjectLoad', () => {
         getActiveContent: () => 'print(1)',
         openProjectFile,
         setEditorFileName,
-        runValidation,
-        isEditorActive: () => false,
-        convert: vi.fn(),
       },
     )
 
     expect(openProjectFile).toHaveBeenCalledWith('new.py', 'print(1)')
     expect(setEditorFileName).toHaveBeenCalledWith('new.py')
-    expect(runValidation).toHaveBeenCalledWith('print(1)')
     expect(refreshExplorer).toHaveBeenCalledTimes(1)
 
     const loadOrder = loadProject.mock.invocationCallOrder[0]
@@ -72,24 +64,5 @@ describe('applyProjectLoad', () => {
     const editorOrder = openProjectFile.mock.invocationCallOrder[0]
     expect(loadOrder).toBeLessThan(refreshOrder)
     expect(refreshOrder).toBeLessThan(editorOrder)
-  })
-
-  it('activeSourceがeditorでないときはconvertが呼ばれない(Blockly誤変換の防止)', () => {
-    const convert = vi.fn()
-    applyProjectLoad(
-      buildInput('new.py', [{ path: 'new.py', content: { kind: 'text', data: 'print(1)' } }]),
-      {
-        loadProject: vi.fn(),
-        refreshExplorer: vi.fn(),
-        getActiveFile: () => 'new.py',
-        getActiveContent: () => 'print(1)',
-        openProjectFile: vi.fn(),
-        setEditorFileName: vi.fn(),
-        runValidation: vi.fn(),
-        isEditorActive: () => false,
-        convert,
-      },
-    )
-    expect(convert).not.toHaveBeenCalled()
   })
 })

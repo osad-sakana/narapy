@@ -173,14 +173,6 @@ console.log(bytesToBase64Url(zlibSync(archive, { level: 9 })))
 
 ---
 
-## 他のクエリパラメータとの併用
-
-Blockly有効化フラグ（issue #31, `?blockly=1`）と併用できます。
-
-```
-https://<narapyのURL>/?blockly=1&project=https://your-materials-site.example.com/api/exercises/42.narapy
-```
-
 ## 既存の作業内容の扱い
 
 ブラウザに既存の作業内容（IndexedDBに保存済みのファイル）がある場合、URLからの読み込みは

@@ -29,20 +29,8 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
       - name: Install dependencies
         run: pnpm install
-
-      # typecheck は src/wasm の型定義（gitignore 済み）に依存するため先に WASM をビルド
-      - name: Build WASM
-        run: pnpm build:wasm
 
       - name: Typecheck
         run: pnpm typecheck
@@ -54,31 +42,3 @@ jobs:
         run: pnpm build
         env:
           CI: true
-
-  rust:
-    name: Rust (fmt / clippy / test)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: core
-
-      - name: Format check
-        run: cargo fmt --check
-        working-directory: core
-
-      - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
-        working-directory: core
-
-      - name: Test
-        run: cargo test
-        working-directory: core

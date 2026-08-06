@@ -13,9 +13,6 @@ export interface ApplyProjectLoadDeps {
   getActiveContent: () => string
   openProjectFile: (path: string, content: string) => void
   setEditorFileName: (path: string) => void
-  runValidation: (source: string) => void
-  isEditorActive: () => boolean
-  convert: (source: string) => void
 }
 
 // .narapy プロジェクトの読込を適用するオーケストレーション(issue #45)。
@@ -31,8 +28,4 @@ export function applyProjectLoad(input: ProjectLoadInput, deps: ApplyProjectLoad
   const content = deps.getActiveContent()
   deps.openProjectFile(path, content)
   deps.setEditorFileName(path)
-  deps.runValidation(content)
-  if (deps.isEditorActive()) {
-    deps.convert(content)
-  }
 }

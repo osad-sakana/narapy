@@ -80,18 +80,6 @@
   --color-code-func: #734e00;
 }
 
-/* Blockly インジェクト先の SVG が height:100% を要求するため明示的に指定 */
-#blocklyDiv svg {
-  height: 100%;
-}
-
-/* Tailwind の svg{display:block} リセットが Blockly の setAttribute("display","none") を
-   上書きしてスクロールバーが残留するのを防ぐ */
-.blocklyScrollbarVertical[display="none"],
-.blocklyScrollbarHorizontal[display="none"] {
-  display: none !important;
-}
-
 /* ─── split.js リサイズハンドル ─────────────────────────────── */
 .gutter {
   background-color: var(--color-canvas);
@@ -110,11 +98,6 @@
 
 .gutter:hover::after {
   background: color-mix(in srgb, var(--color-accent) 55%, transparent);
-}
-
-.gutter.gutter-horizontal {
-  cursor: col-resize;
-  width: 6px !important;
 }
 
 .gutter.gutter-vertical {
@@ -136,91 +119,6 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-muted);
-}
-
-/* ─── Blockly フィールド入力（テキスト・数値編集時のHTML input）────── */
-.blocklyHtmlInput {
-  background-color: var(--color-editor) !important;
-  color: var(--color-ink) !important;
-  border: 1px solid var(--color-accent) !important;
-  border-radius: 3px !important;
-  caret-color: var(--color-accent) !important;
-}
-
-/* ─── ブロックホバーツールチップ ───────────────────────────── */
-#bt-root {
-  position: fixed;
-  z-index: 9999;
-  pointer-events: none;
-  width: 280px;
-  background: var(--color-panel);
-  border: 1px solid var(--color-line);
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
-  font-family: 'BIZ UDPGothic', 'Hiragino Kaku Gothic ProN', sans-serif;
-}
-
-.bt-title {
-  padding: 9px 14px 8px;
-  font-family: '0xProto', monospace;
-  font-size: 12.5px;
-  font-weight: bold;
-  color: var(--color-ink);
-  background: var(--color-hover);
-  border-bottom: 1px solid var(--color-line);
-  letter-spacing: 0.01em;
-}
-
-.bt-desc {
-  padding: 8px 14px 9px;
-  font-size: 11.5px;
-  color: var(--color-muted);
-  line-height: 1.65;
-  margin: 0;
-  border-bottom: 1px solid var(--color-line);
-}
-
-.bt-section {
-  padding: 0;
-}
-
-.bt-section-label {
-  padding: 5px 14px 2px;
-  font-size: 9.5px;
-  font-weight: bold;
-  color: var(--color-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  background: var(--color-editor);
-}
-
-.bt-code {
-  display: block;
-  padding: 4px 14px 10px;
-  font-family: '0xProto', monospace;
-  font-size: 10.5px;
-  color: var(--color-code-string);
-  background: var(--color-editor);
-  margin: 0;
-  line-height: 1.75;
-  white-space: pre;
-}
-
-.bt-section-out {
-  border-top: 1px solid var(--color-line);
-}
-
-.bt-out {
-  display: block;
-  padding: 4px 14px 10px;
-  font-family: '0xProto', monospace;
-  font-size: 10.5px;
-  color: var(--color-muted);
-  background: var(--color-editor);
-  margin: 0;
-  line-height: 1.75;
-  white-space: pre;
 }
 
 /* ─── Monaco 補完ウィジェット: ステータスバーに「Tab で確定」を表示 ──── */

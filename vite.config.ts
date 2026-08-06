@@ -1,9 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
-import wasm from 'vite-plugin-wasm'
-import topLevelAwait from 'vite-plugin-top-level-await'
-import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 const root = fileURLToPath(new URL('.', import.meta.url))
 
@@ -13,17 +10,6 @@ export default defineConfig({
 
   plugins: [
     tailwindcss(),
-    wasm(),
-    topLevelAwait(),
-    // COEP 環境でも Blockly メディアを同一オリジンから配信するためにコピー
-    viteStaticCopy({
-      targets: [
-        {
-          src: 'node_modules/blockly/media/*',
-          dest: 'blockly-media',
-        },
-      ],
-    }),
     // Monaco ワーカーは editor/index.ts で MonacoEnvironment を直接セットして管理する
     // (vite-plugin-monaco-editor のinlineスクリプト注入はCSPに違反するため不使用)
   ],
@@ -58,6 +44,9 @@ export default defineConfig({
   },
 
   build: {
+    // esnext: main.ts のトップレベル await（initStore / applyUrlLoad）をネイティブESMの
+    // トップレベル await としてそのまま出力するために必須（vite-plugin-top-level-await 廃止後、
+    // このターゲット設定自体がTLAを合法にする唯一の手段になった）
     target: 'esnext',
     rollupOptions: {
       // /make-url (共有リンク生成ページ, issue #32) を静的マルチページとしてビルド対象に含める
@@ -68,16 +57,10 @@ export default defineConfig({
     },
   },
 
-  optimizeDeps: {
-    // blockly は CJS モジュールのため esbuild でプリバンドル（ESM 変換）させる
-    include: ['blockly', 'blockly/python'],
-  },
-
   worker: {
     // iife形式にすることでViteがmodule workerにHMRクライアントを注入しなくなる
     // （module workerへのHMR注入はdocument未定義エラーを起こすため）
-    // topLevelAwaitはiife formatに非対応のためworkerには含めない（workers内でtop-level awaitは未使用）
+    // workers内では top-level await を使わないこと（iife format は TLA 非対応）
     format: 'iife',
-    plugins: () => [wasm()],
   },
 })

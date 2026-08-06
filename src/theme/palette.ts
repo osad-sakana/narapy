@@ -1,7 +1,7 @@
 // Narapy のカラーパレット（単一の真実）。
 //
 // Tailwind のユーティリティ（bg-panel など）は src/style.css の @theme と
-// ライトモードの上書きブロックが生成するが、Monaco と Blockly のテーマ定義は
+// ライトモードの上書きブロックが生成するが、Monaco のテーマ定義は
 // CSS 変数を解釈できず hex を直接要求するため、同じ値を TS 側にも持つ必要がある。
 // CSS から TS を import することはできないのでこの 1 箇所だけ重複が避けられない。
 // palette.test.ts が両者の一致を検査している。

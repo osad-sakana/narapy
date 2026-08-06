@@ -25,7 +25,7 @@ import { applyProjectLoad } from './fileio/applyProjectLoad'
 import { createFileSwitcher } from './editor/fileSwitcher'
 import { initTheme } from './theme/index'
 
-// createEditor / createWorkspace が解決済みテーマを読むため、他の初期化より先に実行する
+// createEditor が解決済みテーマを読むため、他の初期化より先に実行する
 initTheme()
 
 // initLayout() は createEditor() より先に呼ぶこと。

@@ -100,11 +100,6 @@
   background: color-mix(in srgb, var(--color-accent) 55%, transparent);
 }
 
-.gutter.gutter-horizontal {
-  cursor: col-resize;
-  width: 6px !important;
-}
-
 .gutter.gutter-vertical {
   cursor: row-resize;
   height: 6px !important;

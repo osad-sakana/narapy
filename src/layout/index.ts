@@ -39,8 +39,8 @@ function load(): LayoutState {
 }
 
 function save(patch: Partial<LayoutState>): void {
-  const current = load()
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, ...patch }))
+  const { vertical, editorCollapsed, logCollapsed } = { ...load(), ...patch }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ vertical, editorCollapsed, logCollapsed }))
 }
 
 export function initLayout(): void {

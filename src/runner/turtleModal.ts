@@ -3,7 +3,7 @@ import { createTurtlePlayer, type PlayerState } from './turtlePlayer'
 
 const CANVAS_SIZE = 480
 
-const BTN_BASE = 'flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors cursor-pointer border-2'
+const BTN_BASE = 'flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors cursor-pointer border'
 const BTN_PLAY = `${BTN_BASE} bg-accent text-accent-ink border-accent hover:bg-accent-ink hover:text-accent`
 const BTN_SUB = `${BTN_BASE} bg-hover text-ink border-line hover:bg-ink hover:text-hover`
 

@@ -3,9 +3,9 @@ import { createTurtlePlayer, type PlayerState } from './turtlePlayer'
 
 const CANVAS_SIZE = 480
 
-const BTN_BASE = 'flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors cursor-pointer'
-const BTN_PLAY = `${BTN_BASE} bg-accent text-accent-ink hover:opacity-90 active:opacity-80`
-const BTN_SUB = `${BTN_BASE} bg-hover text-ink border border-line hover:opacity-90 active:opacity-80`
+const BTN_BASE = 'flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors cursor-pointer border-2'
+const BTN_PLAY = `${BTN_BASE} bg-accent text-accent-ink border-accent hover:bg-accent-ink hover:text-accent`
+const BTN_SUB = `${BTN_BASE} bg-hover text-ink border-line hover:bg-ink hover:text-hover`
 
 // turtle の描画データを Canvas に描画し、再生コントロール付きモーダルで表示する。
 export function showTurtleModal(data: TurtleCommands): void {

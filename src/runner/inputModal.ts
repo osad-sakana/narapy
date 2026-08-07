@@ -68,7 +68,7 @@ export function showInputModal(
     cancelBtn.textContent = 'キャンセル'
 
     const submitBtn = document.createElement('button')
-    submitBtn.className = 'px-3 py-1.5 rounded-lg text-sm font-bold bg-accent text-accent-ink hover:opacity-90 active:opacity-80 transition-opacity cursor-pointer'
+    submitBtn.className = 'px-3 py-1.5 rounded-lg text-sm font-bold bg-accent text-accent-ink border-2 border-accent hover:bg-accent-ink hover:text-accent transition-colors cursor-pointer'
     submitBtn.textContent = '送信'
 
     rightActions.appendChild(cancelBtn)

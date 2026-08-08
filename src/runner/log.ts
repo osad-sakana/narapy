@@ -1,3 +1,5 @@
+import { buildErrorIssueUrl } from './issueReport'
+
 export type LogKind = 'output' | 'result' | 'error' | 'info' | 'warn'
 
 const LOG_CLASSES: Record<LogKind, string> = {
@@ -35,6 +37,35 @@ export interface ErrorBlock {
   description: string
   hint?: string
   raw: string
+  matched?: boolean
+  rawMessage?: string
+}
+
+// ルール未ヒットのエラーに「未対応」バッジ・英語原文・GitHub起票リンクを添える。
+// リンクは手動起票の導線に留め、送信前確認を促す（プライバシー配慮のため自動送信はしない）
+function buildUnmatchedFooter(block: ErrorBlock): HTMLElement {
+  const footer = document.createElement('div')
+  footer.className = 'space-y-0.5 mt-0.5'
+
+  const badge = document.createElement('span')
+  badge.textContent = '未対応'
+  badge.className = 'inline-block text-[10px] text-muted border border-line rounded px-1'
+  footer.appendChild(badge)
+
+  const rawMsg = document.createElement('div')
+  rawMsg.textContent = block.rawMessage ?? ''
+  rawMsg.className = 'text-muted text-xs'
+  footer.appendChild(rawMsg)
+
+  const link = document.createElement('a')
+  link.href = buildErrorIssueUrl({ errorType: block.errorType, raw: block.raw })
+  link.target = '_blank'
+  link.rel = 'noopener noreferrer'
+  link.textContent = 'このエラーの日本語化をリクエスト（GitHub・送信前に内容を確認してください）'
+  link.className = 'text-accent text-xs underline hover:no-underline'
+  footer.appendChild(link)
+
+  return footer
 }
 
 export function appendErrorBlock(block: ErrorBlock): void {
@@ -65,6 +96,10 @@ export function appendErrorBlock(block: ErrorBlock): void {
       hintEl.className = 'text-warn text-xs'
       wrapper.appendChild(hintEl)
     }
+  }
+
+  if (block.matched === false) {
+    wrapper.appendChild(buildUnmatchedFooter(block))
   }
 
   // 元のエラー（折りたたみ）

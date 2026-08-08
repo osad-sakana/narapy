@@ -74,4 +74,22 @@ describe('buildErrorIssueUrl', () => {
     const body = decodeParam(url, 'body')
     expect(body).toContain('以下省略')
   })
+
+  it('サロゲートペアが切り詰め境界に跨っても例外を投げない', () => {
+    const raw = 'x'.repeat(999) + '\u{1F600}' + 'y'.repeat(3000)
+    expect(() => buildErrorIssueUrl({ errorType: 'ValueError', raw })).not.toThrow()
+  })
+
+  it('絵文字主体の長いトレースバックでも例外を投げない', () => {
+    const raw = 'Traceback\n' + '\u{1F600}'.repeat(900)
+    expect(() => buildErrorIssueUrl({ errorType: 'ValueError', raw })).not.toThrow()
+  })
+
+  it('サロゲートペアの直前で切り詰めても、片割れの孤立サロゲートを含まない', () => {
+    const raw = 'x'.repeat(999) + '\u{1F600}'
+    const url = buildErrorIssueUrl({ errorType: 'ValueError', raw })
+    const body = decodeParam(url, 'body')
+    // 孤立サロゲートが残っていれば body 自体の取得（decodeURIComponent相当）で崩れる
+    expect(body).toContain('x'.repeat(999))
+  })
 })

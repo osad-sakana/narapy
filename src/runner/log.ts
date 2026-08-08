@@ -132,12 +132,11 @@ export function appendErrorBlock(block: ErrorBlock): void {
 }
 
 export function clearLog(): void {
-  const outputLog = document.getElementById('outputLog') as HTMLDivElement
-  outputLog.innerHTML = PLACEHOLDER_HTML
+  getOutputLog().innerHTML = PLACEHOLDER_HTML
 }
 
 export function getLogText(): string {
-  const outputLog = document.getElementById('outputLog') as HTMLDivElement
+  const outputLog = getOutputLog()
   const clone = outputLog.cloneNode(true) as HTMLDivElement
   clone.removeAttribute('id')
   clone.querySelectorAll('[data-log-exclude]').forEach((el) => el.remove())

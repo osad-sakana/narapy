@@ -11,25 +11,18 @@ export interface ErrorIssueInput {
   raw: string
 }
 
-function truncate(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text
-  return `${text.slice(0, maxLength)}\n…（以下省略）`
-}
-
-function truncateByEncodedLength(text: string, maxEncodedLength: number): string {
-  if (encodeURIComponent(text).length <= maxEncodedLength) return text
-
-  let lo = 0
-  let hi = text.length
-  while (lo < hi) {
-    const mid = Math.ceil((lo + hi) / 2)
-    if (encodeURIComponent(text.slice(0, mid)).length <= maxEncodedLength) {
-      lo = mid
-    } else {
-      hi = mid - 1
-    }
+// コードポイント単位（[...text]）でスライスする。UTF-16コードユニット単位の
+// text.slice() だとサロゲートペアの途中で切れて encodeURIComponent が
+// URIError を投げることがあるため
+function truncate(text: string, maxLength: number, maxEncodedLength: number): string {
+  const chars = [...text]
+  let limit = Math.min(chars.length, maxLength)
+  while (limit > 0 && encodeURIComponent(chars.slice(0, limit).join('')).length > maxEncodedLength) {
+    limit--
   }
-  return `${text.slice(0, lo)}\n…（以下省略）`
+
+  if (limit >= chars.length) return text
+  return `${chars.slice(0, limit).join('')}\n…（以下省略）`
 }
 
 // raw に ``` が含まれているとMarkdownのコードフェンスが途中で閉じてしまうため、
@@ -42,10 +35,7 @@ function fence(text: string): string {
 
 export function buildErrorIssueUrl({ errorType, raw }: ErrorIssueInput): string {
   const title = `[未翻訳エラー] ${errorType}`
-  const truncatedRaw = truncateByEncodedLength(
-    truncate(raw, RAW_MESSAGE_MAX_LENGTH),
-    RAW_MESSAGE_MAX_ENCODED_LENGTH,
-  )
+  const truncatedRaw = truncate(raw, RAW_MESSAGE_MAX_LENGTH, RAW_MESSAGE_MAX_ENCODED_LENGTH)
   const body = [
     '## 元のエラー',
     '（実行結果のトレースバックです。入力したコードの一部が含まれる場合があります）',

@@ -42,26 +42,32 @@ export interface ErrorBlock {
 }
 
 // ルール未ヒットのエラーに「未対応」バッジ・英語原文・GitHub起票リンクを添える。
-// リンクは手動起票の導線に留め、送信前確認を促す（プライバシー配慮のため自動送信はしない）
+// リンクはクリックした時点でGitHubにエラー内容が送信されるため、その旨を文言で明示する
+// （プライバシー配慮のため、こちらから自動送信することはない）
 function buildUnmatchedFooter(block: ErrorBlock): HTMLElement {
   const footer = document.createElement('div')
   footer.className = 'space-y-0.5 mt-0.5'
+  footer.dataset.logExclude = 'true'
 
   const badge = document.createElement('span')
   badge.textContent = '未対応'
+  badge.title = '翻訳ルールが未対応のエラーです'
   badge.className = 'inline-block text-[10px] text-muted border border-line rounded px-1'
   footer.appendChild(badge)
 
-  const rawMsg = document.createElement('div')
-  rawMsg.textContent = block.rawMessage ?? ''
-  rawMsg.className = 'text-muted text-xs'
-  footer.appendChild(rawMsg)
+  // generic ルールでは description に既に rawMessage の内容が含まれるため、二重表示を避ける
+  if (block.rawMessage && !block.description.includes(block.rawMessage)) {
+    const rawMsg = document.createElement('div')
+    rawMsg.textContent = block.rawMessage
+    rawMsg.className = 'text-muted text-xs'
+    footer.appendChild(rawMsg)
+  }
 
   const link = document.createElement('a')
   link.href = buildErrorIssueUrl({ errorType: block.errorType, raw: block.raw })
   link.target = '_blank'
   link.rel = 'noopener noreferrer'
-  link.textContent = 'このエラーの日本語化をリクエスト（GitHub・送信前に内容を確認してください）'
+  link.textContent = 'このエラーの日本語化をGitHubでリクエスト（クリックすると内容が送信されます・新しいタブで開きます）'
   link.className = 'text-accent text-xs underline hover:no-underline'
   footer.appendChild(link)
 
@@ -98,7 +104,9 @@ export function appendErrorBlock(block: ErrorBlock): void {
     }
   }
 
-  if (block.matched === false) {
+  // stderr は行単位で渡ってくるため、例外のトレースバックでない単なる文字列出力にまで
+  // 「未対応」バッジと起票リンクが付くのを避ける
+  if (block.matched === false && block.raw.includes('Traceback')) {
     wrapper.appendChild(buildUnmatchedFooter(block))
   }
 
@@ -126,5 +134,15 @@ export function clearLog(): void {
 
 export function getLogText(): string {
   const outputLog = document.getElementById('outputLog') as HTMLDivElement
-  return outputLog.innerText.trim()
+  const clone = outputLog.cloneNode(true) as HTMLDivElement
+  clone.querySelectorAll('[data-log-exclude]').forEach((el) => el.remove())
+
+  // innerText はレイアウト計算に依存するため、画面外に配置した状態で計測する
+  clone.style.position = 'absolute'
+  clone.style.left = '-9999px'
+  clone.style.top = '0'
+  document.body.appendChild(clone)
+  const text = clone.innerText.trim()
+  document.body.removeChild(clone)
+  return text
 }

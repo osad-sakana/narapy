@@ -129,6 +129,11 @@ const RULES: Record<string, Rule[]> = {
       pattern: /tuple index out of range/,
       description: () => `タプルの範囲外にアクセスしようとしました。`,
     },
+    {
+      pattern: /pop from empty list/,
+      description: () => `空のリストから pop() しようとしました。`,
+      hint: () => `pop() する前にリストの要素数を確認してください。`,
+    },
   ],
 
   KeyError: [
@@ -141,9 +146,20 @@ const RULES: Record<string, Rule[]> = {
 
   AttributeError: [
     {
+      pattern: /'(\w+)' object has no attribute '(\w+)'\. Did you mean: '(\w+)'\?/,
+      description: (t, attr) => `${jpType(t)} には "${attr}" という属性・メソッドはありません。`,
+      hint: (_t, _attr, suggestion) =>
+        `もしかして "${suggestion}" の間違いではありませんか？\nスペルミスがないか確認してください。`,
+    },
+    {
       pattern: /'(\w+)' object has no attribute '(\w+)'/,
       description: (t, attr) => `${jpType(t)} には "${attr}" という属性・メソッドはありません。`,
       hint: () => `スペルミスがないか確認してください。`,
+    },
+    {
+      pattern: /module '([\w.]+)' has no attribute '(\w+)'/,
+      description: (mod, attr) => `モジュール "${mod}" に "${attr}" はありません。`,
+      hint: () => `関数名・属性名のスペルミスがないか確認してください。`,
     },
   ],
 
@@ -161,6 +177,26 @@ const RULES: Record<string, Rule[]> = {
       pattern: /math domain error/,
       description: () => `定義できない数学的計算をしようとしました。`,
       hint: () => `負の数の平方根など、実数では計算できない式がないか確認してください。`,
+    },
+    {
+      pattern: /not enough values to unpack \(expected (\d+), got (\d+)\)/,
+      description: (expected, got) => `${expected} 個の変数に代入しようとしましたが、値は ${got} 個しかありません。`,
+      hint: () => `左辺の変数の数と、右辺の要素の数を合わせてください。`,
+    },
+    {
+      pattern: /too many values to unpack \(expected (\d+)\)/,
+      description: (expected) => `代入先の変数は ${expected} 個ですが、値のほうが多すぎます。`,
+      hint: () => `左辺の変数の数と、右辺の要素の数を合わせてください。`,
+    },
+    {
+      pattern: /substring not found/,
+      description: () => `指定した文字列が見つかりませんでした。`,
+      hint: () => `find() ではなく index() を使うと、見つからないときにこのエラーになります。`,
+    },
+    {
+      pattern: /list\.remove\(x\): x not in list/,
+      description: () => `リストに存在しない要素を remove() しようとしました。`,
+      hint: () => `remove() する前に in 演算子で要素の存在を確認してください。`,
     },
     {
       pattern: /(.+)/,
@@ -291,6 +327,11 @@ const RULES: Record<string, Rule[]> = {
       hint: () => `リストや関数の引数の区切りにカンマがあるか確認してください。`,
     },
     {
+      pattern: /invalid syntax\. Maybe you meant '==' or ':=' instead of '='\?/,
+      description: () => `比較のつもりで代入の「=」を使っている可能性があります。`,
+      hint: () => `値が等しいかを調べるときは「==」を使います。例: if x == 3:`,
+    },
+    {
       pattern: /'return' outside function/,
       description: () => `return を関数の外で使っています。`,
       hint: () => `return は def で定義した関数の中でのみ使えます。`,
@@ -380,7 +421,7 @@ function isExceptionTypeName(name: string): boolean {
 // 型名のみの行（素の assert 文による AssertionError 等）にも対応するため、
 // 「行全体が \w+ とコロン」という単純な最終行マッチではなく型名らしさで判定する。
 function findErrorHeader(raw: string): { errorType: string; message: string } | null {
-  const lines = raw.split('\n')
+  const lines = raw.split(/\r?\n/)
   for (let i = lines.length - 1; i >= 0; i--) {
     const m = lines[i].match(/^([A-Za-z_][\w.]*)(?::\s*(.*))?$/)
     if (!m) continue
@@ -397,9 +438,10 @@ export function translatePythonError(raw: string): TranslatedError | null {
   const header = findErrorHeader(raw)
   if (!header) return null
 
-  // ユーザーコード行番号を <exec> のトレースから抽出
-  const lineMatch = raw.match(/File "<exec>", line (\d+)/)
-  const line = lineMatch ? parseInt(lineMatch[1], 10) : null
+  // ユーザーコード行番号を <exec> のトレースから抽出。
+  // 関数呼び出しをまたぐと <exec> フレームが複数出るため、実際のエラー発生箇所に近い最後の一致を使う
+  const lineMatches = [...raw.matchAll(/File "<exec>", line (\d+)/g)]
+  const line = lineMatches.length > 0 ? parseInt(lineMatches[lineMatches.length - 1][1], 10) : null
 
   const { errorType, message } = header
   const rules = RULES[errorType]

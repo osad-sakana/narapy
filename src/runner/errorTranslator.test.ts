@@ -534,3 +534,84 @@ describe('translatePythonError（TypeError / UnboundLocalError / ImportError の
     expect(result?.description).toBe('ローカル変数 "x" が代入前に使われています。')
   })
 })
+
+describe('translatePythonError（レビュー対応: ValueError/IndexError/AttributeError/SyntaxErrorの追加ルール）', () => {
+  it('ValueError: アンパック不足', () => {
+    const result = translatePythonError(
+      traceback('ValueError: not enough values to unpack (expected 2, got 1)'),
+    )
+    expect(result?.matched).toBe(true)
+    expect(result?.description).toBe('2 個の変数に代入しようとしましたが、値は 1 個しかありません。')
+  })
+
+  it('ValueError: アンパックしすぎ', () => {
+    const result = translatePythonError(traceback('ValueError: too many values to unpack (expected 2)'))
+    expect(result?.matched).toBe(true)
+    expect(result?.description).toBe('代入先の変数は 2 個ですが、値のほうが多すぎます。')
+  })
+
+  it('ValueError: substring not found', () => {
+    const result = translatePythonError(traceback('ValueError: substring not found'))
+    expect(result?.matched).toBe(true)
+    expect(result?.description).toBe('指定した文字列が見つかりませんでした。')
+  })
+
+  it('ValueError: list.remove(x): x not in list', () => {
+    const result = translatePythonError(traceback('ValueError: list.remove(x): x not in list'))
+    expect(result?.matched).toBe(true)
+    expect(result?.description).toBe('リストに存在しない要素を remove() しようとしました。')
+  })
+
+  it('IndexError: 空リストへのpop', () => {
+    const result = translatePythonError(traceback('IndexError: pop from empty list'))
+    expect(result?.matched).toBe(true)
+    expect(result?.description).toBe('空のリストから pop() しようとしました。')
+  })
+
+  it('AttributeError: module形式（module has no attribute）', () => {
+    const result = translatePythonError(traceback("AttributeError: module 'math' has no attribute 'sqr'"))
+    expect(result?.errorType).toBe('AttributeError')
+    expect(result?.matched).toBe(true)
+    expect(result?.description).toBe('モジュール "math" に "sqr" はありません。')
+  })
+
+  it('AttributeError: Did you mean 候補付き', () => {
+    const result = translatePythonError(
+      traceback("AttributeError: 'list' object has no attribute 'appendd'. Did you mean: 'append'?"),
+    )
+    expect(result?.description).toBe('リスト（list） には "appendd" という属性・メソッドはありません。')
+    expect(result?.hint).toBe('もしかして "append" の間違いではありませんか？\nスペルミスがないか確認してください。')
+  })
+
+  it('AttributeError: 候補なしは既存のヒントにフォールバックする', () => {
+    const result = translatePythonError(traceback("AttributeError: 'int' object has no attribute 'append'"))
+    expect(result?.hint).toBe('スペルミスがないか確認してください。')
+  })
+
+  it('SyntaxError: "=" と "==" の混同', () => {
+    const result = translatePythonError(
+      traceback("SyntaxError: invalid syntax. Maybe you meant '==' or ':=' instead of '='?"),
+    )
+    expect(result?.matched).toBe(true)
+    expect(result?.description).toBe('比較のつもりで代入の「=」を使っている可能性があります。')
+  })
+})
+
+describe('translatePythonError（レビュー対応: CRLF・複数フレームの行番号）', () => {
+  it('CRLF終端でもヘッダーを検出できる', () => {
+    const raw = traceback('ZeroDivisionError: division by zero') + '\r\n'
+    const result = translatePythonError(raw)
+    expect(result?.errorType).toBe('ZeroDivisionError')
+  })
+
+  it('複数の<exec>フレームがある場合、実際のエラー発生箇所に近い最後の行番号を使う', () => {
+    const raw = [
+      'Traceback (most recent call last):',
+      '  File "<exec>", line 5, in <module>',
+      '  File "<exec>", line 2, in f',
+      'ZeroDivisionError: division by zero',
+    ].join('\n')
+    const result = translatePythonError(raw)
+    expect(result?.line).toBe(2)
+  })
+})

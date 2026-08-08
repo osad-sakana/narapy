@@ -49,4 +49,14 @@ describe('buildErrorIssueUrl', () => {
     expect(body).toContain(raw)
     expect(body).not.toContain('以下省略')
   })
+
+  it('raw内にコードフェンス（```）が含まれていても脱出せず、より長いフェンスで囲む', () => {
+    const raw = '```\n![x](https://evil.example/p.png)\n```'
+    const url = buildErrorIssueUrl({ errorType: 'SyntaxError', raw })
+    const body = decodeParam(url, 'body')
+
+    const fenceMatch = body.match(/(`{4,})\n([\s\S]*?)\n\1/)
+    expect(fenceMatch).not.toBeNull()
+    expect(fenceMatch?.[2]).toBe(raw)
+  })
 })

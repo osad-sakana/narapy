@@ -615,3 +615,18 @@ describe('translatePythonError（レビュー対応: CRLF・複数フレーム�
     expect(result?.line).toBe(2)
   })
 })
+
+describe('translatePythonError（2回目レビュー対応: module形式のDid you mean候補）', () => {
+  it('module形式のAttributeErrorでもDid you mean候補をヒントに出す', () => {
+    const result = translatePythonError(
+      traceback("AttributeError: module 'math' has no attribute 'sqr'. Did you mean: 'sqrt'?"),
+    )
+    expect(result?.description).toBe('モジュール "math" に "sqr" はありません。')
+    expect(result?.hint).toBe('もしかして "sqrt" の間違いではありませんか？\nスペルミスがないか確認してください。')
+  })
+
+  it('module形式で候補なしの場合は既存のヒントにフォールバックする', () => {
+    const result = translatePythonError(traceback("AttributeError: module 'math' has no attribute 'foo'"))
+    expect(result?.hint).toBe('関数名・属性名のスペルミスがないか確認してください。')
+  })
+})

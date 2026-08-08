@@ -59,4 +59,19 @@ describe('buildErrorIssueUrl', () => {
     expect(fenceMatch).not.toBeNull()
     expect(fenceMatch?.[2]).toBe(raw)
   })
+
+  it('日本語主体の1000文字以内のエラー本文でも、URL全体が実用的な長さに収まる', () => {
+    const raw = 'あ'.repeat(999)
+    const url = buildErrorIssueUrl({ errorType: 'SyntaxError', raw })
+    // encodeURIComponentで1文字9バイトに膨れるため、対策前は約9000文字になっていた
+    expect(url.length).toBeLessThan(6000)
+  })
+
+  it('パーセントエンコード後の長さでも上限が効き、URLが安全な長さに収まる', () => {
+    const raw = 'い'.repeat(1000)
+    const url = buildErrorIssueUrl({ errorType: 'SyntaxError', raw })
+    expect(url.length).toBeLessThan(6000)
+    const body = decodeParam(url, 'body')
+    expect(body).toContain('以下省略')
+  })
 })

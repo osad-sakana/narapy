@@ -157,6 +157,12 @@ const RULES: Record<string, Rule[]> = {
       hint: () => `スペルミスがないか確認してください。`,
     },
     {
+      pattern: /module '([\w.]+)' has no attribute '(\w+)'\. Did you mean: '(\w+)'\?/,
+      description: (mod, attr) => `モジュール "${mod}" に "${attr}" はありません。`,
+      hint: (_mod, _attr, suggestion) =>
+        `もしかして "${suggestion}" の間違いではありませんか？\nスペルミスがないか確認してください。`,
+    },
+    {
       pattern: /module '([\w.]+)' has no attribute '(\w+)'/,
       description: (mod, attr) => `モジュール "${mod}" に "${attr}" はありません。`,
       hint: () => `関数名・属性名のスペルミスがないか確認してください。`,
@@ -191,7 +197,7 @@ const RULES: Record<string, Rule[]> = {
     {
       pattern: /substring not found/,
       description: () => `指定した文字列が見つかりませんでした。`,
-      hint: () => `find() ではなく index() を使うと、見つからないときにこのエラーになります。`,
+      hint: () => `見つからない場合に -1 を返す find() を使うか、in 演算子で存在を確認してから index() を使ってください。`,
     },
     {
       pattern: /list\.remove\(x\): x not in list/,

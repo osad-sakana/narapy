@@ -86,10 +86,20 @@ describe('buildErrorIssueUrl', () => {
   })
 
   it('サロゲートペアの直前で切り詰めても、片割れの孤立サロゲートを含まない', () => {
-    const raw = 'x'.repeat(999) + '\u{1F600}'
+    const raw = 'x'.repeat(1000) + '\u{1F600}' + 'y'.repeat(100)
     const url = buildErrorIssueUrl({ errorType: 'ValueError', raw })
     const body = decodeParam(url, 'body')
     // 孤立サロゲートが残っていれば body 自体の取得（decodeURIComponent相当）で崩れる
-    expect(body).toContain('x'.repeat(999))
+    expect(body).not.toMatch(/[\uD800-\uDFFF]/)
+    expect(body).toContain('以下省略')
+  })
+
+  it('入力自体に孤立サロゲートが含まれていても例外を投げず、置換文字になる', () => {
+    const raw = `a${'\uD800'}b`
+    expect(() => buildErrorIssueUrl({ errorType: 'ValueError', raw })).not.toThrow()
+    const url = buildErrorIssueUrl({ errorType: 'ValueError', raw })
+    const body = decodeParam(url, 'body')
+    expect(body).not.toMatch(/[\uD800-\uDFFF]/)
+    expect(body).toContain('a�b')
   })
 })

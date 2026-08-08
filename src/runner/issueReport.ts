@@ -13,9 +13,10 @@ export interface ErrorIssueInput {
 
 // コードポイント単位（[...text]）でスライスする。UTF-16コードユニット単位の
 // text.slice() だとサロゲートペアの途中で切れて encodeURIComponent が
-// URIError を投げることがあるため
+// URIError を投げることがあるため。入力に片割れの孤立サロゲートが含まれる
+// 場合も同様に例外の原因になるため、事前に置換しておく
 function truncate(text: string, maxLength: number, maxEncodedLength: number): string {
-  const chars = [...text]
+  const chars = [...text.replace(/\p{Surrogate}/gu, '�')]
   let limit = Math.min(chars.length, maxLength)
   while (limit > 0 && encodeURIComponent(chars.slice(0, limit).join('')).length > maxEncodedLength) {
     limit--

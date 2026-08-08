@@ -416,7 +416,13 @@ const RULES: Record<string, Rule[]> = {
 
 // Error/Exception/Warning で終わらない組み込み例外（すべて列挙する必要はなく、
 // このプロジェクトが実際に扱うものだけを追加する）
-const EXTRA_EXCEPTION_NAMES = new Set(['StopIteration', 'StopAsyncIteration'])
+const EXTRA_EXCEPTION_NAMES = new Set([
+  'StopIteration',
+  'StopAsyncIteration',
+  'SystemExit',
+  'KeyboardInterrupt',
+  'GeneratorExit',
+])
 
 function isExceptionTypeName(name: string): boolean {
   return /(?:Error|Exception|Warning)$/.test(name) || EXTRA_EXCEPTION_NAMES.has(name)

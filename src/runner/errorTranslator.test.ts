@@ -630,3 +630,13 @@ describe('translatePythonError（2回目レビュー対応: module形式のDid y
     expect(result?.hint).toBe('関数名・属性名のスペルミスがないか確認してください。')
   })
 })
+
+describe('translatePythonError（4回目レビュー対応: SystemExitが構造化エラーブロックとして検出される）', () => {
+  it('SystemExitはnullを返さず、未翻訳エラーとして検出される', () => {
+    const result = translatePythonError(traceback('SystemExit: 1'))
+    expect(result).not.toBeNull()
+    expect(result?.errorType).toBe('SystemExit')
+    expect(result?.matched).toBe(false)
+    expect(result?.rawMessage).toBe('1')
+  })
+})

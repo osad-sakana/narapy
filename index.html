@@ -40,6 +40,28 @@
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
+        <!-- ハンバーガーメニュー -->
+        <div class="relative shrink-0">
+          <button
+            id="hamburgerMenuBtn"
+            title="メニュー"
+            aria-label="メニュー"
+            aria-expanded="false"
+            aria-controls="hamburgerMenuDropdown"
+            class="flex items-center justify-center w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer shrink-0"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
+            </svg>
+          </button>
+          <!-- z-[100]: Monaco の内部ウィジェット（サジェスト/ホバー等、z-index 40〜70程度）より確実に手前へ出すため -->
+          <div
+            id="hamburgerMenuDropdown"
+            role="group"
+            aria-label="メニュー"
+            class="hidden absolute right-0 mt-1 w-44 bg-panel border border-line rounded-lg shadow-xl py-1 z-[100]"
+          ></div>
+        </div>
         <!-- フォントサイズ制御 -->
         <div class="hidden md:flex items-center gap-0.5 border border-line rounded-lg overflow-hidden mr-1 shrink-0">
           <button

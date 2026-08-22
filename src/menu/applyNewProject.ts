@@ -12,8 +12,11 @@ export interface ApplyNewProjectDeps extends ApplyProjectLoadDeps {
 // リセット前のエディタ→ストア同期は不要（打鍵時の onDidChangeModelContent が
 // 既にストアへ書き込み済みのため、issue #48）。逆に loadProject の「後」に同期すると
 // 新しい内容を古いエディタ内容で上書きしてしまうため、applyProjectLoad 側でも行わない(issue #45)。
-export function applyNewProject(deps: ApplyNewProjectDeps): void {
+// 戻り値はリセットを実際に行ったかどうか。呼び出し側はこれを見て、キャンセル時には
+// 実行ログのクリアなど「リセットに付随する副作用」を起こさないようにする。
+export function applyNewProject(deps: ApplyNewProjectDeps): boolean {
   const confirm = deps.confirm ?? confirmNewProject
-  if (deps.hasUserContent() && !confirm()) return
+  if (deps.hasUserContent() && !confirm()) return false
   applyProjectLoad(createDefaultProject(), deps)
+  return true
 }

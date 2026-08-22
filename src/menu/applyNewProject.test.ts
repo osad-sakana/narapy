@@ -17,7 +17,7 @@ function buildDeps(hasUserContent: boolean, confirm: () => boolean) {
 describe('applyNewProject', () => {
   it('作業内容が無ければ確認なしでリセットする', () => {
     const deps = buildDeps(false, vi.fn().mockReturnValue(true))
-    applyNewProject(deps)
+    expect(applyNewProject(deps)).toBe(true)
 
     expect(deps.confirm).not.toHaveBeenCalled()
     expect(deps.loadProject).toHaveBeenCalledWith(
@@ -30,7 +30,7 @@ describe('applyNewProject', () => {
 
   it('作業内容があり確認でOKならリセットする', () => {
     const deps = buildDeps(true, vi.fn().mockReturnValue(true))
-    applyNewProject(deps)
+    expect(applyNewProject(deps)).toBe(true)
 
     expect(deps.confirm).toHaveBeenCalledTimes(1)
     expect(deps.loadProject).toHaveBeenCalledTimes(1)
@@ -40,7 +40,9 @@ describe('applyNewProject', () => {
 
   it('作業内容があり確認でキャンセルすれば何も実行しない(データ損失防止)', () => {
     const deps = buildDeps(true, vi.fn().mockReturnValue(false))
-    applyNewProject(deps)
+    // false を返すことで、呼び出し側(main.ts)がログクリア等の副作用を
+    // 起こさないようにする契約(issue #58 レビュー2回目対応)
+    expect(applyNewProject(deps)).toBe(false)
 
     expect(deps.confirm).toHaveBeenCalledTimes(1)
     expect(deps.loadProject).not.toHaveBeenCalled()

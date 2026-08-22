@@ -46,7 +46,6 @@
             id="hamburgerMenuBtn"
             title="メニュー"
             aria-label="メニュー"
-            aria-haspopup="true"
             aria-expanded="false"
             aria-controls="hamburgerMenuDropdown"
             class="flex items-center justify-center w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer shrink-0"
@@ -58,6 +57,7 @@
           <!-- z-[100]: Monaco の内部ウィジェット（サジェスト/ホバー等、z-index 40〜70程度）より確実に手前へ出すため -->
           <div
             id="hamburgerMenuDropdown"
+            role="group"
             aria-label="メニュー"
             class="hidden absolute right-0 mt-1 w-44 bg-panel border border-line rounded-lg shadow-xl py-1 z-[100]"
           ></div>

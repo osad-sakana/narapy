@@ -104,7 +104,8 @@ describe('createDefaultProject', () => {
     expect(first).not.toBe(second)
     expect(first.files).not.toBe(second.files)
 
-    first.files[0].content.kind === 'text' && (first.files[0].content.data = '書き換え')
+    expect(first.files[0].content.kind).toBe('text')
+    if (first.files[0].content.kind === 'text') first.files[0].content.data = '書き換え'
     expect(second.files[0].content).toEqual({ kind: 'text', data: '' })
   })
 })

@@ -42,7 +42,11 @@ export function initHamburgerMenu(actions: MenuAction[]): void {
   }
 
   // stopPropagation に頼らず、クリック先がボタン/ドロップダウンの外かどうかで判定する
-  // （将来 document レベルのクリックハンドラが増えても壊れない）
+  // （将来 document レベルのクリックハンドラが増えても壊れない）。
+  // open() 内で登録した直後でも、このハンドラは「開くために押した同一クリック」自体を
+  // 受け取る（document のリスナーリストはイベントが document に到達した時点で
+  // 評価されるため、バブリング中に追加したリスナーもその回で発火する）。
+  // btn.contains() の判定は冗長な防御ではなく、即座に閉じてしまわないための必須条件。
   function handleOutsideClick(e: MouseEvent): void {
     const target = e.target as Node
     if (!btn.contains(target) && !dropdown.contains(target)) close()

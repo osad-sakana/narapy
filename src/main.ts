@@ -180,10 +180,9 @@ initHamburgerMenu([
   {
     label: '新規プロジェクト作成',
     onClick: () => {
-      applyNewProject({ hasUserContent, ...projectLoadDeps })
-      // 実行ログ・実行中のPyodideワーカーはリセット対象外のプロジェクトの結果を
-      // 表示し続けてしまうため、新規作成時にログもクリアする
-      clearLog()
+      // リセット対象外のプロジェクトの実行結果が残り続けないよう、
+      // 実際にリセットした場合のみログをクリアする（キャンセル時は何もしない）
+      if (applyNewProject({ hasUserContent, ...projectLoadDeps })) clearLog()
     },
   },
 ])

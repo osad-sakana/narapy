@@ -1,6 +1,7 @@
 import { KeyMod, KeyCode } from 'monaco-editor'
 import { initLayout } from './layout/index'
 import { initRunner } from './runner/index'
+import { clearLog } from './runner/log'
 import { createEditor, createEditorModelHost, getValue } from './editor/index'
 import { createFileOpener, createModelRegistry } from './editor/modelRegistry'
 import { initFontSizeControls } from './editor/fontSize'
@@ -128,6 +129,17 @@ initFontSizeControls((size) => {
   outputLog.style.fontSize = `${size}px`
 })
 
+// プロジェクト読込系オーケストレーション（.narapy を開く／新規作成）が共有する依存。
+// 別々に組み立てると、どちらかだけ直して食い違う事故が起きうるため一箇所にまとめる。
+const projectLoadDeps = {
+  loadProject,
+  refreshExplorer,
+  getActiveFile,
+  getActiveContent,
+  openProjectFile: fileSwitcher.openProjectFile,
+  setEditorFileName: (path: string) => { editorFileName.textContent = path },
+}
+
 // --- プロジェクトを開く (.narapy) ---
 const importProjectBtn = document.getElementById('importProjectBtn') as HTMLButtonElement
 importProjectBtn.addEventListener('click', () => {
@@ -135,14 +147,7 @@ importProjectBtn.addEventListener('click', () => {
     (project) => {
       applyProjectLoad(
         { files: project.files, directories: project.directories, activeFile: project.activeFile },
-        {
-          loadProject,
-          refreshExplorer,
-          getActiveFile,
-          getActiveContent,
-          openProjectFile: fileSwitcher.openProjectFile,
-          setEditorFileName: (path) => { editorFileName.textContent = path },
-        },
+        projectLoadDeps,
       )
     },
     (message) => window.alert(message),
@@ -175,15 +180,10 @@ initHamburgerMenu([
   {
     label: '新規プロジェクト作成',
     onClick: () => {
-      applyNewProject({
-        hasUserContent,
-        loadProject,
-        refreshExplorer,
-        getActiveFile,
-        getActiveContent,
-        openProjectFile: fileSwitcher.openProjectFile,
-        setEditorFileName: (path) => { editorFileName.textContent = path },
-      })
+      applyNewProject({ hasUserContent, ...projectLoadDeps })
+      // 実行ログ・実行中のPyodideワーカーはリセット対象外のプロジェクトの結果を
+      // 表示し続けてしまうため、新規作成時にログもクリアする
+      clearLog()
     },
   },
 ])

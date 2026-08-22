@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createTextFile, createDirectory, deleteFile, getActiveContent, getActiveFile, hasUserContent, loadProject, setActiveFile, updateFileContent } from './store'
+import { createDefaultProject, createTextFile, createDirectory, deleteFile, getActiveContent, getActiveFile, hasUserContent, loadProject, setActiveFile, updateFileContent } from './store'
 
 // state はモジュール単位のシングルトンなので、各テスト前にデフォルト状態へ明示的に戻す。
 describe('hasUserContent', () => {
@@ -82,5 +82,29 @@ describe('updateFileContent: 存在しないパスへの書き込みはno-op', (
 
     expect(getActiveFile()).toBe('sub.py')
     expect(getActiveContent()).toBe('サブの内容')
+  })
+})
+
+// 新規プロジェクト作成(issue #58)の初期状態が、起動時のデフォルト状態と定義レベルで
+// 一致していることを保証する。ずれると applyNewProject 直後に hasUserContent() が
+// 誤って true を返し、URL読込用の確認ダイアログが意図せず出る不具合につながる。
+describe('createDefaultProject', () => {
+  it('main.py 1件のみ・空文字・ディレクトリ0件の初期状態を返す', () => {
+    const project = createDefaultProject()
+    expect(project).toEqual({
+      files: [{ path: 'main.py', content: { kind: 'text', data: '' } }],
+      directories: [],
+      activeFile: 'main.py',
+    })
+  })
+
+  it('呼び出すたびに新しいオブジェクトを返し、互いに汚染しない', () => {
+    const first = createDefaultProject()
+    const second = createDefaultProject()
+    expect(first).not.toBe(second)
+    expect(first.files).not.toBe(second.files)
+
+    first.files[0].content.kind === 'text' && (first.files[0].content.data = '書き換え')
+    expect(second.files[0].content).toEqual({ kind: 'text', data: '' })
   })
 })

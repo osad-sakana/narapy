@@ -14,5 +14,7 @@ describe('confirmNewProject', () => {
     const confirmFn = vi.fn().mockReturnValue(true)
     confirmNewProject(confirmFn)
     expect(confirmFn).toHaveBeenCalledWith(expect.stringContaining('新規プロジェクト'))
+    // データ損失の警告が「破棄」であることを確認する（文言変更で警告が弱まる事故を防ぐ）
+    expect(confirmFn).toHaveBeenCalledWith(expect.stringContaining('破棄'))
   })
 })

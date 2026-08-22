@@ -24,6 +24,8 @@ import { applyUrlLoad } from './urlload/applyUrlLoad'
 import { applyProjectLoad } from './fileio/applyProjectLoad'
 import { createFileSwitcher } from './editor/fileSwitcher'
 import { initTheme } from './theme/index'
+import { initHamburgerMenu } from './menu/ui'
+import { applyNewProject } from './menu/applyNewProject'
 
 // createEditor が解決済みテーマを読むため、他の初期化より先に実行する
 initTheme()
@@ -167,3 +169,21 @@ exportProjectBtn.addEventListener('click', async () => {
 })
 
 initAbout()
+
+// --- 新規プロジェクト作成 (issue #58) ---
+initHamburgerMenu([
+  {
+    label: '新規プロジェクト作成',
+    onClick: () => {
+      applyNewProject({
+        hasUserContent,
+        loadProject,
+        refreshExplorer,
+        getActiveFile,
+        getActiveContent,
+        openProjectFile: fileSwitcher.openProjectFile,
+        setEditorFileName: (path) => { editorFileName.textContent = path },
+      })
+    },
+  },
+])

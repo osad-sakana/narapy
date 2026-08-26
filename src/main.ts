@@ -27,6 +27,8 @@ import { createFileSwitcher } from './editor/fileSwitcher'
 import { initTheme } from './theme/index'
 import { initHamburgerMenu } from './menu/ui'
 import { applyNewProject } from './menu/applyNewProject'
+import { createInstructorController } from './instructor/controller'
+import { createInstructorMenuAction, syncInstructorMenuItem, initInstructorBaselineButton } from './instructor/ui'
 
 // createEditor が解決済みテーマを読むため、他の初期化より先に実行する
 initTheme()
@@ -65,8 +67,29 @@ const fileSwitcher = createFileSwitcher({
   setFileName: (path) => { editorFileName.textContent = path },
 })
 
+// --- 講師モード ---
+// 基準スナップショットは表示中のファイルパスと組にして持つため、パス追跡を持つ
+// fileSwitcher の完成後に生成する
+const instructorController = createInstructorController({
+  editor,
+  getEditorPath: () => fileSwitcher.getEditorPath(),
+  onStateChange: () => {
+    fontControls.refresh()
+    syncInstructorMenuItem(instructorController.isOn())
+    instructorBaselineButton.sync()
+  },
+})
+
 function switchToFile(path: string): void {
   fileSwitcher.switchToFile(path)
+  instructorController.onActiveFileChanged(path)
+}
+
+// プロジェクト全体が入れ替わる場合（起動時・.narapyインポート・新規プロジェクト作成）は
+// パスが偶然一致していても内容は別物なので、基準を無条件で破棄する
+function openProjectFileWithReset(path: string, content: string): void {
+  fileSwitcher.openProjectFile(path, content)
+  instructorController.discardBaseline()
 }
 
 // --- エディタ変更 ---
@@ -81,6 +104,7 @@ editor.onDidChangeModelContent(() => {
   const source = getValue(editor)
   // 変更をストアに保存（エディタが実際に表示しているパスへ、issue #45 L1）
   updateFileContent(path, source)
+  instructorController.onContentChanged()
 })
 
 // --- キーボードショートカット ---
@@ -113,7 +137,7 @@ try {
 // エディタを永続化済みの内容で初期化。
 // ?project=<URL> の読込待ちの間にユーザーがファイルを選択するとモデルが作られうるため、
 // ここでは既存モデルを全破棄して開き、旧プロジェクトの undo 履歴を持ち越さない(issue #47)
-fileSwitcher.openProjectFile(getActiveFile(), getActiveContent())
+openProjectFileWithReset(getActiveFile(), getActiveContent())
 editorFileName.textContent = getActiveFile()
 
 
@@ -124,10 +148,15 @@ initRunner(editor, () => {
 })
 
 const outputLog = document.getElementById('outputLog') as HTMLElement
-initFontSizeControls((size) => {
-  editor.updateOptions({ fontSize: size })
-  outputLog.style.fontSize = `${size}px`
-})
+const fontControls = initFontSizeControls(
+  (size) => {
+    editor.updateOptions({ fontSize: size })
+    outputLog.style.fontSize = `${size}px`
+  },
+  () => instructorController.fontProfile(),
+)
+
+const instructorBaselineButton = initInstructorBaselineButton(instructorController)
 
 // プロジェクト読込系オーケストレーション（.narapy を開く／新規作成）が共有する依存。
 // 別々に組み立てると、どちらかだけ直して食い違う事故が起きうるため一箇所にまとめる。
@@ -136,7 +165,7 @@ const projectLoadDeps = {
   refreshExplorer,
   getActiveFile,
   getActiveContent,
-  openProjectFile: fileSwitcher.openProjectFile,
+  openProjectFile: openProjectFileWithReset,
   setEditorFileName: (path: string) => { editorFileName.textContent = path },
 }
 
@@ -185,4 +214,5 @@ initHamburgerMenu([
       if (applyNewProject({ hasUserContent, ...projectLoadDeps })) clearLog()
     },
   },
+  createInstructorMenuAction(instructorController),
 ])

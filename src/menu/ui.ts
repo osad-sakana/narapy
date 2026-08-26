@@ -1,6 +1,10 @@
 export interface MenuAction {
   label: string
   onClick: () => void
+  /** 項目のDOM id。外部（講師モードのON/OFF表示など）から状態を反映するために使う */
+  id?: string
+  /** トグル系項目の状態を aria-pressed として表す */
+  ariaPressed?: boolean
 }
 
 export function initHamburgerMenu(actions: MenuAction[]): void {
@@ -16,6 +20,8 @@ export function initHamburgerMenu(actions: MenuAction[]): void {
     item.type = 'button'
     item.className = 'w-full text-left px-3 py-2 text-xs text-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer whitespace-nowrap'
     item.textContent = action.label
+    if (action.id) item.id = action.id
+    if (action.ariaPressed !== undefined) item.setAttribute('aria-pressed', String(action.ariaPressed))
     item.addEventListener('click', () => {
       close()
       action.onClick()

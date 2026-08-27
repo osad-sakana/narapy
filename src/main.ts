@@ -82,7 +82,7 @@ const instructorController = createInstructorController({
 
 function switchToFile(path: string): void {
   fileSwitcher.switchToFile(path)
-  instructorController.onActiveFileChanged(path)
+  instructorController.onActiveFileChanged()
 }
 
 // プロジェクト全体が入れ替わる場合（起動時・.narapyインポート・新規プロジェクト作成）は

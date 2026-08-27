@@ -92,6 +92,50 @@ function computeEditOps<T>(a: T[], b: T[], maxCells: number, eq: (x: T, y: T) =>
   return ops
 }
 
+// equal以外が連続する1ブロック（idx以降、次のequalの手前まで）を処理し、
+// 「削除の直後に追加」を先頭からインデックス順に1件のmodifiedへまとめる。
+// 削除・追加の数が異なる場合、超過分はそれぞれ deletedAt / added として個別に扱う。
+function processBlock(
+  ops: EditOp<string>[],
+  startIdx: number,
+  startLine: number,
+): { changes: LineChange[]; nextIdx: number; nextLine: number } {
+  const blockDeletes: string[] = []
+  const blockInserts: { text: string; line: number }[] = []
+  let idx = startIdx
+  let curLine = startLine
+  while (idx < ops.length && ops[idx].kind !== 'equal') {
+    const o = ops[idx]
+    if (o.kind === 'del') {
+      blockDeletes.push(o.value)
+    } else if (o.kind === 'ins') {
+      blockInserts.push({ text: o.value, line: curLine })
+      curLine++
+    }
+    idx++
+  }
+
+  const changes: LineChange[] = []
+  const pairCount = Math.min(blockDeletes.length, blockInserts.length)
+  for (let k = 0; k < pairCount; k++) {
+    changes.push({
+      kind: 'modified',
+      line: blockInserts[k].line,
+      baselineText: blockDeletes[k],
+      currentText: blockInserts[k].text,
+    })
+  }
+  for (let k = pairCount; k < blockInserts.length; k++) {
+    changes.push({ kind: 'added', line: blockInserts[k].line })
+  }
+  // ペアリングされなかった削除は、ブロック終了時点のcurLine（＝この後に続く現在行、
+  // またはブロックがファイル末尾なら行数+1）の直前で起きたものとして1件にまとめる
+  if (blockDeletes.length > pairCount) {
+    changes.push({ kind: 'deletedAt', line: curLine })
+  }
+  return { changes, nextIdx: idx, nextLine: curLine }
+}
+
 // baseline → current の行単位diff。
 export function diffLines(baseline: string, current: string): LineChange[] {
   const a = baseline.split('\n')
@@ -103,46 +147,15 @@ export function diffLines(baseline: string, current: string): LineChange[] {
   let curLine = 1
   let idx = 0
   while (idx < ops.length) {
-    const op = ops[idx]
-    if (op.kind === 'equal') {
+    if (ops[idx].kind === 'equal') {
       curLine++
       idx++
       continue
     }
-
-    // equal以外が連続する区間を1ブロックとしてまとめ、削除・追加をペアリングする
-    const blockDeletes: string[] = []
-    const blockInserts: { text: string; line: number }[] = []
-    while (idx < ops.length && ops[idx].kind !== 'equal') {
-      const o = ops[idx]
-      if (o.kind === 'del') {
-        blockDeletes.push(o.value)
-      } else if (o.kind === 'ins') {
-        blockInserts.push({ text: o.value, line: curLine })
-        curLine++
-      }
-      idx++
-    }
-
-    // 「削除の直後に追加」を先頭からインデックス順に1件のmodifiedへまとめる。
-    // 削除・追加の数が異なる場合、超過分はそれぞれ deletedAt / added として個別に扱う。
-    const pairCount = Math.min(blockDeletes.length, blockInserts.length)
-    for (let k = 0; k < pairCount; k++) {
-      result.push({
-        kind: 'modified',
-        line: blockInserts[k].line,
-        baselineText: blockDeletes[k],
-        currentText: blockInserts[k].text,
-      })
-    }
-    for (let k = pairCount; k < blockInserts.length; k++) {
-      result.push({ kind: 'added', line: blockInserts[k].line })
-    }
-    // ペアリングされなかった削除は、ブロック終了時点のcurLine（＝この後に続く現在行、
-    // またはブロックがファイル末尾なら行数+1）の直前で起きたものとして1件にまとめる
-    if (blockDeletes.length > pairCount) {
-      result.push({ kind: 'deletedAt', line: curLine })
-    }
+    const block = processBlock(ops, idx, curLine)
+    result.push(...block.changes)
+    idx = block.nextIdx
+    curLine = block.nextLine
   }
   return result
 }

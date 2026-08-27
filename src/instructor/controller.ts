@@ -33,7 +33,7 @@ export interface InstructorController {
   recordBaseline: () => void
   discardBaseline: () => void
   onContentChanged: () => void
-  onActiveFileChanged: (path: string) => void
+  onActiveFileChanged: () => void
   fontProfile: () => FontSizeProfile
 }
 
@@ -48,7 +48,15 @@ export function createInstructorController(deps: InstructorControllerDeps): Inst
 
   const decorationsCollection = deps.editor.createDecorationsCollection([])
 
+  function cancelPendingRecompute(): void {
+    if (debounceTimer !== null) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+    }
+  }
+
   function clearDecorations(): void {
+    cancelPendingRecompute()
     decorationsCollection.set([])
   }
 
@@ -84,15 +92,12 @@ export function createInstructorController(deps: InstructorControllerDeps): Inst
 
   function onContentChanged(): void {
     if (!isOn || !baseline) return
-    if (debounceTimer !== null) clearTimeout(debounceTimer)
+    cancelPendingRecompute()
     debounceTimer = setTimeout(recomputeDecorations, RECOMPUTE_DEBOUNCE_MS)
   }
 
   function onActiveFileChanged(): void {
-    if (debounceTimer !== null) {
-      clearTimeout(debounceTimer)
-      debounceTimer = null
-    }
+    cancelPendingRecompute()
     recomputeDecorations()
   }
 

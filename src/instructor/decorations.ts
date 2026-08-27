@@ -6,9 +6,8 @@ import { diffLines, diffInline } from './diff'
 // baseline/current の2つの全文からエディタ非依存の diff.ts を経由して装飾配列を組み立てるだけ。
 export function buildDecorations(baselineText: string, currentText: string): monaco.editor.IModelDeltaDecoration[] {
   const lineChanges = diffLines(baselineText, currentText)
-  const currentLines = currentText.split('\n')
-  const totalLines = currentLines.length
-  if (totalLines === 0) return []
+  // String.split('\n') は空文字列に対しても [''] を返すため、行数は常に1以上になる
+  const totalLines = currentText.split('\n').length
 
   const decorations: monaco.editor.IModelDeltaDecoration[] = []
 

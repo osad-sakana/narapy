@@ -60,11 +60,18 @@ function trimCommonEnds<T>(a: T[], b: T[], eq: (x: T, y: T) => boolean): { prefi
   return { prefix, suffix }
 }
 
-// LCS（最長共通部分列）に基づく編集操作列を求める。n*m が maxCells を超える場合は null。
+// 片側が極端に長く、もう片側がトリムでほぼ0に縮んだ場合、n*mは小さくても
+// バックトラック後の「残りを全部del/insとして積む」ループ（下記の2つのwhile）が
+// 大きい方の辺の長さに比例したop数・オブジェクト生成を伴う。n*mだけでは
+// この線形コストを抑えられないため、合計op数にも上限を設ける。
+const MAX_EDIT_OPS = 20_000
+
+// LCS（最長共通部分列）に基づく編集操作列を求める。n*m が maxCells を超える、
+// またはn+mがMAX_EDIT_OPSを超える場合は null。
 function computeEditOps<T>(a: T[], b: T[], maxCells: number, eq: (x: T, y: T) => boolean): EditOp<T>[] | null {
   const n = a.length
   const m = b.length
-  if (n * m > maxCells) return null
+  if (n * m > maxCells || n + m > MAX_EDIT_OPS) return null
 
   // dp[i][j] = a[i..n) と b[j..m) のLCS長
   const dp: Int32Array[] = new Array(n + 1)

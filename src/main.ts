@@ -116,25 +116,24 @@ editor.addCommand(
 
 // --- ファイルエクスプローラー初期化 ---
 const explorerContainer = document.getElementById('fileExplorer') as HTMLElement
-const { refresh: refreshExplorer } = createExplorer(
-  explorerContainer,
-  (path) => {
+const { refresh: refreshExplorer } = createExplorer(explorerContainer, {
+  onFileSelect: (path) => {
     switchToFile(path)
     refreshExplorer()
   },
-  (message) => window.alert(message),
-  (path) => {
+  onError: (message) => window.alert(message),
+  onFileDeleted: (path) => {
     // 非アクティブなファイルの削除では切替が起きないため、ここでモデルを破棄する(issue #47)
     modelRegistry.prune(listFilePaths())
     // 削除されたファイルに対して基準を記録していた場合、無意味な差分表示にならないよう破棄する
     instructorController.discardBaselineIfPath(path)
   },
-  (path) => {
+  onFileUpserted: (path) => {
     // アップロードによる上書きも、非アクティブファイルへは無言で内容だけが変わるため
-    // 削除と同様に扱い、対象ファイルの基準があれば破棄する
+    // 削除と同様に扱い、対象ファイルの基準があれば破棄する（新規追加時は基準が無いため無害）
     instructorController.discardBaselineIfPath(path)
   },
-)
+})
 
 // --- URLパラメータからの初期プロジェクト読み込み (issue #32) ---
 // #project= > #code= > ?project=<URL> の優先順位で解決する。既存の作業内容がある場合のみ確認する。

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { diffLines, diffInline } from './diff'
+import { diffLines, diffInline, inlineDiffCost } from './diff'
 
 describe('diffLines', () => {
   it('差分がなければ空配列を返す', () => {
@@ -83,6 +83,14 @@ describe('diffLines', () => {
     expect(diffLines(bigA, bigB)).toEqual([])
   })
 
+  it('片側だけが極端に行数が多い場合、n*mが小さくても安全弁が働く', () => {
+    // n*m = 25,000 * 1 = 25,000 で MAX_CELLS を大きく下回るが、
+    // 合計op数（n+m）は25,000超であり、ガード無しでは残りを全部delとして
+    // 積むループが25,000個のオブジェクトを生成してしまう
+    const bigA = Array.from({ length: 25_000 }, (_, i) => `line${i}`).join('\n')
+    expect(diffLines(bigA, 'X')).toEqual([])
+  })
+
   it('大きなファイルでも変更が局所的なら共通の先頭・末尾を除いて安全弁に抵触しない', () => {
     const lines = Array.from({ length: 2100 }, (_, i) => `line${i}`)
     const baseline = lines.join('\n')
@@ -158,6 +166,15 @@ describe('diffInline', () => {
     ])
   })
 
+  it('片側だけが極端に長い場合、n*mが小さくても安全弁が働く', () => {
+    // n*m = 200,000 * 1 = 200,000 で MAX_INLINE_CELLS ちょうど（超過しない）だが、
+    // 合計op数（n+m）は20万超であり、ガード無しでは残りを全部delとして
+    // 積むループが20万個のオブジェクトを生成してしまう
+    expect(diffInline('x'.repeat(200_000), 'y')).toEqual([
+      { kind: 'range', start: 1, end: 2 },
+    ])
+  })
+
   it('長い行でも変更が局所的なら共通の先頭・末尾を除いて安全弁に抵触しない', () => {
     const prefix = 'x'.repeat(300)
     const suffix = 'y'.repeat(300)
@@ -166,5 +183,19 @@ describe('diffInline', () => {
     expect(diffInline(`${prefix}A${suffix}`, `${prefix}B${suffix}`)).toEqual([
       { kind: 'range', start: 301, end: 302 },
     ])
+  })
+})
+
+describe('inlineDiffCost', () => {
+  it('共通の先頭・末尾を控除した実質コストを返す', () => {
+    expect(inlineDiffCost('xxAyy', 'xxByy')).toBe(1)
+  })
+
+  it('完全一致なら0を返す', () => {
+    expect(inlineDiffCost('same', 'same')).toBe(0)
+  })
+
+  it('共通部分が無ければ元の長さの積を返す', () => {
+    expect(inlineDiffCost('abc', 'XYZ')).toBe(9)
   })
 })

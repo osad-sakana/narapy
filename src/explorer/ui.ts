@@ -57,13 +57,22 @@ interface ExplorerHandle {
 
 // 非アクティブなファイルの削除はエディタ側に切替を伴わないため、
 // 削除を知らせないとエディタが保持する当該ファイルの状態（undo履歴など）が残り続ける(issue #47)
-export type OnFileDeleted = () => void
+export type OnFileDeleted = (path: string) => void
+// アップロードで内容が確定したファイルを知らせる（新規追加・既存上書きのいずれも含む）。
+// 既存ファイルの上書きはエディタ側に切替を伴わず無言で内容だけが変わるため、
+// 講師モードの基準破棄などに使う（新規追加時は該当パスの基準がそもそも無いため無害）
+export type OnFileUpserted = (path: string) => void
+
+export interface CreateExplorerOptions {
+  onFileSelect: OnFileSelect
+  onError: OnNotify
+  onFileDeleted: OnFileDeleted
+  onFileUpserted: OnFileUpserted
+}
 
 export function createExplorer(
   container: HTMLElement,
-  onFileSelect: OnFileSelect,
-  onError: OnNotify,
-  onFileDeleted: OnFileDeleted,
+  { onFileSelect, onError, onFileDeleted, onFileUpserted }: CreateExplorerOptions,
 ): ExplorerHandle {
   const expanded = new Set<string>()
   let dragDepth = 0
@@ -186,6 +195,7 @@ export function createExplorer(
       try {
         const uploaded = await readBrowserFile(item.file, targetPath)
         upsertFile(uploaded.path, uploaded.content)
+        onFileUpserted(uploaded.path)
         if (!firstTextPath && uploaded.content.kind === 'text') {
           firstTextPath = uploaded.path
         }
@@ -341,7 +351,7 @@ export function createExplorer(
         window.alert('最後のテキストファイルは削除できません')
         return
       }
-      onFileDeleted()
+      onFileDeleted(node.path)
       if (wasActive) {
         const next = getActiveFile()
         onFileSelect(next)

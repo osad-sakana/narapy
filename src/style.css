@@ -134,3 +134,32 @@
   padding: 0 8px;
   white-space: nowrap;
 }
+
+/* ─── 講師モード: 基準からの差分ハイライト ─────────────
+   「追加・変更＝緑（進行方向）」「削除＝赤（注意）」の2色運用に絞る。 */
+.monaco-editor .diff-line {
+  background-color: color-mix(in srgb, var(--color-success) 12%, transparent);
+}
+
+.monaco-editor .diff-gutter {
+  background-color: color-mix(in srgb, var(--color-success) 80%, transparent);
+}
+
+.monaco-editor .diff-deleted-gutter {
+  background-color: color-mix(in srgb, var(--color-danger) 80%, transparent);
+}
+
+.monaco-editor .diff-inline {
+  background-color: color-mix(in srgb, var(--color-success) 25%, transparent);
+  border-bottom: 2px solid var(--color-success);
+}
+
+/* 挿入を伴わない純粋な削除の位置を示す幅ゼロのマーカー */
+.monaco-editor .diff-inline-deleted::before {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  vertical-align: text-bottom;
+  background-color: var(--color-danger);
+}

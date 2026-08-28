@@ -27,6 +27,8 @@ import { createFileSwitcher } from './editor/fileSwitcher'
 import { initTheme } from './theme/index'
 import { initHamburgerMenu } from './menu/ui'
 import { applyNewProject } from './menu/applyNewProject'
+import { createInstructorController } from './instructor/controller'
+import { createInstructorMenuAction, syncInstructorMenuItem, initInstructorBaselineButton } from './instructor/ui'
 
 // createEditor が解決済みテーマを読むため、他の初期化より先に実行する
 initTheme()
@@ -65,8 +67,30 @@ const fileSwitcher = createFileSwitcher({
   setFileName: (path) => { editorFileName.textContent = path },
 })
 
+// --- 講師モード ---
+// 基準スナップショットは表示中のファイルパスと組にして持つため、パス追跡を持つ
+// fileSwitcher の完成後に生成する
+const instructorController = createInstructorController({
+  editor,
+  getEditorPath: () => fileSwitcher.getEditorPath(),
+})
+
 function switchToFile(path: string): void {
+  // 装飾のクリアはモデル差し替え（fileSwitcher.switchToFile内のsetModel）の前に行う必要がある。
+  // 差し替え後にクリアすると、古いモデル上の装飾IDが新モデルには存在せず無視されてしまう。
+  instructorController.beforeActiveFileChange()
   fileSwitcher.switchToFile(path)
+  instructorController.onActiveFileChanged()
+}
+
+// プロジェクト全体が入れ替わる場合（起動時・.narapyインポート・新規プロジェクト作成）は
+// パスが偶然一致していても内容は別物なので、基準を無条件で破棄する
+function openProjectFileWithReset(path: string, content: string): void {
+  // switchToFile と同じ規律で、モデル差し替えの前に基準を破棄する。
+  // 現状 openFile(mode:'reset') は常に旧モデルを破棄するため後でも実害はないが、
+  // reset の実装詳細（同一パスなら再利用等）に暗黙依存しないようにする
+  instructorController.discardBaseline()
+  fileSwitcher.openProjectFile(path, content)
 }
 
 // --- エディタ変更 ---
@@ -81,6 +105,7 @@ editor.onDidChangeModelContent(() => {
   const source = getValue(editor)
   // 変更をストアに保存（エディタが実際に表示しているパスへ、issue #45 L1）
   updateFileContent(path, source)
+  instructorController.onContentChanged()
 })
 
 // --- キーボードショートカット ---
@@ -91,16 +116,24 @@ editor.addCommand(
 
 // --- ファイルエクスプローラー初期化 ---
 const explorerContainer = document.getElementById('fileExplorer') as HTMLElement
-const { refresh: refreshExplorer } = createExplorer(
-  explorerContainer,
-  (path) => {
+const { refresh: refreshExplorer } = createExplorer(explorerContainer, {
+  onFileSelect: (path) => {
     switchToFile(path)
     refreshExplorer()
   },
-  (message) => window.alert(message),
-  // 非アクティブなファイルの削除では切替が起きないため、ここでモデルを破棄する(issue #47)
-  () => modelRegistry.prune(listFilePaths()),
-)
+  onError: (message) => window.alert(message),
+  onFileDeleted: (path) => {
+    // 非アクティブなファイルの削除では切替が起きないため、ここでモデルを破棄する(issue #47)
+    modelRegistry.prune(listFilePaths())
+    // 削除されたファイルに対して基準を記録していた場合、無意味な差分表示にならないよう破棄する
+    instructorController.discardBaselineIfPath(path)
+  },
+  onFileUpserted: (path) => {
+    // アップロードによる上書きも、非アクティブファイルへは無言で内容だけが変わるため
+    // 削除と同様に扱い、対象ファイルの基準があれば破棄する（新規追加時は基準が無いため無害）
+    instructorController.discardBaselineIfPath(path)
+  },
+})
 
 // --- URLパラメータからの初期プロジェクト読み込み (issue #32) ---
 // #project= > #code= > ?project=<URL> の優先順位で解決する。既存の作業内容がある場合のみ確認する。
@@ -113,7 +146,7 @@ try {
 // エディタを永続化済みの内容で初期化。
 // ?project=<URL> の読込待ちの間にユーザーがファイルを選択するとモデルが作られうるため、
 // ここでは既存モデルを全破棄して開き、旧プロジェクトの undo 履歴を持ち越さない(issue #47)
-fileSwitcher.openProjectFile(getActiveFile(), getActiveContent())
+openProjectFileWithReset(getActiveFile(), getActiveContent())
 editorFileName.textContent = getActiveFile()
 
 
@@ -124,9 +157,20 @@ initRunner(editor, () => {
 })
 
 const outputLog = document.getElementById('outputLog') as HTMLElement
-initFontSizeControls((size) => {
-  editor.updateOptions({ fontSize: size })
-  outputLog.style.fontSize = `${size}px`
+const fontControls = initFontSizeControls(
+  (size) => {
+    editor.updateOptions({ fontSize: size })
+    outputLog.style.fontSize = `${size}px`
+  },
+  () => instructorController.fontProfile(),
+)
+
+const instructorBaselineButton = initInstructorBaselineButton(instructorController)
+
+instructorController.setStateChangeListener(() => {
+  fontControls.refresh()
+  syncInstructorMenuItem(instructorController.isOn())
+  instructorBaselineButton.sync()
 })
 
 // プロジェクト読込系オーケストレーション（.narapy を開く／新規作成）が共有する依存。
@@ -136,7 +180,7 @@ const projectLoadDeps = {
   refreshExplorer,
   getActiveFile,
   getActiveContent,
-  openProjectFile: fileSwitcher.openProjectFile,
+  openProjectFile: openProjectFileWithReset,
   setEditorFileName: (path: string) => { editorFileName.textContent = path },
 }
 
@@ -185,4 +229,5 @@ initHamburgerMenu([
       if (applyNewProject({ hasUserContent, ...projectLoadDeps })) clearLog()
     },
   },
+  createInstructorMenuAction(instructorController),
 ])

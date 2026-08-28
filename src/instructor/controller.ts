@@ -24,7 +24,6 @@ const instructorFontProfile: FontSizeProfile = {
 export interface InstructorControllerDeps {
   editor: EditorInstance
   getEditorPath: () => string
-  onStateChange: (isOn: boolean) => void
 }
 
 export interface InstructorController {
@@ -32,9 +31,15 @@ export interface InstructorController {
   toggle: () => void
   recordBaseline: () => void
   discardBaseline: () => void
+  discardBaselineIfPath: (path: string) => void
   onContentChanged: () => void
+  beforeActiveFileChange: () => void
   onActiveFileChanged: () => void
   fontProfile: () => FontSizeProfile
+  // ON/OFF切替を検知するリスナーを登録する。main.ts側でフォント表示やメニュー項目の
+  // 更新に使う依存（fontControls等）はcontroller構築より後に生成されるため、
+  // deps注入ではなく構築後に登録できるようにしている
+  onStateChange: (listener: (isOn: boolean) => void) => void
 }
 
 // 講師モードの状態遷移（ON/OFF・基準記録・装飾の張り替え）を管理する。
@@ -45,6 +50,7 @@ export function createInstructorController(deps: InstructorControllerDeps): Inst
   let isOn = getInstructorEnabled()
   let baseline: { path: string; text: string } | null = null
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  let stateChangeListener: ((isOn: boolean) => void) | null = null
 
   const decorationsCollection = deps.editor.createDecorationsCollection([])
 
@@ -76,7 +82,7 @@ export function createInstructorController(deps: InstructorControllerDeps): Inst
       baseline = null
       clearDecorations()
     }
-    deps.onStateChange(isOn)
+    stateChangeListener?.(isOn)
   }
 
   function recordBaseline(): void {
@@ -90,10 +96,25 @@ export function createInstructorController(deps: InstructorControllerDeps): Inst
     clearDecorations()
   }
 
+  // 削除されたファイルが非アクティブ（=切替を経由しない）だった場合に、その基準だけを
+  // 対象を絞って破棄する。無関係なファイルの削除で他ファイルの基準まで失わないようにする。
+  function discardBaselineIfPath(path: string): void {
+    if (baseline?.path === path) discardBaseline()
+  }
+
   function onContentChanged(): void {
     if (!isOn || !baseline) return
     cancelPendingRecompute()
     debounceTimer = setTimeout(recomputeDecorations, RECOMPUTE_DEBOUNCE_MS)
+  }
+
+  // IEditorDecorationsCollection.set() は「その時点でエディタにアタッチされているモデル」
+  // に対してのみ有効（Monaco内部でモデルごとの装飾IDマップを引くため）。ファイル切替で
+  // モデルを差し替えた後にクリアすると、古い装飾IDは新モデルには存在せず黙って無視され、
+  // 元のモデル（reuse方式で切替後も保持され続ける）上に装飾が残り続けてしまう。
+  // そのためモデル差し替えの直前・直後の両方でフックする。
+  function beforeActiveFileChange(): void {
+    clearDecorations()
   }
 
   function onActiveFileChanged(): void {
@@ -106,8 +127,11 @@ export function createInstructorController(deps: InstructorControllerDeps): Inst
     toggle,
     recordBaseline,
     discardBaseline,
+    discardBaselineIfPath,
     onContentChanged,
+    beforeActiveFileChange,
     onActiveFileChanged,
     fontProfile: () => (isOn ? instructorFontProfile : normalFontProfile),
+    onStateChange: (listener) => { stateChangeListener = listener },
   }
 }

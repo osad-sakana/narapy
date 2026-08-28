@@ -48,6 +48,18 @@ type EditOp<T> =
   | { kind: 'del'; value: T }
   | { kind: 'ins'; value: T }
 
+// 実際の編集は局所的なことがほとんどなので、LCSにかける前に共通の先頭・末尾を除いておく。
+// これによりDPテーブルのサイズ（延いてはMAX_CELLS/MAX_INLINE_CELLSへの抵触しやすさ）を
+// 実際に変化した範囲だけに縮小できる。
+function trimCommonEnds<T>(a: T[], b: T[], eq: (x: T, y: T) => boolean): { prefix: number; suffix: number } {
+  const minLen = Math.min(a.length, b.length)
+  let prefix = 0
+  while (prefix < minLen && eq(a[prefix], b[prefix])) prefix++
+  let suffix = 0
+  while (suffix < minLen - prefix && eq(a[a.length - 1 - suffix], b[b.length - 1 - suffix])) suffix++
+  return { prefix, suffix }
+}
+
 // LCS（最長共通部分列）に基づく編集操作列を求める。n*m が maxCells を超える場合は null。
 function computeEditOps<T>(a: T[], b: T[], maxCells: number, eq: (x: T, y: T) => boolean): EditOp<T>[] | null {
   const n = a.length
@@ -140,11 +152,13 @@ function processBlock(
 export function diffLines(baseline: string, current: string): LineChange[] {
   const a = baseline.split('\n')
   const b = current.split('\n')
-  const ops = computeEditOps(a, b, MAX_CELLS, (x, y) => x === y)
+  const eq = (x: string, y: string) => x === y
+  const { prefix, suffix } = trimCommonEnds(a, b, eq)
+  const ops = computeEditOps(a.slice(prefix, a.length - suffix), b.slice(prefix, b.length - suffix), MAX_CELLS, eq)
   if (ops === null) return []
 
   const result: LineChange[] = []
-  let curLine = 1
+  let curLine = prefix + 1
   let idx = 0
   while (idx < ops.length) {
     if (ops[idx].kind === 'equal') {
@@ -181,15 +195,16 @@ function codepointColumns(codepoints: string[]): number[] {
 export function diffInline(baselineLine: string, currentLine: string): InlineChange[] {
   const a = toCodepoints(baselineLine)
   const b = toCodepoints(currentLine)
-
-  const ops = computeEditOps(a, b, MAX_INLINE_CELLS, (x, y) => x === y)
+  const eq = (x: string, y: string) => x === y
+  const { prefix, suffix } = trimCommonEnds(a, b, eq)
+  const ops = computeEditOps(a.slice(prefix, a.length - suffix), b.slice(prefix, b.length - suffix), MAX_INLINE_CELLS, eq)
   if (ops === null) {
     return currentLine.length === 0 ? [] : [{ kind: 'range', start: 1, end: currentLine.length + 1 }]
   }
 
   const bCols = codepointColumns(b)
   const result: InlineChange[] = []
-  let bIndex = 0
+  let bIndex = prefix
   let idx = 0
   while (idx < ops.length) {
     const op = ops[idx]

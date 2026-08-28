@@ -66,6 +66,19 @@ describe('diffLines', () => {
     // 2100 * 2100 = 4,410,000 > 4,000,000
     expect(diffLines(bigA, bigB)).toEqual([])
   })
+
+  it('大きなファイルでも変更が局所的なら共通の先頭・末尾を除いて安全弁に抵触しない', () => {
+    const lines = Array.from({ length: 2100 }, (_, i) => `line${i}`)
+    const baseline = lines.join('\n')
+    const changed = [...lines]
+    changed[1050] = 'CHANGED'
+    const current = changed.join('\n')
+    // トリム無しなら 2100*2100 > MAX_CELLS で安全弁に抵触するが、
+    // 共通の先頭1050行・末尾1049行を除けば1行同士の比較で済む
+    expect(diffLines(baseline, current)).toEqual([
+      { kind: 'modified', line: 1051, baselineText: 'line1050', currentText: 'CHANGED' },
+    ])
+  })
 })
 
 describe('diffInline', () => {
@@ -110,6 +123,16 @@ describe('diffInline', () => {
     // 500 * 500 = 250,000 > 200,000
     expect(diffInline(longA, longB)).toEqual([
       { kind: 'range', start: 1, end: 501 },
+    ])
+  })
+
+  it('長い行でも変更が局所的なら共通の先頭・末尾を除いて安全弁に抵触しない', () => {
+    const prefix = 'x'.repeat(300)
+    const suffix = 'y'.repeat(300)
+    // トリム無しなら 600*600 > MAX_INLINE_CELLS で行全体フォールバックになるが、
+    // 共通の先頭・末尾を除けば1文字同士の比較で済む
+    expect(diffInline(`${prefix}A${suffix}`, `${prefix}B${suffix}`)).toEqual([
+      { kind: 'range', start: 301, end: 302 },
     ])
   })
 })

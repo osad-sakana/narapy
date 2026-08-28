@@ -73,14 +73,12 @@ const fileSwitcher = createFileSwitcher({
 const instructorController = createInstructorController({
   editor,
   getEditorPath: () => fileSwitcher.getEditorPath(),
-  onStateChange: () => {
-    fontControls.refresh()
-    syncInstructorMenuItem(instructorController.isOn())
-    instructorBaselineButton.sync()
-  },
 })
 
 function switchToFile(path: string): void {
+  // 装飾のクリアはモデル差し替え（fileSwitcher.switchToFile内のsetModel）の前に行う必要がある。
+  // 差し替え後にクリアすると、古いモデル上の装飾IDが新モデルには存在せず無視されてしまう。
+  instructorController.beforeActiveFileChange()
   fileSwitcher.switchToFile(path)
   instructorController.onActiveFileChanged()
 }
@@ -122,8 +120,12 @@ const { refresh: refreshExplorer } = createExplorer(
     refreshExplorer()
   },
   (message) => window.alert(message),
-  // 非アクティブなファイルの削除では切替が起きないため、ここでモデルを破棄する(issue #47)
-  () => modelRegistry.prune(listFilePaths()),
+  (path) => {
+    // 非アクティブなファイルの削除では切替が起きないため、ここでモデルを破棄する(issue #47)
+    modelRegistry.prune(listFilePaths())
+    // 削除されたファイルに対して基準を記録していた場合、無意味な差分表示にならないよう破棄する
+    instructorController.discardBaselineIfPath(path)
+  },
 )
 
 // --- URLパラメータからの初期プロジェクト読み込み (issue #32) ---
@@ -157,6 +159,12 @@ const fontControls = initFontSizeControls(
 )
 
 const instructorBaselineButton = initInstructorBaselineButton(instructorController)
+
+instructorController.onStateChange(() => {
+  fontControls.refresh()
+  syncInstructorMenuItem(instructorController.isOn())
+  instructorBaselineButton.sync()
+})
 
 // プロジェクト読込系オーケストレーション（.narapy を開く／新規作成）が共有する依存。
 // 別々に組み立てると、どちらかだけ直して食い違う事故が起きうるため一箇所にまとめる。

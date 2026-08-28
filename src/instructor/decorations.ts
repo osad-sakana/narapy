@@ -30,12 +30,18 @@ export function buildDecorations(baselineText: string, currentText: string): mon
       })
     } else {
       decorations.push(wholeLineDecoration(change.line, 'diff-gutter'))
-      // トリム前の行長ではなく、diffInlineが実際にDPへかける実質コストで課金する
-      // （そうしないと共通の先頭・末尾が多い行で予算を大幅に過大消費してしまう）
-      inlineCostUsed += inlineDiffCost(change.baselineText, change.currentText)
-      if (inlineCostUsed > MAX_TOTAL_INLINE_COST) continue
-      for (const inline of diffInline(change.baselineText, change.currentText)) {
-        decorations.push(inlineDecoration(change.line, inline))
+      // 既に予算を使い切っている場合、以降の行では inlineDiffCost/diffInline 自体を
+      // 呼ばない（どちらも行長に比例したコードポイント配列の構築を伴うため、
+      // 呼ぶだけでも無駄なコストがかかる）
+      if (inlineCostUsed <= MAX_TOTAL_INLINE_COST) {
+        // トリム前の行長ではなく、diffInlineが実際にかける実質コストで課金する
+        // （そうしないと共通の先頭・末尾が多い行で予算を大幅に過大消費してしまう）
+        inlineCostUsed += inlineDiffCost(change.baselineText, change.currentText)
+        if (inlineCostUsed <= MAX_TOTAL_INLINE_COST) {
+          for (const inline of diffInline(change.baselineText, change.currentText)) {
+            decorations.push(inlineDecoration(change.line, inline))
+          }
+        }
       }
     }
   }

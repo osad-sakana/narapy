@@ -101,4 +101,19 @@ describe('buildDecorations', () => {
     expect(wholeLineDecorations).toHaveLength(15)
     expect(inlineDecorations).toHaveLength(12)
   })
+
+  it('挿入のみの行が大量にあっても総予算が働く（片側が空の行はn*mでは0課金になる回帰テスト）', () => {
+    // 各行はbaseline側が空行なのでn*mでは常に0課金になってしまう（修正前の欠陥）。
+    // n+mも合算すると1行あたり100,000で、20行分の累計1,900,000+αで予算(2,000,000)を使い切り、
+    // 21行目以降はインライン装飾を持たない
+    const baselineLines = Array.from({ length: 25 }, () => '')
+    const currentLines = Array.from({ length: 25 }, () => 'y'.repeat(100_000))
+    const decorations = buildDecorations(baselineLines.join('\n'), currentLines.join('\n'))
+
+    const inlineDecorations = decorations.filter(d => d.options.className === 'diff-inline')
+    const wholeLineDecorations = decorations.filter(d => d.options.className === 'diff-line')
+
+    expect(wholeLineDecorations).toHaveLength(25)
+    expect(inlineDecorations).toHaveLength(20)
+  })
 })

@@ -188,14 +188,23 @@ describe('diffInline', () => {
 
 describe('inlineDiffCost', () => {
   it('共通の先頭・末尾を控除した実質コストを返す', () => {
-    expect(inlineDiffCost('xxAyy', 'xxByy')).toBe(1)
+    // トリム後は 'A' vs 'B' の1文字同士（n=m=1）。n*m + n + m = 1 + 1 + 1 = 3
+    expect(inlineDiffCost('xxAyy', 'xxByy')).toBe(3)
   })
 
   it('完全一致なら0を返す', () => {
     expect(inlineDiffCost('same', 'same')).toBe(0)
   })
 
-  it('共通部分が無ければ元の長さの積を返す', () => {
-    expect(inlineDiffCost('abc', 'XYZ')).toBe(9)
+  it('共通部分が無ければ元の長さから n*m + n + m で計算する', () => {
+    // n=m=3。 3*3 + 3 + 3 = 15
+    expect(inlineDiffCost('abc', 'XYZ')).toBe(15)
+  })
+
+  it('挿入のみ・削除のみ（片側がトリムで0に縮む）でも0にならない', () => {
+    // n*mだけで見積もると常に0になり、computeEditOpsが実際に行うO(n+m)の
+    // オブジェクト生成が予算に反映されない（回帰テスト）
+    expect(inlineDiffCost('', 'a'.repeat(1000))).toBeGreaterThan(0)
+    expect(inlineDiffCost('a'.repeat(1000), '')).toBeGreaterThan(0)
   })
 })

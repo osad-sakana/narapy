@@ -1,5 +1,5 @@
 import * as monaco from 'monaco-editor'
-import { diffLines, diffInline } from './diff'
+import { diffLines, diffInline, inlineDiffCost } from './diff'
 
 // modified行1件あたりのdiffInlineコストは行diffのMAX_INLINE_CELLSで抑えられているが、
 // 一度の再計算でmodified行が大量にある場合（大きな貼り付け等）にコストが積み上がるのを防ぐため、
@@ -30,7 +30,9 @@ export function buildDecorations(baselineText: string, currentText: string): mon
       })
     } else {
       decorations.push(wholeLineDecoration(change.line, 'diff-gutter'))
-      inlineCostUsed += change.baselineText.length * change.currentText.length
+      // トリム前の行長ではなく、diffInlineが実際にDPへかける実質コストで課金する
+      // （そうしないと共通の先頭・末尾が多い行で予算を大幅に過大消費してしまう）
+      inlineCostUsed += inlineDiffCost(change.baselineText, change.currentText)
       if (inlineCostUsed > MAX_TOTAL_INLINE_COST) continue
       for (const inline of diffInline(change.baselineText, change.currentText)) {
         decorations.push(inlineDecoration(change.line, inline))

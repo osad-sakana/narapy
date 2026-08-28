@@ -36,10 +36,10 @@ export interface InstructorController {
   beforeActiveFileChange: () => void
   onActiveFileChanged: () => void
   fontProfile: () => FontSizeProfile
-  // ON/OFF切替を検知するリスナーを登録する。main.ts側でフォント表示やメニュー項目の
-  // 更新に使う依存（fontControls等）はcontroller構築より後に生成されるため、
-  // deps注入ではなく構築後に登録できるようにしている
-  onStateChange: (listener: (isOn: boolean) => void) => void
+  // ON/OFF切替を検知するリスナーを登録する（単一リスナーのみ、後勝ち）。main.ts側で
+  // フォント表示やメニュー項目の更新に使う依存（fontControls等）はcontroller構築より
+  // 後に生成されるため、deps注入ではなく構築後に登録できるようにしている
+  setStateChangeListener: (listener: (isOn: boolean) => void) => void
 }
 
 // 講師モードの状態遷移（ON/OFF・基準記録・装飾の張り替え）を管理する。
@@ -132,6 +132,6 @@ export function createInstructorController(deps: InstructorControllerDeps): Inst
     beforeActiveFileChange,
     onActiveFileChanged,
     fontProfile: () => (isOn ? instructorFontProfile : normalFontProfile),
-    onStateChange: (listener) => { stateChangeListener = listener },
+    setStateChangeListener: (listener) => { stateChangeListener = listener },
   }
 }

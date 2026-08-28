@@ -191,6 +191,16 @@ function codepointColumns(codepoints: string[]): number[] {
   return cols
 }
 
+// diffInline実行前に、共通の先頭・末尾を除いた実質的なコスト（DPセル数）を見積もる。
+// buildDecorations が1回の再計算全体でのインライン差分コスト予算を管理するために使う。
+// トリム前の行長をそのまま使うと、実際に diffInline が行うDPよりも大幅に過大評価してしまう。
+export function inlineDiffCost(baselineLine: string, currentLine: string): number {
+  const a = toCodepoints(baselineLine)
+  const b = toCodepoints(currentLine)
+  const { prefix, suffix } = trimCommonEnds(a, b, (x, y) => x === y)
+  return (a.length - prefix - suffix) * (b.length - prefix - suffix)
+}
+
 // baseline行 → current行 の文字単位diff（modified行に対してのみ実行する）。
 export function diffInline(baselineLine: string, currentLine: string): InlineChange[] {
   const a = toCodepoints(baselineLine)

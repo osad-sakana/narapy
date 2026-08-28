@@ -6,6 +6,22 @@ describe('diffLines', () => {
     expect(diffLines('a\nb\nc', 'a\nb\nc')).toEqual([])
   })
 
+  it('両方空文字列なら空配列を返す', () => {
+    expect(diffLines('', '')).toEqual([])
+  })
+
+  it('baselineが空文字列ならmodifiedを返す', () => {
+    expect(diffLines('', 'a')).toEqual([
+      { kind: 'modified', line: 1, baselineText: '', currentText: 'a' },
+    ])
+  })
+
+  it('currentが空文字列ならmodifiedを返す', () => {
+    expect(diffLines('a', '')).toEqual([
+      { kind: 'modified', line: 1, baselineText: 'a', currentText: '' },
+    ])
+  })
+
   it('末尾に行が追加された場合はaddedを返す', () => {
     expect(diffLines('a\nb', 'a\nb\nc')).toEqual([
       { kind: 'added', line: 3 },
@@ -82,6 +98,22 @@ describe('diffLines', () => {
 })
 
 describe('diffInline', () => {
+  it('両方空文字列なら空配列を返す', () => {
+    expect(diffInline('', '')).toEqual([])
+  })
+
+  it('baselineが空文字列ならrangeを返す', () => {
+    expect(diffInline('', 'a')).toEqual([
+      { kind: 'range', start: 1, end: 2 },
+    ])
+  })
+
+  it('currentが空文字列ならdeletionMarkerを返す', () => {
+    expect(diffInline('a', '')).toEqual([
+      { kind: 'deletionMarker', column: 1 },
+    ])
+  })
+
   it('末尾への追加はrangeを返す', () => {
     expect(diffInline('foo', 'foobar')).toEqual([
       { kind: 'range', start: 4, end: 7 },

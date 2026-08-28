@@ -86,8 +86,11 @@ function switchToFile(path: string): void {
 // プロジェクト全体が入れ替わる場合（起動時・.narapyインポート・新規プロジェクト作成）は
 // パスが偶然一致していても内容は別物なので、基準を無条件で破棄する
 function openProjectFileWithReset(path: string, content: string): void {
-  fileSwitcher.openProjectFile(path, content)
+  // switchToFile と同じ規律で、モデル差し替えの前に基準を破棄する。
+  // 現状 openFile(mode:'reset') は常に旧モデルを破棄するため後でも実害はないが、
+  // reset の実装詳細（同一パスなら再利用等）に暗黙依存しないようにする
   instructorController.discardBaseline()
+  fileSwitcher.openProjectFile(path, content)
 }
 
 // --- エディタ変更 ---
@@ -126,6 +129,11 @@ const { refresh: refreshExplorer } = createExplorer(
     // 削除されたファイルに対して基準を記録していた場合、無意味な差分表示にならないよう破棄する
     instructorController.discardBaselineIfPath(path)
   },
+  (path) => {
+    // アップロードによる上書きも、非アクティブファイルへは無言で内容だけが変わるため
+    // 削除と同様に扱い、対象ファイルの基準があれば破棄する
+    instructorController.discardBaselineIfPath(path)
+  },
 )
 
 // --- URLパラメータからの初期プロジェクト読み込み (issue #32) ---
@@ -160,7 +168,7 @@ const fontControls = initFontSizeControls(
 
 const instructorBaselineButton = initInstructorBaselineButton(instructorController)
 
-instructorController.onStateChange(() => {
+instructorController.setStateChangeListener(() => {
   fontControls.refresh()
   syncInstructorMenuItem(instructorController.isOn())
   instructorBaselineButton.sync()

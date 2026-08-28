@@ -70,8 +70,10 @@ describe('buildDecorations', () => {
   })
 
   it('1回の呼び出し全体でのインラインコスト予算を超えたら、超過分は全行ハイライトのみにフォールバックする', () => {
-    // 各行 800 文字 × 800 文字 = 640,000 セル。3行分で 1,920,000 とまだ予算内(2,000,000)だが、
-    // 4行目で累計が予算を超えるため、4行目以降はインライン装飾を持たない
+    // 各行 800 文字 × 800 文字 = 640,000 セル（行単体でMAX_INLINE_CELLS=200,000を超えるため、
+    // diffInline自体が既に行全体1件へフォールバックする）。3行分で1,920,000とまだ予算内
+    // (MAX_TOTAL_INLINE_COST=2,000,000)だが、4行目で累計が予算を超えるため
+    // 4・5行目はインライン装飾を持たない
     const longLine = (ch: string) => ch.repeat(800)
     const baselineLines = Array.from({ length: 5 }, () => longLine('a'))
     const currentLines = Array.from({ length: 5 }, () => longLine('b'))
@@ -81,7 +83,22 @@ describe('buildDecorations', () => {
     const wholeLineDecorations = decorations.filter(d => d.options.className === 'diff-line')
 
     expect(wholeLineDecorations).toHaveLength(5)
-    // 予算超過後の行にはインライン装飾が付かない
-    expect(inlineDecorations.length).toBeLessThan(5)
+    expect(inlineDecorations).toHaveLength(3)
+  })
+
+  it('行単体では予算内でも、文字単位diffが累積で総予算を使い切ったら以降の行はフォールバックする', () => {
+    // 各行は 400文字×400文字=160,000セルでMAX_INLINE_CELLS(200,000)未満のため、
+    // 実際に文字単位のLCSが実行される（行全体フォールバックではない）。
+    // 12行分の累計は 1,920,000 で予算内(2,000,000)だが、13行目で2,080,000を超える
+    const longLine = (ch: string) => ch.repeat(400)
+    const baselineLines = Array.from({ length: 15 }, () => longLine('x'))
+    const currentLines = Array.from({ length: 15 }, () => longLine('y'))
+    const decorations = buildDecorations(baselineLines.join('\n'), currentLines.join('\n'))
+
+    const inlineDecorations = decorations.filter(d => d.options.className === 'diff-inline')
+    const wholeLineDecorations = decorations.filter(d => d.options.className === 'diff-line')
+
+    expect(wholeLineDecorations).toHaveLength(15)
+    expect(inlineDecorations).toHaveLength(12)
   })
 })

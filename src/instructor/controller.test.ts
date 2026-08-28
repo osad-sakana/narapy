@@ -236,11 +236,11 @@ describe('instructor controller', () => {
     expect(onProfile).not.toBe(offProfile)
   })
 
-  it('onStateChange で登録したリスナーが toggle のたびに呼ばれる', () => {
+  it('setStateChangeListener で登録したリスナーが toggle のたびに呼ばれる', () => {
     const fake = createFakeEditor()
     const controller = createInstructorController({ editor: fake.editor, getEditorPath: () => 'main.py' })
     const listener = vi.fn()
-    controller.onStateChange(listener)
+    controller.setStateChangeListener(listener)
 
     controller.toggle()
     expect(listener).toHaveBeenCalledWith(true)

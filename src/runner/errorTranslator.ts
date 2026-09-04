@@ -91,6 +91,13 @@ const RULES: Record<string, Rule[]> = {
       description: (t) => `${jpType(t)} には [ ] を使った代入ができません。`,
       hint: () => `文字列やタプルは変更できません（イミュータブル）。リストに変換するか、新しい値を作り直してください。`,
     },
+    {
+      pattern: /not all arguments converted during string formatting/,
+      description: () =>
+        `文字列（str）に「%」を使ったため、「%」の左側が書式指定文字列として扱われ、右側の値の個数が合いませんでした。`,
+      hint: () =>
+        `余りを求めたい場合は int() で数値に変換してください。\n例: (int(a) + int(b)) % 2\n書式指定のつもりの場合は、"%s" などのプレースホルダの数と渡す値の数を合わせてください。`,
+    },
   ],
 
   NameError: [

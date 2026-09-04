@@ -640,3 +640,33 @@ describe('translatePythonError（4回目レビュー対応: SystemExitが構造�
     expect(result?.rawMessage).toBe('1')
   })
 })
+
+describe('translatePythonError（TypeError: %演算子による書式指定エラー）', () => {
+  it('文字列同士の "+" のあと "%" を余りの計算のつもりで使うと、書式指定として解釈されたことを説明する', () => {
+    const raw = [
+      'Traceback (most recent call last):',
+      '  File "/lib/python312.zip/_pyodide/_base.py", line 597, in eval_code_async',
+      '    await CodeRunner(',
+      '  File "/lib/python312.zip/_pyodide/_base.py", line 411, in run_async',
+      '    coroutine = eval(self.code, globals, locals)',
+      '  File "<exec>", line 9, in <module>',
+      '  File "<exec>", line 2, in hantei',
+      'TypeError: not all arguments converted during string formatting',
+    ].join('\n')
+    const result = translatePythonError(raw)
+    expect(result?.errorType).toBe('TypeError')
+    expect(result?.line).toBe(2)
+    expect(result?.matched).toBe(true)
+    expect(result?.description).toBe(
+      '文字列（str）に「%」を使ったため、余りの計算ではなく文字列の書式指定として解釈されました。',
+    )
+    expect(result?.hint).toBe(
+      '余りを求めたい場合は int() で数値に変換してください。\n例: (int(a) + int(b)) % 2\n書式指定のつもりの場合は、"%s" などのプレースホルダの数と渡す値の数を合わせてください。',
+    )
+  })
+
+  it('プレースホルダ数と値の数が合わない純粋な書式指定ミスでも同じ説明になる', () => {
+    const result = translatePythonError(traceback('TypeError: not all arguments converted during string formatting'))
+    expect(result?.matched).toBe(true)
+  })
+})

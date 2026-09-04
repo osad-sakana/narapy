@@ -94,7 +94,7 @@ const RULES: Record<string, Rule[]> = {
     {
       pattern: /not all arguments converted during string formatting/,
       description: () =>
-        `文字列（str）に「%」を使ったため、余りの計算ではなく文字列の書式指定として解釈されました。`,
+        `文字列（str）に「%」を使ったため、「%」の左側が書式指定文字列として扱われ、右側の値の個数が合いませんでした。`,
       hint: () =>
         `余りを求めたい場合は int() で数値に変換してください。\n例: (int(a) + int(b)) % 2\n書式指定のつもりの場合は、"%s" などのプレースホルダの数と渡す値の数を合わせてください。`,
     },

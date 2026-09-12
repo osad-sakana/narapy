@@ -64,6 +64,31 @@ class _NarapyRepr(_reprlib.Repr):
     def repr_frozenset(self, x, level):
         return self._repr_unordered(x, level, "frozenset({", "})", self.maxfrozenset, "frozenset()")
 
+    # repr_dict/repr_set/repr_frozenset の上書きは type(x) が dict/set/frozenset
+    # そのものの場合にしか効かない（reprlib は type(x).__name__ でディスパッチする
+    # ため）。Counter/OrderedDict/defaultdict のような「独自 __repr__ を持つ dict
+    # サブクラス」は repr_instance 経由で素の repr() が全長を構築してから切られ、
+    # 巨大なインスタンスで依然 O(n) のコストがかかる。要素数が閾値を超える場合のみ
+    # 迂回し、閾値以下（学習コードで典型的なサイズ）では独自 __repr__ をそのまま
+    # 使うことで、namedtuple 等の表示を壊さないようにする。
+    def repr_instance(self, x, level):
+        try:
+            if isinstance(x, dict) and len(x) > self.maxdict:
+                return "%s(%s)" % (type(x).__name__, self.repr_dict(x, level))
+            if isinstance(x, (set, frozenset)) and len(x) > self.maxset:
+                return "%s(%s)" % (
+                    type(x).__name__,
+                    self._repr_unordered(x, level, "{", "}", self.maxset, "{}"),
+                )
+            if isinstance(x, (list, tuple)) and len(x) > self.maxlist:
+                return "%s(%s)" % (
+                    type(x).__name__,
+                    self._repr_unordered(x, level, "[", "]", self.maxlist, "[]"),
+                )
+        except Exception:
+            pass
+        return _reprlib.Repr.repr_instance(self, x, level)
+
 
 # 巨大なコレクション（例: list(range(1000000))）でも要素数で打ち切って構築するため、
 # 素の repr() のように全長を作ってから切る（＝計算コストは上限なし）ことを避けられる。
@@ -153,6 +178,8 @@ class _Recorder:
         except (KeyboardInterrupt, SystemExit):
             # 停止操作(interrupt buffer)によるKeyboardInterruptはユーザーコード側へ
             # 伝播させる必要がある。ここで握り潰すと停止操作が効かなくなる。
+            # 記録済みのステップは打ち切り扱いにする（実際に打ち切られているため）。
+            self.truncated = True
             raise
         except BaseException:
             # トレース関数自体が例外を起こすとCPythonは黙ってトレースを解除する。
@@ -216,6 +243,15 @@ def run_trace(source, filename, max_steps, max_depth, main_globals, known_names)
             _warnings.filterwarnings(
                 "ignore", message="assigning None to unbound local", category=RuntimeWarning,
             )
+            # catch_warnings() は showwarning の差し替えも保存・復元するため、
+            # ここで上書きしても with を抜ければ元に戻る。_format_error() と同様に
+            # 内部の仮想ファイル名をユーザーに見せる "<exec>" へ揃える。
+            _original_showwarning = _warnings.showwarning
+
+            def _narapy_showwarning(message, category, fname, lineno, file=None, line=None):
+                _original_showwarning(message, category, fname.replace(filename, "<exec>"), lineno, file, line)
+
+            _warnings.showwarning = _narapy_showwarning
             exec(code_obj, main_globals)
     except BaseException:
         error = _format_error(filename)

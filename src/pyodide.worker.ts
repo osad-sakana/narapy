@@ -19,13 +19,14 @@ type OutMessage =
 const WORK_DIR = '/home/pyodide'
 
 // 実行後に matplotlib の全フィギュアを PNG base64 の JSON 配列として返す。
-// ループ変数等を関数内に閉じ込めることで __main__ に一時変数を残さない
-// （残すとステップ実行の変数一覧にトレーサ自身の内部状態が混入してしまう。
-// 関数名自体は "__" で始まり終わるため traceModule.ts の除外フィルタに含まれる）。
+// import・ループ変数等を関数内に閉じ込めることで __main__ に一切の一時変数を
+// 残さない（残すとステップ実行の変数一覧にトレーサ自身の内部状態が混入する。
+// 関数名自体は "__" で始まり終わるため traceModule.ts の除外フィルタに含まれる。
+// トップレベルで import すると _sys/_json という名前がユーザーの同名変数を
+// 上書きしてしまうため、import 自体も関数内に置く）。
 const EXTRACT_FIGS_CODE = `
-import sys as _sys, json as _json
-
 def __narapy_extract_figs__():
+    import sys as _sys, json as _json
     result = []
     if 'matplotlib.pyplot' in _sys.modules:
         import matplotlib.pyplot as _plt, io as _io, base64 as _b64
@@ -35,9 +36,9 @@ def __narapy_extract_figs__():
             buf.seek(0)
             result.append({'num': n, 'data': _b64.b64encode(buf.read()).decode()})
         _plt.close('all')
-    return result
+    return _json.dumps(result)
 
-_json.dumps(__narapy_extract_figs__())
+__narapy_extract_figs__()
 `
 
 // 自作 turtle モジュールをフレッシュに sys.modules['turtle'] へ登録する。
@@ -52,11 +53,10 @@ del _m
 `
 
 // 実行後に turtle の描画コマンドを JSON で抽出する（turtle 未使用なら segments=[]）。
-// EXTRACT_FIGS_CODE と同じ理由で一時変数を関数内に閉じ込める。
+// EXTRACT_FIGS_CODE と同じ理由で import・一時変数を関数内に閉じ込める。
 const EXTRACT_TURTLE_CODE = `
-import sys as _sys, json as _json
-
 def __narapy_extract_turtle__():
+    import sys as _sys, json as _json
     t = _sys.modules.get('turtle')
     if t is not None and hasattr(t, '_dump_commands'):
         return _json.dumps(t._dump_commands())

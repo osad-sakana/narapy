@@ -22,10 +22,17 @@ function createWorker(): Worker {
   )
 }
 
+export interface RunnerHandle {
+  // ステップ実行トレースを開始する（src/stepper/controller.ts から呼ばれる）。
+  // 実行中は何もしない（通常実行中にステップ実行を割り込ませない）。
+  runTraceMode: () => void
+}
+
 export function initRunner(
   editor: EditorInstance,
   getRunFiles: () => { files: RunFile[]; directories: string[] },
-): void {
+  onTrace?: (json: string) => void,
+): RunnerHandle {
   const runBtn     = document.getElementById('runBtn')     as HTMLButtonElement
   const copyLogBtn = document.getElementById('copyLogBtn') as HTMLButtonElement
 
@@ -175,6 +182,11 @@ export function initRunner(
         return
       }
 
+      if (msg.type === 'trace') {
+        onTrace?.(msg.payload)
+        return
+      }
+
       if (msg.type === 'stdout') {
         appendLog(msg.payload, 'output')
       } else if (msg.type === 'result') {
@@ -208,11 +220,8 @@ export function initRunner(
 
   attachWorkerHandlers()
 
-  runBtn.addEventListener('click', () => {
-    if (running) {
-      stopExecution()
-      return
-    }
+  function startRun(mode?: 'trace'): void {
+    if (running) return
 
     const code = getValue(editor).trim()
     if (!code) return
@@ -221,7 +230,15 @@ export function initRunner(
     clearLog()
     appendLog('--- 実行開始 ---', 'info')
     const { files, directories } = getRunFiles()
-    worker.postMessage({ type: 'run', code, files, directories } satisfies RunPayload)
+    worker.postMessage({ type: 'run', code, files, directories, mode } satisfies RunPayload)
+  }
+
+  runBtn.addEventListener('click', () => {
+    if (running) {
+      stopExecution()
+      return
+    }
+    startRun()
   })
 
   copyLogBtn.addEventListener('click', async () => {
@@ -236,4 +253,6 @@ export function initRunner(
       copyLogBtn.classList.remove('text-success')
     }, 1500)
   })
+
+  return { runTraceMode: () => startRun('trace') }
 }

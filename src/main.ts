@@ -29,6 +29,7 @@ import { initHamburgerMenu } from './menu/ui'
 import { applyNewProject } from './menu/applyNewProject'
 import { createInstructorController } from './instructor/controller'
 import { createInstructorMenuAction, syncInstructorMenuItem, initInstructorBaselineButton } from './instructor/ui'
+import { createStepperController } from './stepper/controller'
 
 // createEditor が解決済みテーマを読むため、他の初期化より先に実行する
 initTheme()
@@ -75,10 +76,16 @@ const instructorController = createInstructorController({
   getEditorPath: () => fileSwitcher.getEditorPath(),
 })
 
+// --- ステップ実行 ---
+// トレース結果はファイル固有の行番号・変数スナップショットを持つため、講師モードの基準と
+// 同じ規律で、表示中のファイルが変わる／内容が編集されるたびに無効化する。
+const stepperController = createStepperController(editor)
+
 function switchToFile(path: string): void {
   // 装飾のクリアはモデル差し替え（fileSwitcher.switchToFile内のsetModel）の前に行う必要がある。
   // 差し替え後にクリアすると、古いモデル上の装飾IDが新モデルには存在せず無視されてしまう。
   instructorController.beforeActiveFileChange()
+  stepperController.invalidate()
   fileSwitcher.switchToFile(path)
   instructorController.onActiveFileChanged()
 }
@@ -90,6 +97,7 @@ function openProjectFileWithReset(path: string, content: string): void {
   // 現状 openFile(mode:'reset') は常に旧モデルを破棄するため後でも実害はないが、
   // reset の実装詳細（同一パスなら再利用等）に暗黙依存しないようにする
   instructorController.discardBaseline()
+  stepperController.invalidate()
   fileSwitcher.openProjectFile(path, content)
 }
 
@@ -106,6 +114,9 @@ editor.onDidChangeModelContent(() => {
   // 変更をストアに保存（エディタが実際に表示しているパスへ、issue #45 L1）
   updateFileContent(path, source)
   instructorController.onContentChanged()
+  // トレース結果は編集前のコードに基づくため、編集された時点で無効化する
+  // （行ハイライトや変数一覧が古いコードのまま残らないようにする）
+  stepperController.invalidate()
 })
 
 // --- キーボードショートカット ---
@@ -150,11 +161,14 @@ openProjectFileWithReset(getActiveFile(), getActiveContent())
 editorFileName.textContent = getActiveFile()
 
 
-initRunner(editor, () => {
+const runner = initRunner(editor, () => {
   // 実行前に現在の内容をストアへ同期（エディタが実際に表示しているパスへ、issue #45 L1）
   updateFileContent(fileSwitcher.getEditorPath(), getValue(editor))
   return getAllFilesForRun()
-})
+}, (json) => stepperController.onTraceResult(json))
+
+const stepRunBtn = document.getElementById('stepRunBtn') as HTMLButtonElement
+stepRunBtn.addEventListener('click', () => runner.runTraceMode())
 
 const outputLog = document.getElementById('outputLog') as HTMLElement
 const fontControls = initFontSizeControls(

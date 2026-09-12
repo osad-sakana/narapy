@@ -3,41 +3,18 @@
 import { MAX_INPUT_BYTES, type RunFile, type RunPayload } from './types'
 import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from './lib/pyodideLoader'
 import { TURTLE_MODULE_SRC } from './pyodide/turtleModule'
+import { runTrace } from './pyodide/traceRun'
+import type { PyodideInterface, PyodideModule } from './pyodide/pyodideTypes'
 
 type OutMessage =
   | { type: 'stdout' | 'error' | 'loading'; payload: string }
   | { type: 'result'; payload: string | null }
   | { type: 'image'; payload: string; title: string }
   | { type: 'turtle'; payload: string }
+  | { type: 'trace'; payload: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
   | { type: 'input_request'; prompt: string }
   | { type: 'interrupt_sab'; sab: SharedArrayBuffer }
-
-interface PyFS {
-  writeFile: (path: string, data: string | Uint8Array) => void
-  mkdir: (path: string) => void
-  analyzePath: (path: string) => { exists: boolean }
-}
-
-interface PyodideInterface {
-  runPythonAsync: (code: string) => Promise<unknown>
-  loadPackage: (names: string | string[]) => Promise<void>
-  loadPackagesFromImports: (code: string) => Promise<void>
-  setInterruptBuffer: (buffer: Uint8Array) => void
-  globals: {
-    get: (key: string) => unknown
-    set: (key: string, value: unknown) => void
-  }
-  FS: PyFS
-}
-
-interface PyodideModule {
-  loadPyodide: (options: {
-    indexURL: string
-    stdout?: (text: string) => void
-    stderr?: (text: string) => void
-  }) => Promise<PyodideInterface>
-}
 
 const WORK_DIR = '/home/pyodide'
 
@@ -266,7 +243,7 @@ function writeFilesToFS(files: RunFile[], directories: string[]): void {
 self.onmessage = async (event: MessageEvent<RunPayload>) => {
   if (event.data.type !== 'run') return
 
-  const { code, files, directories } = event.data
+  const { code, files, directories, mode } = event.data
 
   try {
     await initPromise
@@ -277,6 +254,10 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
     }
 
     interruptBuffer[0] = 0 // 前回の停止シグナルをクリア
+    // 直前の実行（特に停止操作で中断されたステップ実行トレース）が sys.settrace を
+    // 残していないことを保証する。KeyboardInterrupt 注入は Worker を終了させないため、
+    // ここでの防御的な解除が無いと以降の通常実行が静かに数十倍遅くなる。
+    await pyodide.runPythonAsync('import sys as _sys; _sys.settrace(None); del _sys')
     await cleanupUserModules(files)
     writeFilesToFS(files, directories)
     await loadExternalPackages(code)
@@ -284,6 +265,18 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
     // turtle モジュールを毎回フレッシュ登録（描画状態をリセット）
     pyodide.globals.set('__turtle_src__', TURTLE_MODULE_SRC)
     await pyodide.runPythonAsync(REGISTER_TURTLE_CODE)
+
+    if (mode === 'trace') {
+      const traceJson = await runTrace(pyodide, code)
+      self.postMessage({ type: 'trace', payload: traceJson } satisfies OutMessage)
+      const { error } = JSON.parse(traceJson) as { error: string | null }
+      if (error) {
+        self.postMessage({ type: 'error', payload: error } satisfies OutMessage)
+      } else {
+        self.postMessage({ type: 'result', payload: null } satisfies OutMessage)
+      }
+      return
+    }
 
     const result = await pyodide.runPythonAsync(code)
 

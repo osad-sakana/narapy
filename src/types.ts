@@ -8,6 +8,7 @@ export type WorkerMessage =
   | { type: 'result'; payload: string | null }
   | { type: 'image'; payload: string; title: string }
   | { type: 'turtle'; payload: string }
+  | { type: 'trace'; payload: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
   | { type: 'input_request'; prompt: string }
   | { type: 'interrupt_sab'; sab: SharedArrayBuffer }
@@ -38,4 +39,7 @@ export interface RunPayload {
   code: string
   files: RunFile[]
   directories: string[]
+  // 省略時は 'normal'。'trace' は sys.settrace によるステップ実行トレース
+  // （src/pyodide/traceRun.ts）で、top-level await を含むコードは実行できない。
+  mode?: 'normal' | 'trace'
 }

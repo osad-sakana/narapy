@@ -22,10 +22,14 @@ export function findPreviousStepInScope(
 
 // グローバル変数はスコープに関わらず単一の名前空間なので、直近でグローバルの
 // スナップショットを持っていたステップ（globalsが記録されている最後のステップ）
-// と比較すればよい。
+// と比較すればよい。ただしモジュール直下（depth 0）のステップは locals がそのまま
+// globals と同一のため globals フィールドが null になる（traceModule.ts参照）。
+// そこまで遡った場合は locals をグローバルのスナップショットとして扱う
+// （これを省くと、関数に初めて入った瞬間に全グローバル変数が「新規」表示になる）。
 export function findPreviousGlobalsSnapshot(steps: TraceStep[], index: number): TraceVar[] | null {
   for (let i = index - 1; i >= 0; i--) {
     if (steps[i].globals) return steps[i].globals
+    if (steps[i].depth === 0) return steps[i].locals
   }
   return null
 }

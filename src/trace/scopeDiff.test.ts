@@ -54,8 +54,16 @@ describe('findPreviousGlobalsSnapshot', () => {
     expect(findPreviousGlobalsSnapshot(steps, 2)).toBe(g1)
   })
 
-  it('globalsを持つステップが無ければ null を返す', () => {
-    const steps = [step(0, '<module>'), step(0, '<module>')]
+  it('depth0（モジュール直下）のステップまで遡ったら、その locals をグローバルとして返す', () => {
+    // 関数に初めて入った瞬間はglobalsを持つステップが1件も無いため、
+    // モジュール直下の locals（＝globalsと同一）まで遡って比較する必要がある
+    const moduleLocals: TraceVar[] = [{ name: 'x', type: 'int', value: '1' }]
+    const steps = [step(0, '<module>', moduleLocals), step(1, 'add')]
+    expect(findPreviousGlobalsSnapshot(steps, 1)).toBe(moduleLocals)
+  })
+
+  it('depth0のステップも無ければ null を返す', () => {
+    const steps = [step(1, 'add')]
     expect(findPreviousGlobalsSnapshot(steps, 1)).toBeNull()
   })
 })

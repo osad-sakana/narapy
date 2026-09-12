@@ -18,19 +18,26 @@ type OutMessage =
 
 const WORK_DIR = '/home/pyodide'
 
-// 実行後に matplotlib の全フィギュアを PNG base64 の JSON 配列として返す
+// 実行後に matplotlib の全フィギュアを PNG base64 の JSON 配列として返す。
+// ループ変数等を関数内に閉じ込めることで __main__ に一時変数を残さない
+// （残すとステップ実行の変数一覧にトレーサ自身の内部状態が混入してしまう。
+// 関数名自体は "__" で始まり終わるため traceModule.ts の除外フィルタに含まれる）。
 const EXTRACT_FIGS_CODE = `
 import sys as _sys, json as _json
-_result = []
-if 'matplotlib.pyplot' in _sys.modules:
-    import matplotlib.pyplot as _plt, io as _io, base64 as _b64
-    for _n in _plt.get_fignums():
-        _buf = _io.BytesIO()
-        _plt.figure(_n).savefig(_buf, format='png', bbox_inches='tight', dpi=100)
-        _buf.seek(0)
-        _result.append({'num': _n, 'data': _b64.b64encode(_buf.read()).decode()})
-    _plt.close('all')
-_json.dumps(_result)
+
+def __narapy_extract_figs__():
+    result = []
+    if 'matplotlib.pyplot' in _sys.modules:
+        import matplotlib.pyplot as _plt, io as _io, base64 as _b64
+        for n in _plt.get_fignums():
+            buf = _io.BytesIO()
+            _plt.figure(n).savefig(buf, format='png', bbox_inches='tight', dpi=100)
+            buf.seek(0)
+            result.append({'num': n, 'data': _b64.b64encode(buf.read()).decode()})
+        _plt.close('all')
+    return result
+
+_json.dumps(__narapy_extract_figs__())
 `
 
 // 自作 turtle モジュールをフレッシュに sys.modules['turtle'] へ登録する。
@@ -45,13 +52,17 @@ del _m
 `
 
 // 実行後に turtle の描画コマンドを JSON で抽出する（turtle 未使用なら segments=[]）。
+// EXTRACT_FIGS_CODE と同じ理由で一時変数を関数内に閉じ込める。
 const EXTRACT_TURTLE_CODE = `
 import sys as _sys, json as _json
-_out = '{"segments": [], "turtle": {"x": 0, "y": 0, "heading": 0, "visible": False}}'
-_t = _sys.modules.get('turtle')
-if _t is not None and hasattr(_t, '_dump_commands'):
-    _out = _json.dumps(_t._dump_commands())
-_out
+
+def __narapy_extract_turtle__():
+    t = _sys.modules.get('turtle')
+    if t is not None and hasattr(t, '_dump_commands'):
+        return _json.dumps(t._dump_commands())
+    return '{"segments": [], "turtle": {"x": 0, "y": 0, "heading": 0, "visible": False}}'
+
+__narapy_extract_turtle__()
 `
 
 // Pyodide への KeyboardInterrupt 注入用バッファ
@@ -285,19 +296,25 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
       result = await pyodide.runPythonAsync(code)
     }
 
-    // matplotlib フィギュアを PNG として送信（トレースモードでも同様に扱い、
-    // close('all') を必ず実行しないと次回の通常実行時に古い図が残ってしまう）
+    // matplotlib フィギュアを抽出する。トレースモードでも close('all') を必ず
+    // 実行しないと次回の通常実行時に古い図が残ってしまうため抽出自体は常に行うが、
+    // モーダル表示（postMessage）は通常実行時のみ行う（ステップ実行中にパネルの上へ
+    // モーダルが被るのを防ぐ。図の確認は通常実行で行う想定）
     const figJson = await pyodide.runPythonAsync(EXTRACT_FIGS_CODE) as string
-    const figs = JSON.parse(figJson) as Array<{ num: number; data: string }>
-    for (const fig of figs) {
-      self.postMessage({ type: 'image', payload: fig.data, title: `Figure ${fig.num}` } satisfies OutMessage)
+    if (mode !== 'trace') {
+      const figs = JSON.parse(figJson) as Array<{ num: number; data: string }>
+      for (const fig of figs) {
+        self.postMessage({ type: 'image', payload: fig.data, title: `Figure ${fig.num}` } satisfies OutMessage)
+      }
     }
 
-    // turtle の描画コマンドを抽出し、線分があればメインスレッドへ送信
+    // turtle の描画コマンドを抽出し、線分があれば通常実行時のみメインスレッドへ送信
     const turtleJson = await pyodide.runPythonAsync(EXTRACT_TURTLE_CODE) as string
-    const turtleData = JSON.parse(turtleJson) as { segments: unknown[] }
-    if (turtleData.segments.length > 0) {
-      self.postMessage({ type: 'turtle', payload: turtleJson } satisfies OutMessage)
+    if (mode !== 'trace') {
+      const turtleData = JSON.parse(turtleJson) as { segments: unknown[] }
+      if (turtleData.segments.length > 0) {
+        self.postMessage({ type: 'turtle', payload: turtleJson } satisfies OutMessage)
+      }
     }
 
     if (mode === 'trace') {

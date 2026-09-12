@@ -19,13 +19,55 @@ import sys as _sys
 import json as _json
 import reprlib as _reprlib
 import traceback as _traceback
+import warnings as _warnings
+from itertools import islice as _islice
 
 _MAX_REPR = 120
 _MAX_ITEMS = 50
 
+
+class _NarapyRepr(_reprlib.Repr):
+    # reprlib.Repr.repr_dict / repr_set / repr_frozenset は islice で要素数を
+    # 絞る前に全要素を sorted() 相当で並べ替えるため、要素数に比例したコストが
+    # 毎ステップかかってしまう（巨大な dict/set でタブが固まる）。学習用途では
+    # 並び順を保証する必要が無いため、挿入順のまま打ち切る実装に上書きする。
+    def repr_dict(self, x, level):
+        n = len(x)
+        if n == 0:
+            return "{}"
+        if level <= 0:
+            return "{...}"
+        newlevel = level - 1
+        pieces = [
+            "%s: %s" % (self.repr1(k, newlevel), self.repr1(x[k], newlevel))
+            for k in _islice(x, self.maxdict)
+        ]
+        if n > self.maxdict:
+            pieces.append("...")
+        return "{%s}" % ", ".join(pieces)
+
+    def _repr_unordered(self, x, level, left, right, maxiter, empty):
+        n = len(x)
+        if n == 0:
+            return empty
+        if level <= 0:
+            return left + "..." + right
+        newlevel = level - 1
+        pieces = [self.repr1(v, newlevel) for v in _islice(x, maxiter)]
+        if n > maxiter:
+            pieces.append("...")
+        return left + ", ".join(pieces) + right
+
+    def repr_set(self, x, level):
+        return self._repr_unordered(x, level, "{", "}", self.maxset, "set()")
+
+    def repr_frozenset(self, x, level):
+        return self._repr_unordered(x, level, "frozenset({", "})", self.maxfrozenset, "frozenset()")
+
+
 # 巨大なコレクション（例: list(range(1000000))）でも要素数で打ち切って構築するため、
 # 素の repr() のように全長を作ってから切る（＝計算コストは上限なし）ことを避けられる。
-_repr_printer = _reprlib.Repr()
+_repr_printer = _NarapyRepr()
 _repr_printer.maxlevel = 2
 _repr_printer.maxtuple = 10
 _repr_printer.maxlist = 10
@@ -108,6 +150,10 @@ class _Recorder:
     def trace(self, frame, event, arg):
         try:
             return self._trace_inner(frame, event, arg)
+        except (KeyboardInterrupt, SystemExit):
+            # 停止操作(interrupt buffer)によるKeyboardInterruptはユーザーコード側へ
+            # 伝播させる必要がある。ここで握り潰すと停止操作が効かなくなる。
+            raise
         except BaseException:
             # トレース関数自体が例外を起こすとCPythonは黙ってトレースを解除する。
             # 警告なしに不完全な結果を返さないよう、打ち切りとして明示する。
@@ -163,7 +209,14 @@ def run_trace(source, filename, max_steps, max_depth, main_globals, known_names)
     error = None
     _sys.settrace(recorder.trace)
     try:
-        exec(code_obj, main_globals)
+        with _warnings.catch_warnings():
+            # CPython 3.12 の PEP 709（内包表記のインライン化）により、トレース関数が
+            # frame.f_locals に触れるだけでこの警告が出る（内包表記自体は正常なコード）。
+            # 3.13 の FrameLocalsProxy 導入で発生しなくなる想定の一時的な回避。
+            _warnings.filterwarnings(
+                "ignore", message="assigning None to unbound local", category=RuntimeWarning,
+            )
+            exec(code_obj, main_globals)
     except BaseException:
         error = _format_error(filename)
     finally:

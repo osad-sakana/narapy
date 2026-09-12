@@ -20,6 +20,7 @@ import json as _json
 import reprlib as _reprlib
 import traceback as _traceback
 import warnings as _warnings
+import collections.abc as _abc
 from itertools import islice as _islice
 
 _MAX_REPR = 120
@@ -66,21 +67,30 @@ class _NarapyRepr(_reprlib.Repr):
 
     # repr_dict/repr_set/repr_frozenset の上書きは type(x) が dict/set/frozenset
     # そのものの場合にしか効かない（reprlib は type(x).__name__ でディスパッチする
-    # ため）。Counter/OrderedDict/defaultdict のような「独自 __repr__ を持つ dict
-    # サブクラス」は repr_instance 経由で素の repr() が全長を構築してから切られ、
-    # 巨大なインスタンスで依然 O(n) のコストがかかる。要素数が閾値を超える場合のみ
-    # 迂回し、閾値以下（学習コードで典型的なサイズ）では独自 __repr__ をそのまま
-    # 使うことで、namedtuple 等の表示を壊さないようにする。
+    # ため）。Counter/OrderedDict/defaultdict/UserDict のような「独自 __repr__ を
+    # 持つ dict/set サブクラス」は repr_instance 経由で素の repr() が全長を構築
+    # してから切られ、巨大なインスタンスで依然 O(n) のコストがかかる
+    # （例: キー数は少ないが値が巨大な defaultdict、dict.keys()/.values() 等の
+    # ビューオブジェクトも dict/set のサブクラスではないため同様に漏れる）。
+    # ABC（Mapping/MappingView/Set）で判定することでこれらを網羅的に捕まえ、
+    # 打ち切り処理へ迂回する。namedtuple は list/tuple 判定から除外し表示を保つ。
     def repr_instance(self, x, level):
         try:
-            if isinstance(x, dict) and len(x) > self.maxdict:
+            if isinstance(x, _abc.Mapping):
                 return "%s(%s)" % (type(x).__name__, self.repr_dict(x, level))
-            if isinstance(x, (set, frozenset)) and len(x) > self.maxset:
+            if isinstance(x, _abc.MappingView):
+                return "%s(%s)" % (
+                    type(x).__name__,
+                    self._repr_unordered(x, level, "[", "]", self.maxset, "[]"),
+                )
+            if isinstance(x, _abc.Set):
                 return "%s(%s)" % (
                     type(x).__name__,
                     self._repr_unordered(x, level, "{", "}", self.maxset, "{}"),
                 )
-            if isinstance(x, (list, tuple)) and len(x) > self.maxlist:
+            if isinstance(x, (bytes, bytearray)) and len(x) > self.maxstring:
+                return _reprlib.Repr.repr_instance(self, x[: self.maxstring], level)
+            if isinstance(x, (list, tuple)) and len(x) > self.maxlist and not hasattr(x, "_fields"):
                 return "%s(%s)" % (
                     type(x).__name__,
                     self._repr_unordered(x, level, "[", "]", self.maxlist, "[]"),

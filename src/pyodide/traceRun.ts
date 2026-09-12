@@ -19,32 +19,43 @@ const MAX_DEPTH = 20
 // トレーサ本体を _narapy_trace という独立モジュールとして sys.modules に登録する。
 // __main__ の名前空間を汚さないことで、input() 用に差し込んだ customInput など
 // 既存のグローバル状態と衝突しない（turtle モジュールの毎回フレッシュ登録と同じパターン）。
+// import・一時変数を関数内に閉じ込め、__main__ に "_sys"/"_types" 等が残って
+// 同名のユーザー変数を上書きしないようにする（pyodide.worker.ts のEXTRACT系と同じ理由）。
 const REGISTER_TRACE_CODE = `
-import sys as _sys, types as _types
-_m = _types.ModuleType('_narapy_trace')
-exec(__trace_module_src__, _m.__dict__)
-_sys.modules['_narapy_trace'] = _m
-del _m, _types
+def __narapy_register_trace__():
+    import sys as _sys, types as _types
+    m = _types.ModuleType('_narapy_trace')
+    exec(__trace_module_src__, m.__dict__)
+    _sys.modules['_narapy_trace'] = m
+
+__narapy_register_trace__()
 `
 
+// globals() を __main__ コンテキストで実行されるこの関数内で呼ぶことで、
+// run_trace に __main__ の実際の名前空間（customInput が差し込まれた input を含む）
+// を渡す。_narapy_trace モジュール内で globals() を呼ぶと _narapy_trace 自身の
+// 名前空間が返ってしまうため、呼び出し側（__main__ で定義された関数）で取得する
+// 必要がある（関数内で呼んでも globals() はその関数が定義されたモジュール、
+// つまり __main__ を指すため問題ない）。
 const RUN_TRACE_CODE = `
-import sys as _sys
-_sys.modules['_narapy_trace'].run_trace(
-    __trace_src__, ${JSON.stringify(TRACE_FILENAME)},
-    ${MAX_STEPS}, ${MAX_DEPTH}, globals(), __known_names__,
-)
+def __narapy_run_trace__():
+    import sys as _sys
+    return _sys.modules['_narapy_trace'].run_trace(
+        __trace_src__, ${JSON.stringify(TRACE_FILENAME)},
+        ${MAX_STEPS}, ${MAX_DEPTH}, globals(), __known_names__,
+    )
+
+__narapy_run_trace__()
 `
 
-// globals() をこの文字列の中で呼ぶことで、run_trace に __main__ の実際の名前空間
-// （customInput が差し込まれた input を含む）を渡す。_narapy_trace モジュール内で
-// globals() を呼ぶと _narapy_trace 自身の名前空間が返ってしまうため、
-// 呼び出し側（__main__ コンテキストで実行されるこの文字列）で取得する必要がある。
 const CLEANUP_CODE = `
-import sys as _sys
-_sys.settrace(None)
-for _n in ('__trace_module_src__', '__trace_src__', '__known_names__'):
-    globals().pop(_n, None)
-del _n
+def __narapy_cleanup_trace__():
+    import sys as _sys
+    _sys.settrace(None)
+    for n in ('__trace_module_src__', '__trace_src__', '__known_names__'):
+        globals().pop(n, None)
+
+__narapy_cleanup_trace__()
 `
 
 export async function runTrace(

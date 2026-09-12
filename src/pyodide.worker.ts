@@ -44,12 +44,16 @@ __narapy_extract_figs__()
 // 自作 turtle モジュールをフレッシュに sys.modules['turtle'] へ登録する。
 // 毎回 exec し直すことで run 間の描画状態リセットを保証し、
 // sys.modules へ直接注入することで Pyodide stdlib の turtle.py より確実に優先させる。
+// import・一時変数を関数内に閉じ込め、__main__ に "_sys"/"_types" 等が残って
+// 同名のユーザー変数を上書きしないようにする（EXTRACT_FIGS_CODEと同じ理由）。
 const REGISTER_TURTLE_CODE = `
-import sys as _sys, types as _types
-_m = _types.ModuleType('turtle')
-exec(__turtle_src__, _m.__dict__)
-_sys.modules['turtle'] = _m
-del _m
+def __narapy_register_turtle__():
+    import sys as _sys, types as _types
+    m = _types.ModuleType('turtle')
+    exec(__turtle_src__, m.__dict__)
+    _sys.modules['turtle'] = m
+
+__narapy_register_turtle__()
 `
 
 // 実行後に turtle の描画コマンドを JSON で抽出する（turtle 未使用なら segments=[]）。

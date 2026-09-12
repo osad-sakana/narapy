@@ -121,8 +121,17 @@ JSON に記録し、メインスレッド側でスクラブ再生する record-t
   参照検出（`Py_ReprEnter`）が効かず、素の `repr()` に落ちるとWASM上でJSスタックが尽きる）。
   既知のトレードオフ: このため `defaultdict` は `default_factory` の表示（`<class 'int'>`等）を
   失い、`Counter` の変数パネル表示順は挿入順（`print()` の most_common 順とは異なる）。
-- MVP では関数呼び出しスタックの可視化・実行中の turtle 段階描画・出力のステップ同期
-  （print 出力とステップ位置の対応付け）は対象外。既存の実行ログにそのまま出力される。
+- 標準出力（print）はステップの進行に同期させている。トレース対象コードの実行中は
+  `contextlib.redirect_stdout()` で `sys.stdout` を `_Recorder` 内の `io.StringIO` へ差し替え、
+  既存の pyodide stdout コールバック（実行ログへのライブ配信）を経由させない。各ステップを
+  記録するたびにバッファの差分を `TraceStep.stdout` として持たせ、UI 側
+  （`trace/session.ts` の `cumulativeStdout()`）は先頭から現在のステップまでの `stdout` を
+  連結して「ここまでの出力」として表示する。ステップ上限による打ち切り後に全速実行された
+  分の出力はどのステップにも紐付かないため、`TraceResult.trailingStdout` として別枠で持ち、
+  最終ステップに到達したときだけ末尾へ付け足す。通常実行（`mode !== 'trace'`）は redirect_stdout
+  の対象外で、従来どおり実行ログへライブ配信される。
+- MVP では関数呼び出しスタックの可視化・実行中の turtle 段階描画は対象外
+  （turtle/matplotlib の描画結果は通常実行と同様、完了後にモーダルで表示される）。
 
 ### ビルドターゲット（`esnext`）
 

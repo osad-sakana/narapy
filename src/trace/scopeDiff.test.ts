@@ -8,7 +8,7 @@ function step(
   locals: TraceVar[] = [],
   globals: TraceVar[] | null = null,
 ): TraceStep {
-  return { line: 1, event: 'line', funcName, depth, locals, globals }
+  return { line: 1, event: 'line', funcName, depth, locals, globals, stdout: '' }
 }
 
 describe('findPreviousStepInScope', () => {

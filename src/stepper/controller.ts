@@ -2,7 +2,7 @@ import type { EditorInstance } from '../editor/index'
 import { parseTraceResult } from '../trace/parse'
 import {
   createSession, currentStep, canGoNext, canGoPrev,
-  next, prev, first, last, seekTo, play, pause, setSpeed, speedDelayMs, tick,
+  next, prev, first, last, seekTo, play, pause, setSpeed, speedDelayMs, tick, cumulativeStdout,
   type SessionState,
 } from '../trace/session'
 import { diffVars, type VarWithChange } from '../trace/varDiff'
@@ -25,6 +25,9 @@ export function createStepperController(editor: EditorInstance): StepperControll
   let session: SessionState | null = null
   let truncated = false
   let hasError = false
+  // ステップ上限による打ち切り後、全速実行中に書き込まれた標準出力（どのステップにも
+  // 紐付かない）。最終ステップに到達したときだけ「ここまでの出力」の末尾へ付け足す。
+  let trailingStdout = ''
   let timer: ReturnType<typeof setTimeout> | null = null
 
   function stopTimer(): void {
@@ -61,6 +64,8 @@ export function createStepperController(editor: EditorInstance): StepperControll
     if (!step) return
 
     const { vars, globalsVars } = buildVars(step)
+    const isLastStep = !canGoNext(session)
+    const stdout = cumulativeStdout(session) + (isLastStep ? trailingStdout : '')
 
     ui.render({
       index: session.index,
@@ -71,6 +76,7 @@ export function createStepperController(editor: EditorInstance): StepperControll
       line: step.line,
       vars,
       globalsVars,
+      stdout,
       truncated,
       hasError,
       canPrev: canGoPrev(session),
@@ -108,6 +114,7 @@ export function createStepperController(editor: EditorInstance): StepperControll
     session = createSession(parsed.result.steps)
     truncated = parsed.result.truncated
     hasError = parsed.result.error !== null
+    trailingStdout = parsed.result.trailingStdout
     ui.show()
     render()
   }
@@ -117,6 +124,7 @@ export function createStepperController(editor: EditorInstance): StepperControll
     session = null
     truncated = false
     hasError = false
+    trailingStdout = ''
     ui.hide()
     decorations.clear()
   }

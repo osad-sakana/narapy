@@ -23,6 +23,7 @@ function isTraceStep(value: unknown): value is TraceStep {
   if (typeof v.depth !== 'number') return false
   if (!isTraceVarArray(v.locals)) return false
   if (v.globals !== null && !isTraceVarArray(v.globals)) return false
+  if (typeof v.stdout !== 'string') return false
   return true
 }
 
@@ -51,6 +52,9 @@ export function parseTraceResult(json: string): ParseTraceResult {
   if (r.error !== null && typeof r.error !== 'string') {
     return { ok: false, error: 'トレース結果のerrorフィールドが不正です' }
   }
+  if (typeof r.trailingStdout !== 'string') {
+    return { ok: false, error: 'トレース結果のtrailingStdoutフィールドが不正です' }
+  }
 
   return {
     ok: true,
@@ -58,6 +62,7 @@ export function parseTraceResult(json: string): ParseTraceResult {
       steps: r.steps as TraceStep[],
       truncated: r.truncated,
       error: (r.error as string | null) ?? null,
+      trailingStdout: r.trailingStdout,
     },
   }
 }

@@ -18,6 +18,8 @@ export interface RenderState {
   line: number
   vars: VarWithChange[]
   globalsVars: VarWithChange[] | null
+  // 先頭から現在のステップまでの標準出力（print()等）。ステップの進行に同期して増える。
+  stdout: string
   truncated: boolean
   hasError: boolean
   canPrev: boolean
@@ -125,6 +127,7 @@ interface BodyRefs {
   varsContainer: HTMLElement
   globalsDetails: HTMLDetailsElement
   globalsContainer: HTMLElement
+  stdoutContainer: HTMLElement
 }
 
 function buildVarsSection(): { heading: HTMLElement; container: HTMLElement } {
@@ -132,6 +135,15 @@ function buildVarsSection(): { heading: HTMLElement; container: HTMLElement } {
   heading.className = 'text-[11px] font-bold text-muted uppercase tracking-[0.08em]'
   heading.textContent = '変数'
   const container = document.createElement('div')
+  return { heading, container }
+}
+
+function buildStdoutSection(): { heading: HTMLElement; container: HTMLElement } {
+  const heading = document.createElement('div')
+  heading.className = 'text-[11px] font-bold text-muted uppercase tracking-[0.08em]'
+  heading.textContent = 'ここまでの出力'
+  const container = document.createElement('pre')
+  container.className = 'text-xs font-mono text-code bg-editor rounded-md p-2 whitespace-pre-wrap break-all max-h-40 overflow-y-auto'
   return { heading, container }
 }
 
@@ -169,6 +181,7 @@ function buildBody(dispatch: (action: StepperAction) => void): BodyRefs {
 
   const { heading: varsHeading, container: varsContainer } = buildVarsSection()
   const { details: globalsDetails, container: globalsContainer } = buildGlobalsSection()
+  const { heading: stdoutHeading, container: stdoutContainer } = buildStdoutSection()
 
   const root = document.createElement('div')
   root.className = 'flex-1 overflow-y-auto p-3 flex flex-col gap-3 text-sm'
@@ -176,11 +189,13 @@ function buildBody(dispatch: (action: StepperAction) => void): BodyRefs {
     positionRow, controls.root, slider, speedRow.root,
     truncatedBanner, errorBanner, frameLabel,
     varsHeading, varsContainer, globalsDetails,
+    stdoutHeading, stdoutContainer,
   )
 
   return {
     root, controls, speedRow, slider, positionRow,
     truncatedBanner, errorBanner, frameLabel, varsContainer, globalsDetails, globalsContainer,
+    stdoutContainer,
   }
 }
 
@@ -207,7 +222,10 @@ export function createStepperUI(): StepperUI {
   }
 
   function render(state: RenderState): void {
-    const { controls, speedRow, slider, positionRow, truncatedBanner, errorBanner, frameLabel, varsContainer, globalsDetails, globalsContainer } = body
+    const {
+      controls, speedRow, slider, positionRow, truncatedBanner, errorBanner, frameLabel,
+      varsContainer, globalsDetails, globalsContainer, stdoutContainer,
+    } = body
 
     positionRow.textContent = `${state.index + 1} / ${state.total} ステップ`
     slider.max = String(Math.max(0, state.total - 1))
@@ -237,6 +255,10 @@ export function createStepperUI(): StepperUI {
     } else {
       globalsDetails.classList.add('hidden')
     }
+
+    stdoutContainer.textContent = state.stdout || 'まだ出力はありません'
+    stdoutContainer.classList.toggle('text-muted', !state.stdout)
+    stdoutContainer.classList.toggle('italic', !state.stdout)
   }
 
   return {

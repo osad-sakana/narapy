@@ -73,3 +73,13 @@ export function tick(state: SessionState): SessionState {
   if (!canGoNext(state)) return { ...state, playing: false }
   return next(state)
 }
+
+// 先頭から現在のステップまでの標準出力を連結する。出力をステップの進行に
+// 同期させるため、まだ到達していないステップの出力は含めない。
+export function cumulativeStdout(state: SessionState): string {
+  let text = ''
+  for (let i = 0; i <= state.index && i < state.steps.length; i++) {
+    text += state.steps[i].stdout
+  }
+  return text
+}

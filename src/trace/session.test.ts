@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   createSession, currentStep, canGoNext, canGoPrev,
-  next, prev, first, last, seekTo, play, pause, setSpeed, speedDelayMs, tick,
+  next, prev, first, last, seekTo, play, pause, setSpeed, speedDelayMs, tick, cumulativeStdout,
 } from './session'
 import type { TraceStep } from './types'
 
-function makeStep(line: number): TraceStep {
-  return { line, event: 'line', funcName: '<module>', depth: 0, locals: [], globals: null }
+function makeStep(line: number, stdout = ''): TraceStep {
+  return { line, event: 'line', funcName: '<module>', depth: 0, locals: [], globals: null, stdout }
 }
 
 const STEPS = [makeStep(1), makeStep(2), makeStep(3)]
@@ -93,5 +93,19 @@ describe('session', () => {
     const slow = setSpeed(state, 1)
     const fast = setSpeed(state, 3)
     expect(speedDelayMs(slow)).toBeGreaterThan(speedDelayMs(fast))
+  })
+
+  describe('cumulativeStdout', () => {
+    it('先頭から現在のステップまでの出力を連結する', () => {
+      const steps = [makeStep(1, 'a\n'), makeStep(2, ''), makeStep(3, 'b\n')]
+      const state = createSession(steps)
+      expect(cumulativeStdout(state)).toBe('a\n')
+      expect(cumulativeStdout(seekTo(state, 1))).toBe('a\n')
+      expect(cumulativeStdout(seekTo(state, 2))).toBe('a\nb\n')
+    })
+
+    it('steps が空の場合は空文字列を返す', () => {
+      expect(cumulativeStdout(createSession([]))).toBe('')
+    })
   })
 })

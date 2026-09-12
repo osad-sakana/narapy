@@ -16,15 +16,19 @@
 // 既存のグローバル状態はそのまま見える。
 export const TRACE_MODULE_SRC = String.raw`
 import sys as _sys
+import io as _io
 import json as _json
 import reprlib as _reprlib
 import traceback as _traceback
 import warnings as _warnings
 import collections.abc as _abc
+import contextlib as _contextlib
 from itertools import islice as _islice
 
 _MAX_REPR = 120
 _MAX_ITEMS = 50
+# 1ステップあたりに記録する標準出力の上限（巨大なprint()でJSONが肥大化しないため）
+_MAX_STDOUT_CHUNK = 2000
 
 
 class _NarapyRepr(_reprlib.Repr):
@@ -147,7 +151,7 @@ class _Recorder:
     # self.depth は exec() が生成するモジュール直下のフレームを1として数える
     # （settrace は exec() 自身のフレームから'call'イベントを発行するため）。
     # 出力する depth はユーザーから見た自然な値にするため 1 引いて 0 起点にする。
-    def __init__(self, target_file, max_steps, max_depth, known_names):
+    def __init__(self, target_file, max_steps, max_depth, known_names, stdout_buffer):
         self.target_file = target_file
         self.max_steps = max_steps
         self.max_depth = max_depth
@@ -155,6 +159,20 @@ class _Recorder:
         self.depth = 0
         self.steps = []
         self.truncated = False
+        # トレース対象コードの実行中、sys.stdout はこのバッファへ redirect_stdout()
+        # される（run_trace参照）。ステップを記録するたびに「前回の記録からこの時点
+        # までに書き込まれた分」を差分として取り出し、そのステップに紐付ける。
+        # これにより変数の可視化だけでなく標準出力もステップの進行に同期させられる。
+        self.stdout_buffer = stdout_buffer
+        self.stdout_pos = 0
+
+    def _consume_stdout(self):
+        text = self.stdout_buffer.getvalue()
+        delta = text[self.stdout_pos:]
+        self.stdout_pos = len(text)
+        if len(delta) > _MAX_STDOUT_CHUNK:
+            delta = delta[:_MAX_STDOUT_CHUNK] + "...(以下省略)"
+        return delta
 
     def _record(self, frame, event):
         try:
@@ -172,6 +190,7 @@ class _Recorder:
             "depth": self.depth - 1,
             "locals": _snapshot(locs, exclude, hide_callables=at_module_level),
             "globals": None,
+            "stdout": self._consume_stdout(),
         }
         # モジュール直下では locals がそのまま globals と同一なので別枠は不要
         if not at_module_level:
@@ -236,17 +255,18 @@ def run_trace(source, filename, max_steps, max_depth, main_globals, known_names)
     # 直前の実行が settrace を残していないことを保証する（防御的）
     _sys.settrace(None)
     known_names = frozenset(known_names)
-    recorder = _Recorder(filename, max_steps, max_depth, known_names)
+    stdout_buffer = _io.StringIO()
+    recorder = _Recorder(filename, max_steps, max_depth, known_names, stdout_buffer)
 
     try:
         code_obj = compile(source, filename, "exec")
     except SyntaxError:
-        return _json.dumps({"steps": [], "truncated": False, "error": _format_error(filename)})
+        return _json.dumps({"steps": [], "truncated": False, "error": _format_error(filename), "trailingStdout": ""})
 
     error = None
     _sys.settrace(recorder.trace)
     try:
-        with _warnings.catch_warnings():
+        with _warnings.catch_warnings(), _contextlib.redirect_stdout(stdout_buffer):
             # CPython 3.12 の PEP 709（内包表記のインライン化）により、トレース関数が
             # frame.f_locals に触れるだけでこの警告が出る（内包表記自体は正常なコード）。
             # 3.13 の FrameLocalsProxy 導入で発生しなくなる想定の一時的な回避。
@@ -268,9 +288,16 @@ def run_trace(source, filename, max_steps, max_depth, main_globals, known_names)
     finally:
         _sys.settrace(None)
 
+    # ステップ上限による打ち切り後は全速で実行を継続するため、それ以降に書き込まれた
+    # 標準出力はどのステップにも紐付けられない。ここでまとめて回収し、最後のステップの
+    # 後に「打ち切り後の出力」として表示できるようにする（redirect_stdout済みなので
+    # ここで取得しないと出力が失われてしまう）。
+    trailing_stdout = recorder._consume_stdout()
+
     return _json.dumps({
         "steps": recorder.steps,
         "truncated": recorder.truncated,
         "error": error,
+        "trailingStdout": trailing_stdout,
     })
 `

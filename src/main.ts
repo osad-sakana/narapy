@@ -168,7 +168,12 @@ const runner = initRunner(editor, () => {
 }, (json) => stepperController.onTraceResult(json))
 
 const stepRunBtn = document.getElementById('stepRunBtn') as HTMLButtonElement
-stepRunBtn.addEventListener('click', () => runner.runTraceMode())
+stepRunBtn.addEventListener('click', () => {
+  // 前回のトレース結果を残したまま新しい実行を待つと、パッケージ読み込み失敗などで
+  // trace メッセージが一度も届かないケースで古い変数一覧・行ハイライトが残り続ける
+  stepperController.invalidate()
+  runner.runTraceMode()
+})
 
 const outputLog = document.getElementById('outputLog') as HTMLElement
 const fontControls = initFontSizeControls(

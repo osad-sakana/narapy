@@ -112,7 +112,15 @@ JSON に記録し、メインスレッド側でスクラブ再生する record-t
   `repr_dict`/`repr_set`/`repr_frozenset` も `islice` の前に全要素を並べ替えるため実質 O(n) の
   ままで、`Counter`/`OrderedDict`/`defaultdict` 等の dict/set サブクラスは `repr_instance` 経由で
   同じ問題を起こす。`_NarapyRepr` はこれらを `itertools.islice` で直接打ち切ることで回避している
-  ため、このクラスの実装を素の `reprlib.Repr` に戻さないこと。
+  ため、このクラスの実装を素の `reprlib.Repr` に戻さないこと。`repr_instance` の判定は
+  `collections.abc.Mapping`/`MappingView`/`Set` を使い、`isinstance(x, dict)` のような厳密な型
+  判定や「要素数が閾値を超える場合のみ迂回」というサイズガードを**復活させないこと**
+  （dict.keys()等のビュー・UserDict・キー数少値巨大なdefaultdictを再び取りこぼす上、
+  自己参照するCounter（`v=Counter(); v['self']=v`）でPyodideランタイムごと即死する
+  再現可能なバグも再発する。`Counter.__repr__` は毎回新しい dict を作るため CPython の循環
+  参照検出（`Py_ReprEnter`）が効かず、素の `repr()` に落ちるとWASM上でJSスタックが尽きる）。
+  既知のトレードオフ: このため `defaultdict` は `default_factory` の表示（`<class 'int'>`等）を
+  失い、`Counter` の変数パネル表示順は挿入順（`print()` の most_common 順とは異なる）。
 - MVP では関数呼び出しスタックの可視化・実行中の turtle 段階描画・出力のステップ同期
   （print 出力とステップ位置の対応付け）は対象外。既存の実行ログにそのまま出力される。
 

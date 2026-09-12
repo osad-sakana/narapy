@@ -32,9 +32,13 @@ export function initRunner(
   editor: EditorInstance,
   getRunFiles: () => { files: RunFile[]; directories: string[] },
   onTrace?: (json: string) => void,
+  // 通常実行・ステップ実行のどちらを開始する場合でも、古いステップ実行結果
+  // （行ハイライト・変数一覧）を残さないよう呼び出す（stepper/controller.ts の invalidate）
+  onRunStart?: () => void,
 ): RunnerHandle {
   const runBtn     = document.getElementById('runBtn')     as HTMLButtonElement
   const copyLogBtn = document.getElementById('copyLogBtn') as HTMLButtonElement
+  const stepRunBtn = document.getElementById('stepRunBtn') as HTMLButtonElement | null
 
   let worker  = createWorker()
   let running = false
@@ -79,6 +83,9 @@ export function initRunner(
       runBtn.textContent = '▶ 実行'
       clearExecutionTimeout()
     }
+    // 実行中はステップ実行の開始を割り込ませない（通常実行中にトレースを重ねて
+    // 走らせると Worker への postMessage が競合するため）
+    if (stepRunBtn) stepRunBtn.disabled = state
     setRunStatus(state ? 'running' : outcome)
   }
 
@@ -220,12 +227,13 @@ export function initRunner(
 
   attachWorkerHandlers()
 
-  function startRun(mode?: 'trace'): void {
+  function startRun(mode: 'normal' | 'trace' = 'normal'): void {
     if (running) return
 
     const code = getValue(editor).trim()
     if (!code) return
 
+    onRunStart?.()
     setRunning(true)
     clearLog()
     appendLog('--- 実行開始 ---', 'info')

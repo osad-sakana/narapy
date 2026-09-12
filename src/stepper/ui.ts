@@ -76,7 +76,7 @@ function buildControls(dispatch: (action: StepperAction) => void): ControlRefs {
   const firstBtn = controlButton('⏮', '最初のステップへ', () => dispatch({ type: 'first' }))
   const prevBtn = controlButton('◀', '前のステップへ', () => dispatch({ type: 'prev' }))
   const playBtn = controlButton('▶', '自動再生', () => dispatch({ type: 'togglePlay' }))
-  const nextBtn = controlButton('▶', '次のステップへ', () => dispatch({ type: 'next' }))
+  const nextBtn = controlButton('→', '次のステップへ', () => dispatch({ type: 'next' }))
   const lastBtn = controlButton('⏭', '最後のステップへ', () => dispatch({ type: 'last' }))
 
   root.append(firstBtn, prevBtn, playBtn, nextBtn, lastBtn)
@@ -113,14 +113,41 @@ function buildBanner(className: string, text: string): HTMLElement {
   return banner
 }
 
-export function createStepperUI(): StepperUI {
-  const panel = document.getElementById('stepPanel') as HTMLElement
-  let actionHandler: ((action: StepperAction) => void) | null = null
-  const dispatch = (action: StepperAction): void => actionHandler?.(action)
+interface BodyRefs {
+  root: HTMLElement
+  controls: ControlRefs
+  speedRow: { root: HTMLElement; buttons: Map<StepSpeed, HTMLButtonElement> }
+  slider: HTMLInputElement
+  positionRow: HTMLElement
+  truncatedBanner: HTMLElement
+  errorBanner: HTMLElement
+  frameLabel: HTMLElement
+  varsContainer: HTMLElement
+  globalsDetails: HTMLDetailsElement
+  globalsContainer: HTMLElement
+}
 
-  panel.replaceChildren()
+function buildVarsSection(): { heading: HTMLElement; container: HTMLElement } {
+  const heading = document.createElement('div')
+  heading.className = 'text-[11px] font-bold text-muted uppercase tracking-[0.08em]'
+  heading.textContent = '変数'
+  const container = document.createElement('div')
+  return { heading, container }
+}
 
-  const header = buildHeader(() => dispatch({ type: 'close' }))
+function buildGlobalsSection(): { details: HTMLDetailsElement; container: HTMLElement } {
+  const details = document.createElement('details')
+  details.className = 'hidden text-xs'
+  const summary = document.createElement('summary')
+  summary.className = 'text-[11px] font-bold text-muted uppercase tracking-[0.08em] cursor-pointer'
+  summary.textContent = 'グローバル変数'
+  const container = document.createElement('div')
+  container.className = 'mt-1.5'
+  details.append(summary, container)
+  return { details, container }
+}
+
+function buildBody(dispatch: (action: StepperAction) => void): BodyRefs {
   const controls = buildControls(dispatch)
   const speedRow = buildSpeedRow(dispatch)
 
@@ -128,6 +155,7 @@ export function createStepperUI(): StepperUI {
   slider.type = 'range'
   slider.className = 'w-full cursor-pointer'
   slider.min = '0'
+  slider.setAttribute('aria-label', 'ステップ位置')
   slider.addEventListener('input', () => dispatch({ type: 'seek', index: Number(slider.value) }))
 
   const positionRow = document.createElement('div')
@@ -139,29 +167,34 @@ export function createStepperUI(): StepperUI {
   const frameLabel = document.createElement('div')
   frameLabel.className = 'text-xs text-muted font-mono'
 
-  const varsHeading = document.createElement('div')
-  varsHeading.className = 'text-[11px] font-bold text-muted uppercase tracking-[0.08em]'
-  varsHeading.textContent = '変数'
-  const varsContainer = document.createElement('div')
+  const { heading: varsHeading, container: varsContainer } = buildVarsSection()
+  const { details: globalsDetails, container: globalsContainer } = buildGlobalsSection()
 
-  const globalsDetails = document.createElement('details')
-  globalsDetails.className = 'hidden text-xs'
-  const globalsSummary = document.createElement('summary')
-  globalsSummary.className = 'text-[11px] font-bold text-muted uppercase tracking-[0.08em] cursor-pointer'
-  globalsSummary.textContent = 'グローバル変数'
-  const globalsContainer = document.createElement('div')
-  globalsContainer.className = 'mt-1.5'
-  globalsDetails.append(globalsSummary, globalsContainer)
-
-  const body = document.createElement('div')
-  body.className = 'flex-1 overflow-y-auto p-3 flex flex-col gap-3 text-sm'
-  body.append(
+  const root = document.createElement('div')
+  root.className = 'flex-1 overflow-y-auto p-3 flex flex-col gap-3 text-sm'
+  root.append(
     positionRow, controls.root, slider, speedRow.root,
     truncatedBanner, errorBanner, frameLabel,
     varsHeading, varsContainer, globalsDetails,
   )
 
-  panel.append(header, body)
+  return {
+    root, controls, speedRow, slider, positionRow,
+    truncatedBanner, errorBanner, frameLabel, varsContainer, globalsDetails, globalsContainer,
+  }
+}
+
+export function createStepperUI(): StepperUI {
+  const panel = document.getElementById('stepPanel') as HTMLElement
+  let actionHandler: ((action: StepperAction) => void) | null = null
+  const dispatch = (action: StepperAction): void => actionHandler?.(action)
+
+  panel.replaceChildren()
+
+  const header = buildHeader(() => dispatch({ type: 'close' }))
+  const body = buildBody(dispatch)
+
+  panel.append(header, body.root)
 
   function show(): void {
     panel.classList.remove('hidden')
@@ -174,6 +207,8 @@ export function createStepperUI(): StepperUI {
   }
 
   function render(state: RenderState): void {
+    const { controls, speedRow, slider, positionRow, truncatedBanner, errorBanner, frameLabel, varsContainer, globalsDetails, globalsContainer } = body
+
     positionRow.textContent = `${state.index + 1} / ${state.total} ステップ`
     slider.max = String(Math.max(0, state.total - 1))
     slider.value = String(state.index)

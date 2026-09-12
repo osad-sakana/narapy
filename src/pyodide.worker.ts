@@ -86,6 +86,11 @@ function customInput(prompt: unknown): string {
 
 let pyodide: PyodideInterface | null = null
 let isReady = false
+// Pyodide初期化直後（ユーザーコードを一度も実行する前）の __main__ グローバル名一覧。
+// トレース時にこの名前を「フレームワークが注入した名前」として除外する。実行時点の
+// globals().keys() を使うと、直前の通常実行で定義したユーザー変数まで消えてしまうため、
+// 初期化直後のこの時点でのみ記録する。
+let pristineGlobalNames: string[] = []
 
 async function initPyodide(): Promise<void> {
   // module worker では importScripts() が禁止のため dynamic import() を使用
@@ -112,6 +117,10 @@ async function initPyodide(): Promise<void> {
 
   // builtins.input を上書きして prompt 引数を直接受け取る
   pyodide.globals.set('input', customInput)
+
+  // ユーザーコード実行前の時点でグローバル名一覧を記録する（トレース用）
+  const namesJson = await pyodide.runPythonAsync('import json as _json; _json.dumps(list(globals().keys()))') as string
+  pristineGlobalNames = JSON.parse(namesJson) as string[]
 
   // 停止シグナル用バッファを登録し、メインスレッドへ共有
   pyodide.setInterruptBuffer(interruptBuffer)
@@ -266,21 +275,18 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
     pyodide.globals.set('__turtle_src__', TURTLE_MODULE_SRC)
     await pyodide.runPythonAsync(REGISTER_TURTLE_CODE)
 
+    let traceError: string | null = null
+    let result: unknown = null
     if (mode === 'trace') {
-      const traceJson = await runTrace(pyodide, code)
+      const traceJson = await runTrace(pyodide, code, pristineGlobalNames)
       self.postMessage({ type: 'trace', payload: traceJson } satisfies OutMessage)
-      const { error } = JSON.parse(traceJson) as { error: string | null }
-      if (error) {
-        self.postMessage({ type: 'error', payload: error } satisfies OutMessage)
-      } else {
-        self.postMessage({ type: 'result', payload: null } satisfies OutMessage)
-      }
-      return
+      traceError = (JSON.parse(traceJson) as { error: string | null }).error
+    } else {
+      result = await pyodide.runPythonAsync(code)
     }
 
-    const result = await pyodide.runPythonAsync(code)
-
-    // matplotlib フィギュアを PNG として送信
+    // matplotlib フィギュアを PNG として送信（トレースモードでも同様に扱い、
+    // close('all') を必ず実行しないと次回の通常実行時に古い図が残ってしまう）
     const figJson = await pyodide.runPythonAsync(EXTRACT_FIGS_CODE) as string
     const figs = JSON.parse(figJson) as Array<{ num: number; data: string }>
     for (const fig of figs) {
@@ -292,6 +298,15 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
     const turtleData = JSON.parse(turtleJson) as { segments: unknown[] }
     if (turtleData.segments.length > 0) {
       self.postMessage({ type: 'turtle', payload: turtleJson } satisfies OutMessage)
+    }
+
+    if (mode === 'trace') {
+      if (traceError) {
+        self.postMessage({ type: 'error', payload: traceError } satisfies OutMessage)
+      } else {
+        self.postMessage({ type: 'result', payload: null } satisfies OutMessage)
+      }
+      return
     }
 
     // 最後の式が None の場合は REPL 同様にエコーしない（payload: null で表示を抑制）

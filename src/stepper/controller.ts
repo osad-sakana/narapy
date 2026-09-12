@@ -6,6 +6,7 @@ import {
   type SessionState,
 } from '../trace/session'
 import { diffVars, type VarWithChange } from '../trace/varDiff'
+import { findPreviousStepInScope, findPreviousGlobalsSnapshot } from '../trace/scopeDiff'
 import type { TraceStep } from '../trace/types'
 import { createStepDecorations } from './decorations'
 import { createStepperUI, type StepperAction } from './ui'
@@ -15,16 +16,6 @@ export interface StepperController {
   // パースに失敗、またはステップが1件も無い場合は無効化する。
   onTraceResult: (json: string) => void
   invalidate: () => void
-}
-
-// 直前のステップの locals と比較して変数の増減・変更をハイライトする。
-// スコープ（funcName + depth）が変わった場合は「新しいスコープに入った」とみなし、
-// 全変数を added として表示する（別関数のローカル変数を誤って差分表示しないため）。
-function previousLocalsFor(steps: TraceStep[], index: number, step: TraceStep): TraceStep['locals'] | null {
-  const previous = steps[index - 1]
-  if (!previous) return null
-  if (previous.funcName !== step.funcName || previous.depth !== step.depth) return null
-  return previous.locals
 }
 
 export function createStepperController(editor: EditorInstance): StepperController {
@@ -56,10 +47,11 @@ export function createStepperController(editor: EditorInstance): StepperControll
 
   function buildVars(step: TraceStep): { vars: VarWithChange[]; globalsVars: VarWithChange[] | null } {
     if (!session) return { vars: [], globalsVars: null }
-    const previousLocals = previousLocalsFor(session.steps, session.index, step)
+    const previousStep = findPreviousStepInScope(session.steps, session.index, step)
+    const previousGlobals = findPreviousGlobalsSnapshot(session.steps, session.index)
     return {
-      vars: diffVars(previousLocals, step.locals),
-      globalsVars: step.globals ? diffVars(null, step.globals) : null,
+      vars: diffVars(previousStep?.locals ?? null, step.locals),
+      globalsVars: step.globals ? diffVars(previousGlobals, step.globals) : null,
     }
   }
 

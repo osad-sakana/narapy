@@ -4,8 +4,12 @@ import { TRACE_MODULE_SRC } from './traceModule'
 // ユーザーコードの実行対象ファイルを判定するための仮想パス。実ファイルとしては
 // 書き出されないため、アクティブファイルの実名と一致していなくても問題ない
 // （compile()時のファイル名ラベルとしてのみ使う）。
+// MVPでは単一ファイル（現在エディタで表示中のファイル）のみを対象とする。
+// writeFilesToFS() が書き出す他ファイルは /home/pyodide/ 配下の別パスを持つため、
+// ここを prefix ではなく完全一致で判定することで、import した自作モジュール内の
+// 行が誤って「現在のファイル」としてハイライトされることを防ぐ（複数ファイルの
+// 呼び出しスタック可視化は将来拡張）。
 const TRACE_FILENAME = '/home/pyodide/__entry__.py'
-const TRACE_PREFIX = '/home/pyodide/'
 // 大きすぎるトレースでタブがクラッシュしないための上限。上限到達後は
 // sys.settrace(None) して残りを全速で完走させる（traceModule.ts参照）。
 const MAX_STEPS = 800
@@ -26,27 +30,35 @@ del _m, _types
 const RUN_TRACE_CODE = `
 import sys as _sys
 _sys.modules['_narapy_trace'].run_trace(
-    __trace_src__, ${JSON.stringify(TRACE_FILENAME)}, ${JSON.stringify(TRACE_PREFIX)},
-    ${MAX_STEPS}, ${MAX_DEPTH}, globals(),
+    __trace_src__, ${JSON.stringify(TRACE_FILENAME)},
+    ${MAX_STEPS}, ${MAX_DEPTH}, globals(), __known_names__,
 )
 `
 
-// globals() をこの文字列の中で呼ぶことで、_run_trace に __main__ の実際の名前空間
+// globals() をこの文字列の中で呼ぶことで、run_trace に __main__ の実際の名前空間
 // （customInput が差し込まれた input を含む）を渡す。_narapy_trace モジュール内で
 // globals() を呼ぶと _narapy_trace 自身の名前空間が返ってしまうため、
 // 呼び出し側（__main__ コンテキストで実行されるこの文字列）で取得する必要がある。
 const CLEANUP_CODE = `
 import sys as _sys
 _sys.settrace(None)
-for _n in ('__trace_module_src__', '__trace_src__'):
+for _n in ('__trace_module_src__', '__trace_src__', '__known_names__'):
     globals().pop(_n, None)
 del _n
 `
 
-export async function runTrace(pyodide: PyodideInterface, code: string): Promise<string> {
+export async function runTrace(
+  pyodide: PyodideInterface,
+  code: string,
+  // Pyodide初期化直後（ユーザーコード実行前）のグローバル名一覧。ユーザー変数と
+  // フレームワーク注入名（input等）を区別するため、実行時点のglobals()ではなく
+  // この初期スナップショットを使う（pyodide.worker.ts参照）。
+  pristineGlobalNames: string[],
+): Promise<string> {
   pyodide.globals.set('__trace_module_src__', TRACE_MODULE_SRC)
   await pyodide.runPythonAsync(REGISTER_TRACE_CODE)
   pyodide.globals.set('__trace_src__', code)
+  pyodide.globals.set('__known_names__', pristineGlobalNames)
 
   try {
     return await pyodide.runPythonAsync(RUN_TRACE_CODE) as string

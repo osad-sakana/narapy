@@ -165,15 +165,10 @@ const runner = initRunner(editor, () => {
   // 実行前に現在の内容をストアへ同期（エディタが実際に表示しているパスへ、issue #45 L1）
   updateFileContent(fileSwitcher.getEditorPath(), getValue(editor))
   return getAllFilesForRun()
-}, (json) => stepperController.onTraceResult(json))
+}, (json) => stepperController.onTraceResult(json), () => stepperController.invalidate())
 
 const stepRunBtn = document.getElementById('stepRunBtn') as HTMLButtonElement
-stepRunBtn.addEventListener('click', () => {
-  // 前回のトレース結果を残したまま新しい実行を待つと、パッケージ読み込み失敗などで
-  // trace メッセージが一度も届かないケースで古い変数一覧・行ハイライトが残り続ける
-  stepperController.invalidate()
-  runner.runTraceMode()
-})
+stepRunBtn.addEventListener('click', () => runner.runTraceMode())
 
 const outputLog = document.getElementById('outputLog') as HTMLElement
 const fontControls = initFontSizeControls(

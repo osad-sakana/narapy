@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import indexHtml from '../../index.html?raw'
 import { BTN_ACTIVE, HEADER_BTN_STYLES } from './index'
 import { RUN_STYLE, STOP_STYLE } from '../runner/buttonStyles'
+import { STEP_RUN_STYLE } from '../stepper/buttonStyles'
 
 // ヘッダー幅が狭くなった際にラベルが潰れたり縦積みに折り返したりしないための回帰ガード。
 // issue #51: shrink-0/whitespace-nowrapが欠けるとボタンが折り返してヘッダー高さが伸び、
@@ -11,8 +12,8 @@ describe('ヘッダーの潰れ・折り返し防止クラス', () => {
   // BTN_INACTIVE（パネルOFF時 = ユーザーが最も踏む状態）は index.html との
   // 完全一致テストでは間接的にすら守られない（初期状態は常にACTIVE側のため）
   // ので、ここで直接検査する。
-  it('パネルトグルの全スタイルと RUN_STYLE / STOP_STYLE が whitespace-nowrap と shrink-0 を含む', () => {
-    for (const className of [...HEADER_BTN_STYLES, RUN_STYLE, STOP_STYLE]) {
+  it('パネルトグルの全スタイルと RUN_STYLE / STOP_STYLE / STEP_RUN_STYLE が whitespace-nowrap と shrink-0 を含む', () => {
+    for (const className of [...HEADER_BTN_STYLES, RUN_STYLE, STOP_STYLE, STEP_RUN_STYLE]) {
       expect(className).toContain('whitespace-nowrap')
       expect(className).toContain('shrink-0')
     }
@@ -46,6 +47,10 @@ describe('index.html とヘッダークラス定数の整合性', () => {
 
   it('#editorHeader の class に opacity-50 が含まれない（Blockly廃止によりエディタ単独構成のため常時表示）', () => {
     expect(extractClass('editorHeader')).not.toContain('opacity-50')
+  })
+
+  it('#stepRunBtn の class が STEP_RUN_STYLE と完全一致する', () => {
+    expect(extractClass('stepRunBtn')).toBe(STEP_RUN_STYLE)
   })
 })
 

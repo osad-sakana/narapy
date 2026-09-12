@@ -163,3 +163,12 @@
   vertical-align: text-bottom;
   background-color: var(--color-danger);
 }
+
+/* ─── ステップ実行: 現在行ハイライト ───────────── */
+.monaco-editor .step-current-line {
+  background-color: color-mix(in srgb, var(--color-warn) 15%, transparent);
+}
+
+.monaco-editor .step-current-gutter {
+  background-color: var(--color-warn);
+}

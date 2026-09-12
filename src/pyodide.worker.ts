@@ -3,78 +3,70 @@
 import { MAX_INPUT_BYTES, type RunFile, type RunPayload } from './types'
 import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from './lib/pyodideLoader'
 import { TURTLE_MODULE_SRC } from './pyodide/turtleModule'
+import { runTrace } from './pyodide/traceRun'
+import type { PyodideInterface, PyodideModule } from './pyodide/pyodideTypes'
 
 type OutMessage =
   | { type: 'stdout' | 'error' | 'loading'; payload: string }
   | { type: 'result'; payload: string | null }
   | { type: 'image'; payload: string; title: string }
   | { type: 'turtle'; payload: string }
+  | { type: 'trace'; payload: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
   | { type: 'input_request'; prompt: string }
   | { type: 'interrupt_sab'; sab: SharedArrayBuffer }
 
-interface PyFS {
-  writeFile: (path: string, data: string | Uint8Array) => void
-  mkdir: (path: string) => void
-  analyzePath: (path: string) => { exists: boolean }
-}
-
-interface PyodideInterface {
-  runPythonAsync: (code: string) => Promise<unknown>
-  loadPackage: (names: string | string[]) => Promise<void>
-  loadPackagesFromImports: (code: string) => Promise<void>
-  setInterruptBuffer: (buffer: Uint8Array) => void
-  globals: {
-    get: (key: string) => unknown
-    set: (key: string, value: unknown) => void
-  }
-  FS: PyFS
-}
-
-interface PyodideModule {
-  loadPyodide: (options: {
-    indexURL: string
-    stdout?: (text: string) => void
-    stderr?: (text: string) => void
-  }) => Promise<PyodideInterface>
-}
-
 const WORK_DIR = '/home/pyodide'
 
-// 実行後に matplotlib の全フィギュアを PNG base64 の JSON 配列として返す
+// 実行後に matplotlib の全フィギュアを PNG base64 の JSON 配列として返す。
+// import・ループ変数等を関数内に閉じ込めることで __main__ に一切の一時変数を
+// 残さない（残すとステップ実行の変数一覧にトレーサ自身の内部状態が混入する。
+// 関数名自体は "__" で始まり終わるため traceModule.ts の除外フィルタに含まれる。
+// トップレベルで import すると _sys/_json という名前がユーザーの同名変数を
+// 上書きしてしまうため、import 自体も関数内に置く）。
 const EXTRACT_FIGS_CODE = `
-import sys as _sys, json as _json
-_result = []
-if 'matplotlib.pyplot' in _sys.modules:
-    import matplotlib.pyplot as _plt, io as _io, base64 as _b64
-    for _n in _plt.get_fignums():
-        _buf = _io.BytesIO()
-        _plt.figure(_n).savefig(_buf, format='png', bbox_inches='tight', dpi=100)
-        _buf.seek(0)
-        _result.append({'num': _n, 'data': _b64.b64encode(_buf.read()).decode()})
-    _plt.close('all')
-_json.dumps(_result)
+def __narapy_extract_figs__():
+    import sys as _sys, json as _json
+    result = []
+    if 'matplotlib.pyplot' in _sys.modules:
+        import matplotlib.pyplot as _plt, io as _io, base64 as _b64
+        for n in _plt.get_fignums():
+            buf = _io.BytesIO()
+            _plt.figure(n).savefig(buf, format='png', bbox_inches='tight', dpi=100)
+            buf.seek(0)
+            result.append({'num': n, 'data': _b64.b64encode(buf.read()).decode()})
+        _plt.close('all')
+    return _json.dumps(result)
+
+__narapy_extract_figs__()
 `
 
 // 自作 turtle モジュールをフレッシュに sys.modules['turtle'] へ登録する。
 // 毎回 exec し直すことで run 間の描画状態リセットを保証し、
 // sys.modules へ直接注入することで Pyodide stdlib の turtle.py より確実に優先させる。
+// import・一時変数を関数内に閉じ込め、__main__ に "_sys"/"_types" 等が残って
+// 同名のユーザー変数を上書きしないようにする（EXTRACT_FIGS_CODEと同じ理由）。
 const REGISTER_TURTLE_CODE = `
-import sys as _sys, types as _types
-_m = _types.ModuleType('turtle')
-exec(__turtle_src__, _m.__dict__)
-_sys.modules['turtle'] = _m
-del _m
+def __narapy_register_turtle__():
+    import sys as _sys, types as _types
+    m = _types.ModuleType('turtle')
+    exec(__turtle_src__, m.__dict__)
+    _sys.modules['turtle'] = m
+
+__narapy_register_turtle__()
 `
 
 // 実行後に turtle の描画コマンドを JSON で抽出する（turtle 未使用なら segments=[]）。
+// EXTRACT_FIGS_CODE と同じ理由で import・一時変数を関数内に閉じ込める。
 const EXTRACT_TURTLE_CODE = `
-import sys as _sys, json as _json
-_out = '{"segments": [], "turtle": {"x": 0, "y": 0, "heading": 0, "visible": False}}'
-_t = _sys.modules.get('turtle')
-if _t is not None and hasattr(_t, '_dump_commands'):
-    _out = _json.dumps(_t._dump_commands())
-_out
+def __narapy_extract_turtle__():
+    import sys as _sys, json as _json
+    t = _sys.modules.get('turtle')
+    if t is not None and hasattr(t, '_dump_commands'):
+        return _json.dumps(t._dump_commands())
+    return '{"segments": [], "turtle": {"x": 0, "y": 0, "heading": 0, "visible": False}}'
+
+__narapy_extract_turtle__()
 `
 
 // Pyodide への KeyboardInterrupt 注入用バッファ
@@ -109,6 +101,11 @@ function customInput(prompt: unknown): string {
 
 let pyodide: PyodideInterface | null = null
 let isReady = false
+// Pyodide初期化直後（ユーザーコードを一度も実行する前）の __main__ グローバル名一覧。
+// トレース時にこの名前を「フレームワークが注入した名前」として除外する。実行時点の
+// globals().keys() を使うと、直前の通常実行で定義したユーザー変数まで消えてしまうため、
+// 初期化直後のこの時点でのみ記録する。
+let pristineGlobalNames: string[] = []
 
 async function initPyodide(): Promise<void> {
   // module worker では importScripts() が禁止のため dynamic import() を使用
@@ -135,6 +132,10 @@ async function initPyodide(): Promise<void> {
 
   // builtins.input を上書きして prompt 引数を直接受け取る
   pyodide.globals.set('input', customInput)
+
+  // ユーザーコード実行前の時点でグローバル名一覧を記録する（トレース用）
+  const namesJson = await pyodide.runPythonAsync('import json as _json; _json.dumps(list(globals().keys()))') as string
+  pristineGlobalNames = JSON.parse(namesJson) as string[]
 
   // 停止シグナル用バッファを登録し、メインスレッドへ共有
   pyodide.setInterruptBuffer(interruptBuffer)
@@ -266,7 +267,7 @@ function writeFilesToFS(files: RunFile[], directories: string[]): void {
 self.onmessage = async (event: MessageEvent<RunPayload>) => {
   if (event.data.type !== 'run') return
 
-  const { code, files, directories } = event.data
+  const { code, files, directories, mode } = event.data
 
   try {
     await initPromise
@@ -277,6 +278,10 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
     }
 
     interruptBuffer[0] = 0 // 前回の停止シグナルをクリア
+    // 直前の実行（特に停止操作で中断されたステップ実行トレース）が sys.settrace を
+    // 残していないことを保証する。KeyboardInterrupt 注入は Worker を終了させないため、
+    // ここでの防御的な解除が無いと以降の通常実行が静かに数十倍遅くなる。
+    await pyodide.runPythonAsync('import sys as _sys; _sys.settrace(None); del _sys')
     await cleanupUserModules(files)
     writeFilesToFS(files, directories)
     await loadExternalPackages(code)
@@ -285,20 +290,44 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
     pyodide.globals.set('__turtle_src__', TURTLE_MODULE_SRC)
     await pyodide.runPythonAsync(REGISTER_TURTLE_CODE)
 
-    const result = await pyodide.runPythonAsync(code)
-
-    // matplotlib フィギュアを PNG として送信
-    const figJson = await pyodide.runPythonAsync(EXTRACT_FIGS_CODE) as string
-    const figs = JSON.parse(figJson) as Array<{ num: number; data: string }>
-    for (const fig of figs) {
-      self.postMessage({ type: 'image', payload: fig.data, title: `Figure ${fig.num}` } satisfies OutMessage)
+    let traceError: string | null = null
+    let result: unknown = null
+    if (mode === 'trace') {
+      const traceJson = await runTrace(pyodide, code, pristineGlobalNames)
+      self.postMessage({ type: 'trace', payload: traceJson } satisfies OutMessage)
+      traceError = (JSON.parse(traceJson) as { error: string | null }).error
+    } else {
+      result = await pyodide.runPythonAsync(code)
     }
 
-    // turtle の描画コマンドを抽出し、線分があればメインスレッドへ送信
+    // matplotlib フィギュアを抽出する。トレースモードでも close('all') を必ず
+    // 実行しないと次回の通常実行時に古い図が残ってしまうため抽出自体は常に行うが、
+    // モーダル表示（postMessage）は通常実行時のみ行う（ステップ実行中にパネルの上へ
+    // モーダルが被るのを防ぐ。図の確認は通常実行で行う想定）
+    const figJson = await pyodide.runPythonAsync(EXTRACT_FIGS_CODE) as string
+    if (mode !== 'trace') {
+      const figs = JSON.parse(figJson) as Array<{ num: number; data: string }>
+      for (const fig of figs) {
+        self.postMessage({ type: 'image', payload: fig.data, title: `Figure ${fig.num}` } satisfies OutMessage)
+      }
+    }
+
+    // turtle の描画コマンドを抽出し、線分があれば通常実行時のみメインスレッドへ送信
     const turtleJson = await pyodide.runPythonAsync(EXTRACT_TURTLE_CODE) as string
-    const turtleData = JSON.parse(turtleJson) as { segments: unknown[] }
-    if (turtleData.segments.length > 0) {
-      self.postMessage({ type: 'turtle', payload: turtleJson } satisfies OutMessage)
+    if (mode !== 'trace') {
+      const turtleData = JSON.parse(turtleJson) as { segments: unknown[] }
+      if (turtleData.segments.length > 0) {
+        self.postMessage({ type: 'turtle', payload: turtleJson } satisfies OutMessage)
+      }
+    }
+
+    if (mode === 'trace') {
+      if (traceError) {
+        self.postMessage({ type: 'error', payload: traceError } satisfies OutMessage)
+      } else {
+        self.postMessage({ type: 'result', payload: null } satisfies OutMessage)
+      }
+      return
     }
 
     // 最後の式が None の場合は REPL 同様にエコーしない（payload: null で表示を抑制）

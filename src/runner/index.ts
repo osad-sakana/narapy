@@ -22,12 +22,23 @@ function createWorker(): Worker {
   )
 }
 
+export interface RunnerHandle {
+  // ステップ実行トレースを開始する（src/stepper/controller.ts から呼ばれる）。
+  // 実行中は何もしない（通常実行中にステップ実行を割り込ませない）。
+  runTraceMode: () => void
+}
+
 export function initRunner(
   editor: EditorInstance,
   getRunFiles: () => { files: RunFile[]; directories: string[] },
-): void {
+  onTrace?: (json: string) => void,
+  // 通常実行・ステップ実行のどちらを開始する場合でも、古いステップ実行結果
+  // （行ハイライト・変数一覧）を残さないよう呼び出す（stepper/controller.ts の invalidate）
+  onRunStart?: () => void,
+): RunnerHandle {
   const runBtn     = document.getElementById('runBtn')     as HTMLButtonElement
   const copyLogBtn = document.getElementById('copyLogBtn') as HTMLButtonElement
+  const stepRunBtn = document.getElementById('stepRunBtn') as HTMLButtonElement | null
 
   let worker  = createWorker()
   let running = false
@@ -72,6 +83,9 @@ export function initRunner(
       runBtn.textContent = '▶ 実行'
       clearExecutionTimeout()
     }
+    // 実行中はステップ実行の開始を割り込ませない（通常実行中にトレースを重ねて
+    // 走らせると Worker への postMessage が競合するため）
+    if (stepRunBtn) stepRunBtn.disabled = state
     setRunStatus(state ? 'running' : outcome)
   }
 
@@ -175,6 +189,11 @@ export function initRunner(
         return
       }
 
+      if (msg.type === 'trace') {
+        onTrace?.(msg.payload)
+        return
+      }
+
       if (msg.type === 'stdout') {
         appendLog(msg.payload, 'output')
       } else if (msg.type === 'result') {
@@ -208,20 +227,26 @@ export function initRunner(
 
   attachWorkerHandlers()
 
+  function startRun(mode: 'normal' | 'trace' = 'normal'): void {
+    if (running) return
+
+    const code = getValue(editor).trim()
+    if (!code) return
+
+    onRunStart?.()
+    setRunning(true)
+    clearLog()
+    appendLog('--- 実行開始 ---', 'info')
+    const { files, directories } = getRunFiles()
+    worker.postMessage({ type: 'run', code, files, directories, mode } satisfies RunPayload)
+  }
+
   runBtn.addEventListener('click', () => {
     if (running) {
       stopExecution()
       return
     }
-
-    const code = getValue(editor).trim()
-    if (!code) return
-
-    setRunning(true)
-    clearLog()
-    appendLog('--- 実行開始 ---', 'info')
-    const { files, directories } = getRunFiles()
-    worker.postMessage({ type: 'run', code, files, directories } satisfies RunPayload)
+    startRun()
   })
 
   copyLogBtn.addEventListener('click', async () => {
@@ -236,4 +261,6 @@ export function initRunner(
       copyLogBtn.classList.remove('text-success')
     }, 1500)
   })
+
+  return { runTraceMode: () => startRun('trace') }
 }

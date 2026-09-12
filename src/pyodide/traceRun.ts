@@ -1,0 +1,81 @@
+import type { PyodideInterface } from './pyodideTypes'
+import { TRACE_MODULE_SRC } from './traceModule'
+
+// ユーザーコードの実行対象ファイルを判定するための仮想パス。実ファイルとしては
+// 書き出されないため、アクティブファイルの実名と一致していなくても問題ない
+// （compile()時のファイル名ラベルとしてのみ使う）。
+// MVPでは単一ファイル（現在エディタで表示中のファイル）のみを対象とする。
+// writeFilesToFS() が書き出す他ファイルは /home/pyodide/ 配下の別パスを持つため、
+// ここを prefix ではなく完全一致で判定することで、import した自作モジュール内の
+// 行が誤って「現在のファイル」としてハイライトされることを防ぐ（複数ファイルの
+// 呼び出しスタック可視化は将来拡張）。
+const TRACE_FILENAME = '/home/pyodide/__entry__.py'
+// 大きすぎるトレースでタブがクラッシュしないための上限。上限到達後は
+// sys.settrace(None) して残りを全速で完走させる（traceModule.ts参照）。
+const MAX_STEPS = 800
+// 再帰暴走時にトレース自体が無限に深くなるのを防ぐ上限
+const MAX_DEPTH = 20
+
+// トレーサ本体を _narapy_trace という独立モジュールとして sys.modules に登録する。
+// __main__ の名前空間を汚さないことで、input() 用に差し込んだ customInput など
+// 既存のグローバル状態と衝突しない（turtle モジュールの毎回フレッシュ登録と同じパターン）。
+// import・一時変数を関数内に閉じ込め、__main__ に "_sys"/"_types" 等が残って
+// 同名のユーザー変数を上書きしないようにする（pyodide.worker.ts のEXTRACT系と同じ理由）。
+const REGISTER_TRACE_CODE = `
+def __narapy_register_trace__():
+    import sys as _sys, types as _types
+    m = _types.ModuleType('_narapy_trace')
+    exec(__trace_module_src__, m.__dict__)
+    _sys.modules['_narapy_trace'] = m
+
+__narapy_register_trace__()
+`
+
+// globals() を __main__ コンテキストで実行されるこの関数内で呼ぶことで、
+// run_trace に __main__ の実際の名前空間（customInput が差し込まれた input を含む）
+// を渡す。_narapy_trace モジュール内で globals() を呼ぶと _narapy_trace 自身の
+// 名前空間が返ってしまうため、呼び出し側（__main__ で定義された関数）で取得する
+// 必要がある（関数内で呼んでも globals() はその関数が定義されたモジュール、
+// つまり __main__ を指すため問題ない）。
+const RUN_TRACE_CODE = `
+def __narapy_run_trace__():
+    import sys as _sys
+    return _sys.modules['_narapy_trace'].run_trace(
+        __trace_src__, ${JSON.stringify(TRACE_FILENAME)},
+        ${MAX_STEPS}, ${MAX_DEPTH}, globals(), __known_names__,
+    )
+
+__narapy_run_trace__()
+`
+
+const CLEANUP_CODE = `
+def __narapy_cleanup_trace__():
+    import sys as _sys
+    _sys.settrace(None)
+    for n in ('__trace_module_src__', '__trace_src__', '__known_names__'):
+        globals().pop(n, None)
+
+__narapy_cleanup_trace__()
+`
+
+export async function runTrace(
+  pyodide: PyodideInterface,
+  code: string,
+  // Pyodide初期化直後（ユーザーコード実行前）のグローバル名一覧。ユーザー変数と
+  // フレームワーク注入名（input等）を区別するため、実行時点のglobals()ではなく
+  // この初期スナップショットを使う（pyodide.worker.ts参照）。
+  pristineGlobalNames: string[],
+): Promise<string> {
+  pyodide.globals.set('__trace_module_src__', TRACE_MODULE_SRC)
+  await pyodide.runPythonAsync(REGISTER_TRACE_CODE)
+  pyodide.globals.set('__trace_src__', code)
+  pyodide.globals.set('__known_names__', pristineGlobalNames)
+
+  try {
+    return await pyodide.runPythonAsync(RUN_TRACE_CODE) as string
+  } finally {
+    // settrace は run_trace 内で必ず解除されるが、Worker の強制終了以外の
+    // 想定外の中断に備えて呼び出し側でも防御的に解除・後始末する
+    await pyodide.runPythonAsync(CLEANUP_CODE)
+  }
+}

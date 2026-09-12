@@ -2,7 +2,7 @@ import type { EditorInstance } from '../editor/index'
 import { parseTraceResult } from '../trace/parse'
 import {
   createSession, currentStep, canGoNext, canGoPrev,
-  next, prev, first, last, seekTo, play, pause, setSpeed, speedDelayMs, tick, cumulativeStdout,
+  next, prev, first, last, seekTo, play, pause, setSpeed, speedDelayMs, tick, displayStdout,
   type SessionState,
 } from '../trace/session'
 import { diffVars, type VarWithChange } from '../trace/varDiff'
@@ -64,8 +64,7 @@ export function createStepperController(editor: EditorInstance): StepperControll
     if (!step) return
 
     const { vars, globalsVars } = buildVars(step)
-    const isLastStep = !canGoNext(session)
-    const stdout = cumulativeStdout(session) + (isLastStep ? trailingStdout : '')
+    const stdout = displayStdout(session, trailingStdout)
 
     ui.render({
       index: session.index,

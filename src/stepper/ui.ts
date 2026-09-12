@@ -259,6 +259,8 @@ export function createStepperUI(): StepperUI {
     stdoutContainer.textContent = state.stdout || 'まだ出力はありません'
     stdoutContainer.classList.toggle('text-muted', !state.stdout)
     stdoutContainer.classList.toggle('italic', !state.stdout)
+    // ステップを進めるたびに増える出力の末尾（＝直近の出力）が見えるよう追従させる
+    stdoutContainer.scrollTop = stdoutContainer.scrollHeight
   }
 
   return {

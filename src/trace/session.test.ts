@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   createSession, currentStep, canGoNext, canGoPrev,
-  next, prev, first, last, seekTo, play, pause, setSpeed, speedDelayMs, tick, cumulativeStdout,
+  next, prev, first, last, seekTo, play, pause, setSpeed, speedDelayMs, tick,
+  cumulativeStdout, displayStdout,
 } from './session'
 import type { TraceStep } from './types'
 
@@ -106,6 +107,25 @@ describe('session', () => {
 
     it('steps が空の場合は空文字列を返す', () => {
       expect(cumulativeStdout(createSession([]))).toBe('')
+    })
+  })
+
+  describe('displayStdout', () => {
+    it('最後のステップでなければ trailingStdout を含めない', () => {
+      const steps = [makeStep(1, 'a\n'), makeStep(2, 'b\n')]
+      const state = seekTo(createSession(steps), 0)
+      expect(displayStdout(state, '打ち切り後の出力')).toBe('a\n')
+    })
+
+    it('最後のステップに到達したら trailingStdout を末尾に付け足す', () => {
+      const steps = [makeStep(1, 'a\n'), makeStep(2, 'b\n')]
+      const state = last(createSession(steps))
+      expect(displayStdout(state, '打ち切り後の出力')).toBe('a\nb\n打ち切り後の出力')
+    })
+
+    it('trailingStdout が空文字列なら何も付け足さない', () => {
+      const state = last(createSession([makeStep(1, 'a\n')]))
+      expect(displayStdout(state, '')).toBe('a\n')
     })
   })
 })

@@ -83,3 +83,10 @@ export function cumulativeStdout(state: SessionState): string {
   }
   return text
 }
+
+// ステップパネルに表示する出力全体。最後のステップに到達した場合のみ、
+// ステップ上限による打ち切り後に全速実行された分の出力（trailingStdout、
+// どのステップにも紐付かない）を末尾へ付け足す。
+export function displayStdout(state: SessionState, trailingStdout: string): string {
+  return cumulativeStdout(state) + (canGoNext(state) ? '' : trailingStdout)
+}

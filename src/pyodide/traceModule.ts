@@ -27,8 +27,30 @@ from itertools import islice as _islice
 
 _MAX_REPR = 120
 _MAX_ITEMS = 50
-# 1ステップあたりに記録する標準出力の上限（巨大なprint()でJSONが肥大化しないため）
-_MAX_STDOUT_CHUNK = 2000
+# 1ステップあたりに記録する標準出力の上限（巨大なprint()でJSONが肥大化しないため）。
+# 通常の学習コードの1行分のprint()では実質切られない程度に余裕を持たせてある。
+_MAX_STDOUT_CHUNK = 20000
+# 標準出力バッファの総量上限。ステップ上限(MAX_STEPS)到達後は settrace(None) して
+# 残りを全速で完走させるため、無限ループの print() がここで際限なく蓄積し続けると
+# Worker のメモリを食い潰してタブがクラッシュする（MAX_STEPSが防ごうとしていたのと
+# 同じ種類の問題が別経路で再発する）。バッファ自体に上限を設けて防ぐ。
+_MAX_STDOUT_TOTAL = 200000
+
+
+class _CappedStdout(_io.StringIO):
+    # print() が触る file プロトコル(write/flush等)を保つため StringIO を継承し
+    # write() だけを上書きする。上限に達した後の書き込みは黙って破棄しつつ、
+    # 破棄した文字数を dropped に記録して trailingStdout に注記できるようにする。
+    def __init__(self):
+        super().__init__()
+        self.dropped = 0
+
+    def write(self, s):
+        room = _MAX_STDOUT_TOTAL - self.tell()
+        if room > 0:
+            super().write(s[:room])
+        self.dropped += max(0, len(s) - max(0, room))
+        return len(s)
 
 
 class _NarapyRepr(_reprlib.Repr):
@@ -255,7 +277,7 @@ def run_trace(source, filename, max_steps, max_depth, main_globals, known_names)
     # 直前の実行が settrace を残していないことを保証する（防御的）
     _sys.settrace(None)
     known_names = frozenset(known_names)
-    stdout_buffer = _io.StringIO()
+    stdout_buffer = _CappedStdout()
     recorder = _Recorder(filename, max_steps, max_depth, known_names, stdout_buffer)
 
     try:
@@ -293,6 +315,8 @@ def run_trace(source, filename, max_steps, max_depth, main_globals, known_names)
     # 後に「打ち切り後の出力」として表示できるようにする（redirect_stdout済みなので
     # ここで取得しないと出力が失われてしまう）。
     trailing_stdout = recorder._consume_stdout()
+    if stdout_buffer.dropped:
+        trailing_stdout += "\n...(出力が多すぎるため、以降 {} 文字を省略しました)".format(stdout_buffer.dropped)
 
     return _json.dumps({
         "steps": recorder.steps,

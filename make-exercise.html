@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Narapy — 共有リンクを作る</title>
+    <title>Narapy — 演習を作る</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -20,7 +20,7 @@
         <img src="/favicon.svg" alt="Narapy" class="w-7 h-7 select-none shrink-0 hidden sm:block" draggable="false" />
         <span class="text-[15px] font-bold tracking-tight text-ink shrink-0 whitespace-nowrap hidden sm:inline">Narapy</span>
         <span class="text-[11px] font-mono px-1.5 py-0.5 rounded-md text-muted border border-line shrink-0 whitespace-nowrap">
-          共有リンクを作る
+          演習を作る
         </span>
       </div>
       <div class="flex items-center gap-3 shrink-0">
@@ -45,7 +45,7 @@
           aria-label="テーマ"
           class="flex items-center gap-0.5 border border-line rounded-lg p-0.5 shrink-0"
         ></div>
-        <a href="./make-exercise.html" class="text-xs text-muted hover:text-ink transition-colors shrink-0 whitespace-nowrap">演習(採点付き)を作る →</a>
+        <a href="./make-url.html" class="text-xs text-muted hover:text-ink transition-colors shrink-0 whitespace-nowrap">通常の共有リンクを作る →</a>
         <a href="./index.html" class="text-xs text-muted hover:text-ink transition-colors shrink-0 whitespace-nowrap">← エディタに戻る</a>
       </div>
     </header>
@@ -54,34 +54,18 @@
       <div class="space-y-6">
 
         <p class="text-sm text-muted leading-relaxed">
-          Pythonコードや複数ファイルのプロジェクトから、開くだけで内容が復元されるURLを作成します。
-          生成されるリンクはURLのハッシュ(<code class="font-mono text-code">#</code>以降)に埋め込まれるため、
-          サーバーには送信されません。
+          お題（問題文）・初期コード・テストケースをひとまとめにした演習(<code class="font-mono text-code">.exercise</code>)を、
+          開くだけで採点までできるURLとして作成します。生成されるリンクはURLのハッシュ
+          (<code class="font-mono text-code">#</code>以降)に埋め込まれるため、サーバーには送信されません。
+          詳しい仕様は <code class="font-mono text-code">docs/exercise-format.md</code> を参照してください。
         </p>
 
-        <!-- モード切替 -->
-        <div class="flex gap-2" role="tablist">
-          <button
-            id="modeCodeBtn"
-            type="button"
-            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer border bg-accent/15 text-accent border-accent/40"
-          >単一コード (#code=)</button>
-          <button
-            id="modeProjectBtn"
-            type="button"
-            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer border text-muted border-transparent hover:bg-hover hover:text-ink"
-          >複数ファイル (#project=)</button>
-        </div>
-
-        <!-- 単一コードモード -->
-        <section id="codeModeSection" class="space-y-1.5">
-          <span class="text-xs text-muted block">Pythonコード (main.py として開かれます)</span>
-          <div id="codeEditor" class="h-72 rounded-lg overflow-hidden border border-line"></div>
-        </section>
-
-        <!-- 複数ファイルモード -->
-        <section id="projectModeSection" class="hidden space-y-3">
-          <p class="text-xs text-muted">ラジオボタンを選択した状態のファイルが、開いた状態（アクティブなファイル）になります。</p>
+        <section class="space-y-3">
+          <p class="text-xs text-muted leading-relaxed">
+            各ファイルの役割をラジオボタンで指定してください。「採点対象」は開いた状態になり、
+            「✓ 採点」ボタンを押した時に実際に採点されるファイルです。「テスト」は
+            <code class="font-mono text-code">test_</code> から始まる関数を定義してください。
+          </p>
           <div id="fileRows" class="space-y-4"></div>
           <button
             id="addFileRowBtn"
@@ -137,6 +121,6 @@
       </div>
     </main>
 
-    <script type="module" src="/src/makeUrl/index.ts"></script>
+    <script type="module" src="/src/makeExercise/index.ts"></script>
   </body>
 </html>

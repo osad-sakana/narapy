@@ -82,4 +82,39 @@ describe('applyUrlLoad', () => {
     })).rejects.toThrow('boom')
     expect(loadProject).not.toHaveBeenCalled()
   })
+
+  it('exerciseメタデータ付きプロジェクトを読み込むとonExerciseLoadedへ渡る(issue #65)', async () => {
+    const exerciseProject: NarapyProject = {
+      ...dummyProject,
+      files: [
+        { path: 'main.py', content: { kind: 'text', data: 'def add(a, b): return a + b' } },
+        { path: 'problem.md', content: { kind: 'text', data: '# 足し算' } },
+        { path: 'test.py', content: { kind: 'text', data: 'def test_add(): assert add(1, 2) == 3' } },
+      ],
+      exercise: { problem: 'problem.md', test: 'test.py' },
+    }
+    const onExerciseLoaded = vi.fn()
+    await applyUrlLoad({
+      resolve: async () => ({ project: exerciseProject, source: 'project' }),
+      hasUserContent: () => false,
+      confirm: () => true,
+      loadProject: vi.fn(),
+      refreshExplorer: vi.fn(),
+      onExerciseLoaded,
+    })
+    expect(onExerciseLoaded).toHaveBeenCalledWith(exerciseProject.exercise, exerciseProject.files, exerciseProject.activeFile)
+  })
+
+  it('exerciseメタデータが無ければonExerciseLoadedにundefinedが渡る', async () => {
+    const onExerciseLoaded = vi.fn()
+    await applyUrlLoad({
+      resolve: async () => ({ project: dummyProject, source: 'code' }),
+      hasUserContent: () => false,
+      confirm: () => true,
+      loadProject: vi.fn(),
+      refreshExplorer: vi.fn(),
+      onExerciseLoaded,
+    })
+    expect(onExerciseLoaded).toHaveBeenCalledWith(undefined, dummyProject.files, dummyProject.activeFile)
+  })
 })

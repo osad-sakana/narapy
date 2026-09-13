@@ -16,19 +16,22 @@ Python学習向けWebアプリのプロトタイプ。フロントエンド完�
 ```
 narapy/
 ├── public/
-│   └── favicon.svg
+│   ├── favicon.svg
+│   └── exercises/          # 公式演習(.exercise)。?project=/exercises/xxx.exercise で開く
 ├── src/
 │   ├── main.ts             # エントリポイント（各モジュール初期化・Worker通信）
 │   ├── editor/             # Monaco エディタ・コード補完・フォントサイズ
 │   ├── completion.worker.ts # Pyodide を使ったコード補完 Web Worker
 │   ├── runner/             # 実行・Turtle/matplotlib 描画・エラー翻訳
-│   ├── pyodide/            # Pyodide 連携（Turtle互換モジュール）
+│   ├── pyodide/            # Pyodide 連携（Turtle互換モジュール、採点エンジン）
 │   ├── pyodide.worker.ts   # Pyodide を動的 import で初期化する Web Worker
 │   ├── lib/                # Pyodide ローダーなど共通ユーティリティ
 │   ├── explorer/           # ファイルエクスプローラー・アップロード
-│   ├── fileio/             # .narapy プロジェクト入出力
+│   ├── fileio/             # .narapy / .exercise プロジェクト入出力
+│   ├── exercise/           # 演習(.exercise)の読込検知・問題文表示・採点結果表示（詳細はdocs/exercise-format.md）
 │   ├── urlload/            # URLの #code= / #project= / ?project=<URL> 読み込み
 │   ├── makeUrl/            # /make-url（共有リンク生成ページ）のロジック
+│   ├── makeExercise/       # /make-exercise（演習リンク生成ページ）のロジック
 │   ├── layout/             # パネルレイアウト（split.js、状態をlocalStorageに永続化）
 │   ├── about/              # ライセンス表示
 │   ├── theme/              # カラーパレット・テーマ切り替え

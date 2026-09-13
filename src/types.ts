@@ -9,6 +9,7 @@ export type WorkerMessage =
   | { type: 'image'; payload: string; title: string }
   | { type: 'turtle'; payload: string }
   | { type: 'trace'; payload: string }
+  | { type: 'grade'; payload: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
   | { type: 'input_request'; prompt: string }
   | { type: 'interrupt_sab'; sab: SharedArrayBuffer }
@@ -41,5 +42,26 @@ export interface RunPayload {
   directories: string[]
   // 省略時は 'normal'。'trace' は sys.settrace によるステップ実行トレース
   // （src/pyodide/traceRun.ts）で、top-level await を含むコードは実行できない。
-  mode?: 'normal' | 'trace'
+  // 'grade' は演習の自動採点（src/pyodide/gradeRun.ts）で、testCode必須。
+  mode?: 'normal' | 'trace' | 'grade'
+  // mode: 'grade' のときの test.py の内容
+  testCode?: string
+  // mode: 'grade' のときの採点対象ファイルのプロジェクト内相対パス（例: 'main.py'）。
+  // test.pyがこのファイルを `from main import ...` のようにimportすると、FS上の
+  // 実パス（/home/pyodide/main.py）を含むトレースバックが返ることがあるため、
+  // それを <exec> ラベルに正しく置換できるよう worker 側へ渡す(issue #65)
+  entryPath?: string
+}
+
+// 演習採点1件分の結果（src/pyodide/gradeModule.ts の run_tests() が返すJSONの要素）
+export interface GradeCase {
+  name: string
+  passed: boolean
+  message: string | null
+}
+
+export interface GradeResult {
+  cases: GradeCase[]
+  // test_関数の抽出失敗・構文エラーなど、個別ケースに紐付かない全体エラー
+  error: string | null
 }

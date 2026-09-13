@@ -65,4 +65,44 @@ describe('applyProjectLoad', () => {
     expect(loadOrder).toBeLessThan(refreshOrder)
     expect(refreshOrder).toBeLessThan(editorOrder)
   })
+
+  it('onExerciseLoadedにexerciseメタデータとfilesが渡る(issue #65)', () => {
+    const onExerciseLoaded = vi.fn()
+    const files: FileEntry[] = [
+      { path: 'main.py', content: { kind: 'text', data: 'def add(a, b): return a + b' } },
+      { path: 'test.py', content: { kind: 'text', data: 'def test_add(): assert add(1, 2) == 3' } },
+    ]
+    applyProjectLoad(
+      { files, directories: [], activeFile: 'main.py', exercise: { problem: 'problem.md', test: 'test.py' } },
+      {
+        loadProject: vi.fn(),
+        refreshExplorer: vi.fn(),
+        getActiveFile: () => 'main.py',
+        getActiveContent: () => files[0].content.kind === 'text' ? files[0].content.data : '',
+        openProjectFile: vi.fn(),
+        setEditorFileName: vi.fn(),
+        onExerciseLoaded,
+      },
+    )
+
+    expect(onExerciseLoaded).toHaveBeenCalledWith({ problem: 'problem.md', test: 'test.py' }, files, 'main.py')
+  })
+
+  it('exerciseが無い場合はonExerciseLoadedにundefinedが渡る', () => {
+    const onExerciseLoaded = vi.fn()
+    applyProjectLoad(
+      buildInput('main.py', [{ path: 'main.py', content: { kind: 'text', data: 'print(1)' } }]),
+      {
+        loadProject: vi.fn(),
+        refreshExplorer: vi.fn(),
+        getActiveFile: () => 'main.py',
+        getActiveContent: () => 'print(1)',
+        openProjectFile: vi.fn(),
+        setEditorFileName: vi.fn(),
+        onExerciseLoaded,
+      },
+    )
+
+    expect(onExerciseLoaded).toHaveBeenCalledWith(undefined, expect.any(Array), 'main.py')
+  })
 })

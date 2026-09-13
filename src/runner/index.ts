@@ -26,6 +26,12 @@ export interface RunnerHandle {
   // ステップ実行トレースを開始する（src/stepper/controller.ts から呼ばれる）。
   // 実行中は何もしない（通常実行中にステップ実行を割り込ませない）。
   runTraceMode: () => void
+  // 演習の採点を開始する（src/exercise/controller.ts から呼ばれる、issue #65）。
+  // 通常実行と同じタイムアウト・停止ボタンの仕組みをそのまま利用する。
+  // code はエディタの表示中ファイルではなく、演習が採点対象と定めたファイルの内容を
+  // 呼び出し側が明示的に渡す（問題文やtest.pyを開いたまま採点ボタンを押す事故を防ぐため）。
+  // entryPath はそのファイルのプロジェクト内相対パス（trace/normalには影響しない）
+  runGradeMode: (code: string, testCode: string, entryPath: string) => void
 }
 
 export function initRunner(
@@ -35,10 +41,12 @@ export function initRunner(
   // 通常実行・ステップ実行のどちらを開始する場合でも、古いステップ実行結果
   // （行ハイライト・変数一覧）を残さないよう呼び出す（stepper/controller.ts の invalidate）
   onRunStart?: () => void,
+  onGradeResult?: (json: string) => void,
 ): RunnerHandle {
   const runBtn     = document.getElementById('runBtn')     as HTMLButtonElement
   const copyLogBtn = document.getElementById('copyLogBtn') as HTMLButtonElement
   const stepRunBtn = document.getElementById('stepRunBtn') as HTMLButtonElement | null
+  const gradeBtn   = document.getElementById('gradeBtn')   as HTMLButtonElement | null
 
   let worker  = createWorker()
   let running = false
@@ -83,9 +91,10 @@ export function initRunner(
       runBtn.textContent = '▶ 実行'
       clearExecutionTimeout()
     }
-    // 実行中はステップ実行の開始を割り込ませない（通常実行中にトレースを重ねて
-    // 走らせると Worker への postMessage が競合するため）
+    // 実行中はステップ実行・採点の開始を割り込ませない（通常実行中に重ねて走らせると
+    // Worker への postMessage が競合するため）
     if (stepRunBtn) stepRunBtn.disabled = state
+    if (gradeBtn) gradeBtn.disabled = state
     setRunStatus(state ? 'running' : outcome)
   }
 
@@ -194,6 +203,11 @@ export function initRunner(
         return
       }
 
+      if (msg.type === 'grade') {
+        onGradeResult?.(msg.payload)
+        return
+      }
+
       if (msg.type === 'stdout') {
         appendLog(msg.payload, 'output')
       } else if (msg.type === 'result') {
@@ -227,18 +241,29 @@ export function initRunner(
 
   attachWorkerHandlers()
 
-  function startRun(mode: 'normal' | 'trace' = 'normal'): void {
+  function startRun(mode: 'normal' | 'trace' | 'grade' = 'normal', gradeCode?: string, testCode?: string, entryPath?: string): void {
     if (running) return
 
-    const code = getValue(editor).trim()
-    if (!code) return
+    // grade モードはエディタの表示中ファイルではなく、呼び出し側が明示的に渡した
+    // 採点対象ファイルの内容を使う（issue #65 レビュー指摘対応）
+    const code = mode === 'grade' ? (gradeCode ?? '').trim() : getValue(editor).trim()
+    if (!code) {
+      // grade は採点ボタンを押しても無言で何も起きないと故障に見えるため、
+      // 通常実行と違いログへ理由を残す（採点対象ファイルの削除・リネーム等で空になるケース）。
+      // 他の採点開始経路と同様にclearLog()してから出す（前回の実行結果の下に付かないように）
+      if (mode === 'grade') {
+        clearLog()
+        appendLog('[採点エラー] 採点対象のファイルが空です', 'error')
+      }
+      return
+    }
 
     onRunStart?.()
     setRunning(true)
     clearLog()
-    appendLog('--- 実行開始 ---', 'info')
+    appendLog(mode === 'grade' ? '--- 採点開始 ---' : '--- 実行開始 ---', 'info')
     const { files, directories } = getRunFiles()
-    worker.postMessage({ type: 'run', code, files, directories, mode } satisfies RunPayload)
+    worker.postMessage({ type: 'run', code, files, directories, mode, testCode, entryPath } satisfies RunPayload)
   }
 
   runBtn.addEventListener('click', () => {
@@ -262,5 +287,8 @@ export function initRunner(
     }, 1500)
   })
 
-  return { runTraceMode: () => startRun('trace') }
+  return {
+    runTraceMode: () => startRun('trace'),
+    runGradeMode: (code, testCode, entryPath) => startRun('grade', code, testCode, entryPath),
+  }
 }

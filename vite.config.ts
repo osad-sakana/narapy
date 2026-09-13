@@ -49,10 +49,12 @@ export default defineConfig({
     // このターゲット設定自体がTLAを合法にする唯一の手段になった）
     target: 'esnext',
     rollupOptions: {
-      // /make-url (共有リンク生成ページ, issue #32) を静的マルチページとしてビルド対象に含める
+      // /make-url (共有リンク生成ページ, issue #32) / /make-exercise (演習作成ページ, issue #65)
+      // を静的マルチページとしてビルド対象に含める
       input: {
         main: `${root}index.html`,
         makeUrl: `${root}make-url.html`,
+        makeExercise: `${root}make-exercise.html`,
       },
     },
   },

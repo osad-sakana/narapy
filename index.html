@@ -165,6 +165,22 @@
                   title="この時点を基準として記録する"
                   class="hidden items-center gap-1.5 px-2.5 py-1 rounded-md border border-accent/40 bg-accent/15 text-accent text-[11px] font-medium transition-colors cursor-pointer hover:bg-accent/25 shrink-0 whitespace-nowrap"
                 >基準を記録</button>
+                <!-- 演習(.exercise)読込時のみ表示（src/exercise/controller.ts が hidden ⇄ flex を切替、issue #65） -->
+                <div id="exerciseControls" class="hidden items-center gap-2 shrink-0">
+                  <span class="text-[11px] text-muted whitespace-nowrap">📘 演習モードで開いています</span>
+                  <button
+                    id="problemBtn"
+                    type="button"
+                    title="問題文の表示を切り替える"
+                    class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-line bg-hover text-ink text-[11px] font-medium transition-colors cursor-pointer hover:bg-line shrink-0 whitespace-nowrap"
+                  >📄 問題</button>
+                  <button
+                    id="gradeBtn"
+                    type="button"
+                    title="テストケースに対して採点する"
+                    class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-accent/40 bg-accent/15 text-accent text-[11px] font-medium transition-colors cursor-pointer hover:bg-accent/25 shrink-0 whitespace-nowrap"
+                  >✓ 採点</button>
+                </div>
                 <button
                   id="stepRunBtn"
                   type="button"
@@ -173,6 +189,20 @@
                   class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-accent/40 bg-accent/15 text-accent text-[11px] font-medium transition-colors cursor-pointer hover:bg-accent/25 shrink-0 whitespace-nowrap disabled:opacity-50 disabled:cursor-default"
                 >🐾 ステップ実行</button>
               </div>
+            </div>
+            <!-- 演習(.exercise)の問題文パネル（src/exercise/problemPanel.ts が開閉・内容表示を制御、issue #65） -->
+            <div id="problemPanel" class="hidden flex-col border-b border-line bg-hover/40 shrink-0 max-h-56">
+              <div class="flex items-center justify-between px-4 py-1.5 shrink-0">
+                <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">📄 問題</span>
+                <button
+                  id="problemPanelCloseBtn"
+                  type="button"
+                  title="問題文を閉じる"
+                  aria-label="問題文を閉じる"
+                  class="text-muted hover:text-ink text-xs font-bold transition-colors w-5 h-5 flex items-center justify-center rounded hover:bg-hover cursor-pointer"
+                >×</button>
+              </div>
+              <pre id="problemPanelBody" class="overflow-auto px-4 pb-3 text-sm text-ink whitespace-pre-wrap break-words font-sans"></pre>
             </div>
             <div id="codeEditor" class="flex-1 w-full min-h-0"></div>
           </div>

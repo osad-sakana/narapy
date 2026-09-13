@@ -21,6 +21,9 @@ export function buildExerciseFromRows(
   if (problemPath === testPath) {
     throw new Error('問題文とテストは別のファイルにしてください')
   }
+  if (activeIndex === problemIndex || activeIndex === testIndex) {
+    throw new Error('採点対象は問題文・テストとは別のファイルにしてください')
+  }
   if (!project.files.some(f => f.path === problemPath)) {
     throw new Error(`問題文のファイル「${problemPath}」が見つかりません`)
   }

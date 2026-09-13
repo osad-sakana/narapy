@@ -92,9 +92,15 @@ function init(): void {
       removeBtn.addEventListener('click', () => {
         if (rows.length <= 1) return
         rows = removeRow(rows, index)
-        if (activeIndex >= rows.length) activeIndex = rows.length - 1
-        if (problemIndex >= rows.length) problemIndex = rows.length - 1
-        if (testIndex >= rows.length) testIndex = rows.length - 1
+        // 削除した行より後ろを指していたインデックスは1つ詰める。削除した行自体を
+        // 指していた役割は割り当て先を失うため、範囲内に収めるだけに留め（重複は
+        // buildExerciseFromRows 側のバリデーションでエラーにする)、無言で誤った
+        // ファイルが役割に居座らないようにする。
+        const reindex = (idx: number): number =>
+          idx > index ? idx - 1 : Math.min(idx, rows.length - 1)
+        activeIndex = reindex(activeIndex)
+        problemIndex = reindex(problemIndex)
+        testIndex = reindex(testIndex)
         renderFileRows()
       })
 

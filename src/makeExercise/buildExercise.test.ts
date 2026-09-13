@@ -29,6 +29,14 @@ describe('buildExerciseFromRows', () => {
     expect(() => buildExerciseFromRows(rows, 0, 1, 1)).toThrow(/別のファイル/)
   })
 
+  it('採点対象が問題文と同じ行を指す場合はエラーになる', () => {
+    expect(() => buildExerciseFromRows(rows, 1, 1, 2)).toThrow(/採点対象/)
+  })
+
+  it('採点対象がテストと同じ行を指す場合はエラーになる', () => {
+    expect(() => buildExerciseFromRows(rows, 2, 1, 2)).toThrow(/採点対象/)
+  })
+
   it('問題文の行のパスが空の場合はエラーになる', () => {
     const withEmpty = [rows[0], { path: '  ', content: '' }, rows[2]]
     expect(() => buildExerciseFromRows(withEmpty, 0, 1, 2)).toThrow(/指定してください/)

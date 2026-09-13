@@ -35,6 +35,13 @@ URLだけで配布・採点できるようにする機能です。既存の[URL�
   例: `?project=/exercises/add_two_numbers.exercise`）
 - 外部サーバーでの動的配布: `?project=<URL>`（CORS必要）
 
+### `/make-exercise`: 演習リンクをブラウザ上で作る
+
+`/make-url` と同じ立て付けの、Narapy自身に組み込まれた作成ツールです（`make-exercise.html`）。
+ファイルを追加し、各行のラジオボタンで「採点対象」「問題文」「テスト」の役割を指定すると、
+`#project=` の演習リンクを生成できます。教材作成者向けのツールで、アプリ本体
+（`index.html`）からの導線はあえて設けていません（`/make-url` と同様）。URLを直接開いてください。
+
 ## test.py の作成契約
 
 採点エンジン（`src/pyodide/gradeModule.ts`）は test.py を次のルールで解釈します。

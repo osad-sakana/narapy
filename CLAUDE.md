@@ -31,6 +31,7 @@ narapy/
 │   ├── exercise/           # 演習(.exercise)の読込検知・問題文表示・採点結果表示（詳細はdocs/exercise-format.md）
 │   ├── urlload/            # URLの #code= / #project= / ?project=<URL> 読み込み
 │   ├── makeUrl/            # /make-url（共有リンク生成ページ）のロジック
+│   ├── makeExercise/       # /make-exercise（演習リンク生成ページ）のロジック
 │   ├── layout/             # パネルレイアウト（split.js、状態をlocalStorageに永続化）
 │   ├── about/              # ライセンス表示
 │   ├── theme/              # カラーパレット・テーマ切り替え

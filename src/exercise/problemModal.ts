@@ -3,11 +3,20 @@
 // problem.md の中身は信頼できない入力として扱う必要がある。Markdownのレンダリング
 // （innerHTML等）はここでは行わず、textContentでエスケープしたまま pre-wrap で
 // 改行だけ保持して表示する（書式付き表示は将来課題）。
+const MODAL_MARKER = 'data-narapy-problem-modal'
+
 export function showProblemModal(problemText: string): void {
+  // 「問題」ボタンの連打や、演習読込直後の自動表示と手動表示が重なるケースで
+  // モーダルが積み重ならないよう、既に開いていれば閉じてから開き直す
+  document.querySelector(`[${MODAL_MARKER}]`)?.remove()
+
   const backdrop = document.createElement('div')
+  backdrop.setAttribute(MODAL_MARKER, 'true')
   backdrop.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4'
 
   const card = document.createElement('div')
+  card.setAttribute('role', 'dialog')
+  card.setAttribute('aria-modal', 'true')
   card.className = 'bg-panel border border-line rounded-xl shadow-2xl overflow-hidden max-w-2xl w-full max-h-[80vh] flex flex-col'
 
   const header = document.createElement('div')

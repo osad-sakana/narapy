@@ -102,7 +102,7 @@ describe('applyUrlLoad', () => {
       refreshExplorer: vi.fn(),
       onExerciseLoaded,
     })
-    expect(onExerciseLoaded).toHaveBeenCalledWith(exerciseProject.exercise, exerciseProject.files)
+    expect(onExerciseLoaded).toHaveBeenCalledWith(exerciseProject.exercise, exerciseProject.files, exerciseProject.activeFile)
   })
 
   it('exerciseメタデータが無ければonExerciseLoadedにundefinedが渡る', async () => {
@@ -115,6 +115,6 @@ describe('applyUrlLoad', () => {
       refreshExplorer: vi.fn(),
       onExerciseLoaded,
     })
-    expect(onExerciseLoaded).toHaveBeenCalledWith(undefined, dummyProject.files)
+    expect(onExerciseLoaded).toHaveBeenCalledWith(undefined, dummyProject.files, dummyProject.activeFile)
   })
 })

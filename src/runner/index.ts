@@ -28,7 +28,9 @@ export interface RunnerHandle {
   runTraceMode: () => void
   // 演習の採点を開始する（src/exercise/controller.ts から呼ばれる、issue #65）。
   // 通常実行と同じタイムアウト・停止ボタンの仕組みをそのまま利用する。
-  runGradeMode: (testCode: string) => void
+  // code はエディタの表示中ファイルではなく、演習が採点対象と定めたファイルの内容を
+  // 呼び出し側が明示的に渡す（問題文やtest.pyを開いたまま採点ボタンを押す事故を防ぐため）
+  runGradeMode: (code: string, testCode: string) => void
 }
 
 export function initRunner(
@@ -43,6 +45,7 @@ export function initRunner(
   const runBtn     = document.getElementById('runBtn')     as HTMLButtonElement
   const copyLogBtn = document.getElementById('copyLogBtn') as HTMLButtonElement
   const stepRunBtn = document.getElementById('stepRunBtn') as HTMLButtonElement | null
+  const gradeBtn   = document.getElementById('gradeBtn')   as HTMLButtonElement | null
 
   let worker  = createWorker()
   let running = false
@@ -87,9 +90,10 @@ export function initRunner(
       runBtn.textContent = '▶ 実行'
       clearExecutionTimeout()
     }
-    // 実行中はステップ実行の開始を割り込ませない（通常実行中にトレースを重ねて
-    // 走らせると Worker への postMessage が競合するため）
+    // 実行中はステップ実行・採点の開始を割り込ませない（通常実行中に重ねて走らせると
+    // Worker への postMessage が競合するため）
     if (stepRunBtn) stepRunBtn.disabled = state
+    if (gradeBtn) gradeBtn.disabled = state
     setRunStatus(state ? 'running' : outcome)
   }
 
@@ -236,10 +240,12 @@ export function initRunner(
 
   attachWorkerHandlers()
 
-  function startRun(mode: 'normal' | 'trace' | 'grade' = 'normal', testCode?: string): void {
+  function startRun(mode: 'normal' | 'trace' | 'grade' = 'normal', gradeCode?: string, testCode?: string): void {
     if (running) return
 
-    const code = getValue(editor).trim()
+    // grade モードはエディタの表示中ファイルではなく、呼び出し側が明示的に渡した
+    // 採点対象ファイルの内容を使う（issue #65 レビュー指摘対応）
+    const code = mode === 'grade' ? (gradeCode ?? '').trim() : getValue(editor).trim()
     if (!code) return
 
     onRunStart?.()
@@ -273,6 +279,6 @@ export function initRunner(
 
   return {
     runTraceMode: () => startRun('trace'),
-    runGradeMode: (testCode) => startRun('grade', testCode),
+    runGradeMode: (code, testCode) => startRun('grade', code, testCode),
   }
 }

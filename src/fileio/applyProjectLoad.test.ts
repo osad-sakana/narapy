@@ -85,7 +85,7 @@ describe('applyProjectLoad', () => {
       },
     )
 
-    expect(onExerciseLoaded).toHaveBeenCalledWith({ problem: 'problem.md', test: 'test.py' }, files)
+    expect(onExerciseLoaded).toHaveBeenCalledWith({ problem: 'problem.md', test: 'test.py' }, files, 'main.py')
   })
 
   it('exerciseが無い場合はonExerciseLoadedにundefinedが渡る', () => {
@@ -103,6 +103,6 @@ describe('applyProjectLoad', () => {
       },
     )
 
-    expect(onExerciseLoaded).toHaveBeenCalledWith(undefined, expect.any(Array))
+    expect(onExerciseLoaded).toHaveBeenCalledWith(undefined, expect.any(Array), 'main.py')
   })
 })

@@ -11,7 +11,7 @@ export interface ApplyUrlLoadDeps {
   resolve?: () => Promise<UrlLoadResult | null>
   // #project=/?project=<URL> で読み込んだものが演習(.exercise)かどうかを検知する
   // 任意フック(issue #65)。通常の.narapyプロジェクトでは undefined で呼ばれる
-  onExerciseLoaded?: (exercise: ExerciseMeta | undefined, files: FileEntry[]) => void
+  onExerciseLoaded?: (exercise: ExerciseMeta | undefined, files: FileEntry[], activeFile: string) => void
 }
 
 // main.tsの起動シーケンスから呼ばれるオーケストレーション。
@@ -26,5 +26,5 @@ export async function applyUrlLoad(deps: ApplyUrlLoadDeps): Promise<void> {
 
   deps.loadProject(result.project.files, result.project.directories, result.project.activeFile)
   deps.refreshExplorer()
-  deps.onExerciseLoaded?.(result.project.exercise, result.project.files)
+  deps.onExerciseLoaded?.(result.project.exercise, result.project.files, result.project.activeFile)
 }

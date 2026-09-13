@@ -215,12 +215,16 @@ del _mp, _pkgs, _p
   }
 }
 
-async function cleanupUserModules(files: RunFile[]): Promise<void> {
-  if (!pyodide) return
-  const moduleNames = files
+// トップレベル（ディレクトリ直下以外）に置かれた .py ファイルの、拡張子抜きのモジュール名一覧。
+// sys.path に WORK_DIR が含まれるため、これらは `import main` のように名前で参照できてしまう。
+function topLevelPyModuleNames(files: RunFile[]): string[] {
+  return files
     .filter(f => f.kind === 'text' && f.path.endsWith('.py') && !f.path.includes('/'))
     .map(f => f.path.slice(0, -3))
-  if (moduleNames.length === 0) return
+}
+
+async function cleanupUserModules(moduleNames: string[]): Promise<void> {
+  if (!pyodide || moduleNames.length === 0) return
   await pyodide.runPythonAsync(`
 import sys, importlib as _il
 for _m in ${JSON.stringify(moduleNames)}:
@@ -284,7 +288,8 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
     // 残していないことを保証する。KeyboardInterrupt 注入は Worker を終了させないため、
     // ここでの防御的な解除が無いと以降の通常実行が静かに数十倍遅くなる。
     await pyodide.runPythonAsync('import sys as _sys; _sys.settrace(None); del _sys')
-    await cleanupUserModules(files)
+    const moduleNames = topLevelPyModuleNames(files)
+    await cleanupUserModules(moduleNames)
     writeFilesToFS(files, directories)
     // grade モードは test.py 内の import もプリロード対象に含める
     await loadExternalPackages(mode === 'grade' ? `${code}\n${testCode ?? ''}` : code)
@@ -293,29 +298,25 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
     pyodide.globals.set('__turtle_src__', TURTLE_MODULE_SRC)
     await pyodide.runPythonAsync(REGISTER_TURTLE_CODE)
 
-    if (mode === 'grade') {
-      const gradeJson = await runGrade(pyodide, code, testCode ?? '')
-      self.postMessage({ type: 'grade', payload: gradeJson } satisfies OutMessage)
-      self.postMessage({ type: 'result', payload: null } satisfies OutMessage)
-      return
-    }
-
     let traceError: string | null = null
     let result: unknown = null
     if (mode === 'trace') {
       const traceJson = await runTrace(pyodide, code, pristineGlobalNames)
       self.postMessage({ type: 'trace', payload: traceJson } satisfies OutMessage)
       traceError = (JSON.parse(traceJson) as { error: string | null }).error
+    } else if (mode === 'grade') {
+      const gradeJson = await runGrade(pyodide, code, testCode ?? '', moduleNames)
+      self.postMessage({ type: 'grade', payload: gradeJson } satisfies OutMessage)
     } else {
       result = await pyodide.runPythonAsync(code)
     }
 
-    // matplotlib フィギュアを抽出する。トレースモードでも close('all') を必ず
+    // matplotlib フィギュアを抽出する。トレース/採点モードでも close('all') を必ず
     // 実行しないと次回の通常実行時に古い図が残ってしまうため抽出自体は常に行うが、
-    // モーダル表示（postMessage）は通常実行時のみ行う（ステップ実行中にパネルの上へ
-    // モーダルが被るのを防ぐ。図の確認は通常実行で行う想定）
+    // モーダル表示（postMessage）は通常実行時のみ行う（ステップ実行中・採点中にパネルの
+    // 上へモーダルが被るのを防ぐ。図の確認は通常実行で行う想定）
     const figJson = await pyodide.runPythonAsync(EXTRACT_FIGS_CODE) as string
-    if (mode !== 'trace') {
+    if (mode === 'normal') {
       const figs = JSON.parse(figJson) as Array<{ num: number; data: string }>
       for (const fig of figs) {
         self.postMessage({ type: 'image', payload: fig.data, title: `Figure ${fig.num}` } satisfies OutMessage)
@@ -324,7 +325,7 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
 
     // turtle の描画コマンドを抽出し、線分があれば通常実行時のみメインスレッドへ送信
     const turtleJson = await pyodide.runPythonAsync(EXTRACT_TURTLE_CODE) as string
-    if (mode !== 'trace') {
+    if (mode === 'normal') {
       const turtleData = JSON.parse(turtleJson) as { segments: unknown[] }
       if (turtleData.segments.length > 0) {
         self.postMessage({ type: 'turtle', payload: turtleJson } satisfies OutMessage)
@@ -337,6 +338,11 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
       } else {
         self.postMessage({ type: 'result', payload: null } satisfies OutMessage)
       }
+      return
+    }
+
+    if (mode === 'grade') {
+      self.postMessage({ type: 'result', payload: null } satisfies OutMessage)
       return
     }
 

@@ -17,7 +17,7 @@ export interface ApplyProjectLoadDeps {
   setEditorFileName: (path: string) => void
   // 演習(.exercise)の読込を検知するための任意フック(issue #65)。exercise が無い
   // 通常の.narapyプロジェクトでは undefined で呼ばれ、演習パネルを閉じる契機になる
-  onExerciseLoaded?: (exercise: ExerciseMeta | undefined, files: FileEntry[]) => void
+  onExerciseLoaded?: (exercise: ExerciseMeta | undefined, files: FileEntry[], activeFile: string) => void
 }
 
 // .narapy プロジェクトの読込を適用するオーケストレーション(issue #45)。
@@ -33,5 +33,5 @@ export function applyProjectLoad(input: ProjectLoadInput, deps: ApplyProjectLoad
   const content = deps.getActiveContent()
   deps.openProjectFile(path, content)
   deps.setEditorFileName(path)
-  deps.onExerciseLoaded?.(input.exercise, input.files)
+  deps.onExerciseLoaded?.(input.exercise, input.files, input.activeFile)
 }

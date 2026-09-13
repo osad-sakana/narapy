@@ -1,7 +1,7 @@
 import { KeyMod, KeyCode } from 'monaco-editor'
 import { initLayout } from './layout/index'
 import { initRunner } from './runner/index'
-import { clearLog } from './runner/log'
+import { clearLog, appendLog } from './runner/log'
 import { createEditor, createEditorModelHost, getValue } from './editor/index'
 import { createFileOpener, createModelRegistry } from './editor/modelRegistry'
 import { initFontSizeControls } from './editor/fontSize'
@@ -32,6 +32,8 @@ import { createInstructorController } from './instructor/controller'
 import { createInstructorMenuAction, syncInstructorMenuItem, initInstructorBaselineButton } from './instructor/ui'
 import { createStepperController } from './stepper/controller'
 import { createExerciseController } from './exercise/controller'
+import { showProblemModal } from './exercise/problemModal'
+import { renderGradeResult } from './exercise/resultLog'
 
 // createEditor が解決済みテーマを読むため、他の初期化より先に実行する
 initTheme()
@@ -158,6 +160,9 @@ const exerciseController = createExerciseController({
     exerciseControls.classList.toggle('hidden', !visible)
     exerciseControls.classList.toggle('flex', visible)
   },
+  showProblem: (problemText) => showProblemModal(problemText),
+  renderResult: (json) => renderGradeResult(json),
+  onBrokenExercise: () => appendLog('⚠️ この演習(.exercise)は壊れているため、問題として読み込めませんでした', 'warn'),
 })
 
 problemBtn.addEventListener('click', () => exerciseController.showProblem())
@@ -169,7 +174,7 @@ try {
     hasUserContent,
     loadProject,
     refreshExplorer,
-    onExerciseLoaded: (exercise, files) => exerciseController.onProjectLoaded(exercise, files),
+    onExerciseLoaded: (exercise, files, activeFile) => exerciseController.onProjectLoaded(exercise, files, activeFile),
   })
 } catch (err) {
   window.alert(err instanceof Error ? err.message : String(err))
@@ -196,7 +201,15 @@ const runner = initRunner(
 
 gradeBtn.addEventListener('click', () => {
   const testCode = exerciseController.getTestCode()
-  if (testCode !== null) runner.runGradeMode(testCode)
+  const entryPath = exerciseController.getEntryPath()
+  if (testCode === null || entryPath === null) return
+  // エディタで問題文やtest.pyを開いていても常に採点対象ファイルを採点するため、
+  // エディタの表示中パスとは無関係にentryPathの「今の」内容をストアから読む
+  // （issue #65 レビュー指摘対応）。まずエディタの今の内容をストアへ同期する。
+  updateFileContent(fileSwitcher.getEditorPath(), getValue(editor))
+  const entryFile = getFiles().find(f => f.path === entryPath)
+  const code = entryFile?.content.kind === 'text' ? entryFile.content.data : ''
+  runner.runGradeMode(code, testCode)
 })
 
 const stepRunBtn = document.getElementById('stepRunBtn') as HTMLButtonElement
@@ -228,8 +241,8 @@ const projectLoadDeps = {
   getActiveContent,
   openProjectFile: openProjectFileWithReset,
   setEditorFileName: (path: string) => { editorFileName.textContent = path },
-  onExerciseLoaded: (exercise: ExerciseMeta | undefined, files: FileEntry[]) =>
-    exerciseController.onProjectLoaded(exercise, files),
+  onExerciseLoaded: (exercise: ExerciseMeta | undefined, files: FileEntry[], activeFile: string) =>
+    exerciseController.onProjectLoaded(exercise, files, activeFile),
 }
 
 // --- プロジェクトを開く (.narapy / .exercise) ---

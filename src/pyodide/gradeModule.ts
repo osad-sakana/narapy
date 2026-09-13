@@ -12,6 +12,8 @@ import io as _io
 import json as _json
 import ast as _ast
 import contextlib as _contextlib
+import sys as _sys
+import traceback as _traceback
 
 
 def _unsupported_input(prompt=""):
@@ -20,15 +22,29 @@ def _unsupported_input(prompt=""):
 
 def _extract_test_names(test_source, filename):
     tree = _ast.parse(test_source, filename)
-    return [
-        node.name for node in tree.body
-        if isinstance(node, _ast.FunctionDef) and node.name.startswith("test_")
-    ]
+    names = []
+    async_names = []
+    for node in tree.body:
+        if isinstance(node, _ast.FunctionDef) and node.name.startswith("test_"):
+            names.append(node.name)
+        elif isinstance(node, _ast.AsyncFunctionDef) and node.name.startswith("test_"):
+            async_names.append(node.name)
+    return names, async_names
 
 
-def _run_case(user_code, test_code, name):
-    # input() は採点対象外(issue #65 v1スコープ)なので、使われたら分かりやすいメッセージで失敗させる
-    case_globals = {"input": _unsupported_input}
+def _run_case(user_code, test_code, name, module_names):
+    # test.py が「from main import xxx」のように学生コードをモジュールとしてimportすると、
+    # sys.modules にキャッシュされてケース間で使い回されてしまい、フレッシュ実行による
+    # 状態分離が壊れる（2ケース目以降は再importされず、1ケース目の状態が漏れ続ける）。
+    # ケースごとにキャッシュを捨てることで、importされてもフレッシュ実行を保証する。
+    for module_name in module_names:
+        _sys.modules.pop(module_name, None)
+
+    # __main__ のグローバルではなく専用の辞書で実行するが、通常実行(runPythonAsync)と
+    # 同じく __name__ == "__main__" のコードが動くよう明示的に揃える。揃えないと
+    # if __name__ == "__main__": の中身が採点時だけ実行されず、通常実行では合格する
+    # コードが採点では不合格になってしまう。
+    case_globals = {"__name__": "__main__", "input": _unsupported_input}
     stdout_buffer = _io.StringIO()
     with _contextlib.redirect_stdout(stdout_buffer):
         exec(user_code, case_globals)
@@ -42,14 +58,27 @@ def _run_case(user_code, test_code, name):
     return {"name": name, "passed": True, "message": None}
 
 
-def run_tests(user_source, test_source, user_filename, test_filename):
+def run_tests(user_source, test_source, user_filename, test_filename, module_names):
     try:
-        test_names = _extract_test_names(test_source, test_filename)
+        test_names, async_test_names = _extract_test_names(test_source, test_filename)
     except SyntaxError as e:
         return _json.dumps({"cases": [], "error": "テストの構文エラー: {}".format(e)})
 
+    if async_test_names:
+        return _json.dumps({
+            "cases": [],
+            "error": "async def のテスト関数には対応していません: {}".format(", ".join(async_test_names)),
+        })
+
     if not test_names:
         return _json.dumps({"cases": [], "error": "test_ から始まる関数が見つかりません"})
+
+    duplicates = sorted({n for n in test_names if test_names.count(n) > 1})
+    if duplicates:
+        return _json.dumps({
+            "cases": [],
+            "error": "test.py内に同名の関数が複数あります: {}".format(", ".join(duplicates)),
+        })
 
     try:
         user_code = compile(user_source, user_filename, "exec")
@@ -64,7 +93,7 @@ def run_tests(user_source, test_source, user_filename, test_filename):
     cases = []
     for name in test_names:
         try:
-            cases.append(_run_case(user_code, test_code, name))
+            cases.append(_run_case(user_code, test_code, name, module_names))
         except AssertionError as e:
             message = str(e) if str(e) else "期待した結果と一致しませんでした"
             cases.append({"name": name, "passed": False, "message": message})
@@ -72,7 +101,10 @@ def run_tests(user_source, test_source, user_filename, test_filename):
             # 停止操作によるものなので、採点結果を返さずそのまま上位へ伝播させる
             raise
         except Exception as e:
-            cases.append({"name": name, "passed": False, "message": "{}: {}".format(type(e).__name__, e)})
+            # errorTranslator.ts（通常実行のエラー翻訳）に日本語化させるため、
+            # 通常実行時と同じ形式（"<exec>"をファイル名ラベルにしたトレースバック）で返す
+            tb_text = "".join(_traceback.format_exception(type(e), e, e.__traceback__))
+            cases.append({"name": name, "passed": False, "message": tb_text.replace(user_filename, "<exec>").strip()})
 
     return _json.dumps({"cases": cases, "error": None})
 `

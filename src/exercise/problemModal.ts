@@ -3,15 +3,16 @@
 // problem.md の中身は信頼できない入力として扱う必要がある。Markdownのレンダリング
 // （innerHTML等）はここでは行わず、textContentでエスケープしたまま pre-wrap で
 // 改行だけ保持して表示する（書式付き表示は将来課題）。
-const MODAL_MARKER = 'data-narapy-problem-modal'
+// 「問題」ボタンの連打や、演習読込直後の自動表示と手動表示が重なるケースでモーダルが
+// 積み重ならないよう、既存インスタンスがあれば close() してから開き直す。DOMから
+// backdrop要素を消すだけでは document への keydown リスナーが残り続けてしまうため、
+// 必ずこの close() 経由で片付ける。
+let closeCurrent: (() => void) | null = null
 
 export function showProblemModal(problemText: string): void {
-  // 「問題」ボタンの連打や、演習読込直後の自動表示と手動表示が重なるケースで
-  // モーダルが積み重ならないよう、既に開いていれば閉じてから開き直す
-  document.querySelector(`[${MODAL_MARKER}]`)?.remove()
+  closeCurrent?.()
 
   const backdrop = document.createElement('div')
-  backdrop.setAttribute(MODAL_MARKER, 'true')
   backdrop.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4'
 
   const card = document.createElement('div')
@@ -43,6 +44,7 @@ export function showProblemModal(problemText: string): void {
   const close = (): void => {
     backdrop.remove()
     document.removeEventListener('keydown', handleKey)
+    if (closeCurrent === close) closeCurrent = null
   }
 
   const handleKey = (e: KeyboardEvent): void => {
@@ -52,4 +54,5 @@ export function showProblemModal(problemText: string): void {
   closeBtn.addEventListener('click', close)
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close() })
   document.addEventListener('keydown', handleKey)
+  closeCurrent = close
 }

@@ -248,8 +248,12 @@ export function initRunner(
     const code = mode === 'grade' ? (gradeCode ?? '').trim() : getValue(editor).trim()
     if (!code) {
       // grade は採点ボタンを押しても無言で何も起きないと故障に見えるため、
-      // 通常実行と違いログへ理由を残す（採点対象ファイルの削除・リネーム等で空になるケース）
-      if (mode === 'grade') appendLog('[採点エラー] 採点対象のファイルが空です', 'error')
+      // 通常実行と違いログへ理由を残す（採点対象ファイルの削除・リネーム等で空になるケース）。
+      // 他の採点開始経路と同様にclearLog()してから出す（前回の実行結果の下に付かないように）
+      if (mode === 'grade') {
+        clearLog()
+        appendLog('[採点エラー] 採点対象のファイルが空です', 'error')
+      }
       return
     }
 

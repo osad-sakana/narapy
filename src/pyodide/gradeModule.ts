@@ -26,12 +26,15 @@ def _unsupported_input(prompt=""):
     raise _UnsupportedInput()
 
 
-def _format_syntax_error(e, filename):
+def _format_syntax_error(e, filename, label):
     # errorTranslator.ts（通常実行のエラー翻訳）に日本語化させるため、通常実行時と
-    # 同じ形式（"<exec>"をファイル名ラベルにしたトレースバック）で返す。素の
-    # str(e) だと内部の仮想パス（__entry__.py等）が漏れ、翻訳ルールにもマッチしない。
+    # 同じ形式（ファイル名を仮想ラベルにしたトレースバック）で返す。素の str(e) だと
+    # 内部の仮想パス（__entry__.py等）が漏れ、翻訳ルールにもマッチしない。
+    # test.py側は"<exec>"にせず"<test>"にする理由: errorTranslator.tsは"<exec>"の
+    # 最後の出現行を「学生コードの行」として抽出するため、test.py由来の例外まで
+    # "<exec>"にすると学生コードの無関係な行がハイライトされてしまう。
     detail = "".join(_traceback.format_exception_only(type(e), e))
-    return detail.replace(filename, "<exec>").strip()
+    return detail.replace(filename, label).strip()
 
 
 def _extract_test_names(test_source, filename):
@@ -84,7 +87,7 @@ def run_tests(user_source, test_source, user_filename, test_filename, module_nam
     try:
         test_names, async_test_names = _extract_test_names(test_source, test_filename)
     except SyntaxError as e:
-        return _json.dumps({"cases": [], "error": _format_syntax_error(e, test_filename)})
+        return _json.dumps({"cases": [], "error": _format_syntax_error(e, test_filename, "<test>")})
 
     if async_test_names:
         return _json.dumps({
@@ -105,12 +108,12 @@ def run_tests(user_source, test_source, user_filename, test_filename, module_nam
     try:
         user_code = compile(user_source, user_filename, "exec")
     except SyntaxError as e:
-        return _json.dumps({"cases": [], "error": _format_syntax_error(e, user_filename)})
+        return _json.dumps({"cases": [], "error": _format_syntax_error(e, user_filename, "<exec>")})
 
     try:
         test_code = compile(test_source, test_filename, "exec")
     except SyntaxError as e:
-        return _json.dumps({"cases": [], "error": _format_syntax_error(e, test_filename)})
+        return _json.dumps({"cases": [], "error": _format_syntax_error(e, test_filename, "<test>")})
 
     cases = []
     for name in test_names:
@@ -127,7 +130,8 @@ def run_tests(user_source, test_source, user_filename, test_filename, module_nam
         except Exception as e:
             tb = _trim_internal_frames(e.__traceback__, (user_filename, test_filename))
             tb_text = "".join(_traceback.format_exception(type(e), e, tb))
-            cases.append({"name": name, "passed": False, "message": tb_text.replace(user_filename, "<exec>").strip()})
+            message = tb_text.replace(user_filename, "<exec>").replace(test_filename, "<test>")
+            cases.append({"name": name, "passed": False, "message": message.strip()})
 
     return _json.dumps({"cases": cases, "error": None})
 `

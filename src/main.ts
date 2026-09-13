@@ -5,7 +5,8 @@ import { clearLog } from './runner/log'
 import { createEditor, createEditorModelHost, getValue } from './editor/index'
 import { createFileOpener, createModelRegistry } from './editor/modelRegistry'
 import { initFontSizeControls } from './editor/fontSize'
-import { downloadNarapyProject, openNarapyFilePicker } from './fileio/index'
+import { downloadNarapyProject, openNarapyFilePicker, type ExerciseMeta } from './fileio/index'
+import type { FileEntry } from './explorer/types'
 import { createExplorer } from './explorer/ui'
 import { initAbout } from './about/index'
 import {
@@ -30,6 +31,7 @@ import { applyNewProject } from './menu/applyNewProject'
 import { createInstructorController } from './instructor/controller'
 import { createInstructorMenuAction, syncInstructorMenuItem, initInstructorBaselineButton } from './instructor/ui'
 import { createStepperController } from './stepper/controller'
+import { createExerciseController } from './exercise/controller'
 
 // createEditor が解決済みテーマを読むため、他の初期化より先に実行する
 initTheme()
@@ -146,10 +148,29 @@ const { refresh: refreshExplorer } = createExplorer(explorerContainer, {
   },
 })
 
+// --- 演習(.exercise)モード (issue #65) ---
+const exerciseControls = document.getElementById('exerciseControls') as HTMLElement
+const problemBtn = document.getElementById('problemBtn') as HTMLButtonElement
+const gradeBtn = document.getElementById('gradeBtn') as HTMLButtonElement
+
+const exerciseController = createExerciseController({
+  setGradeControlsVisible: (visible) => {
+    exerciseControls.classList.toggle('hidden', !visible)
+    exerciseControls.classList.toggle('flex', visible)
+  },
+})
+
+problemBtn.addEventListener('click', () => exerciseController.showProblem())
+
 // --- URLパラメータからの初期プロジェクト読み込み (issue #32) ---
 // #project= > #code= > ?project=<URL> の優先順位で解決する。既存の作業内容がある場合のみ確認する。
 try {
-  await applyUrlLoad({ hasUserContent, loadProject, refreshExplorer })
+  await applyUrlLoad({
+    hasUserContent,
+    loadProject,
+    refreshExplorer,
+    onExerciseLoaded: (exercise, files) => exerciseController.onProjectLoaded(exercise, files),
+  })
 } catch (err) {
   window.alert(err instanceof Error ? err.message : String(err))
 }
@@ -161,11 +182,22 @@ openProjectFileWithReset(getActiveFile(), getActiveContent())
 editorFileName.textContent = getActiveFile()
 
 
-const runner = initRunner(editor, () => {
-  // 実行前に現在の内容をストアへ同期（エディタが実際に表示しているパスへ、issue #45 L1）
-  updateFileContent(fileSwitcher.getEditorPath(), getValue(editor))
-  return getAllFilesForRun()
-}, (json) => stepperController.onTraceResult(json), () => stepperController.invalidate())
+const runner = initRunner(
+  editor,
+  () => {
+    // 実行前に現在の内容をストアへ同期（エディタが実際に表示しているパスへ、issue #45 L1）
+    updateFileContent(fileSwitcher.getEditorPath(), getValue(editor))
+    return getAllFilesForRun()
+  },
+  (json) => stepperController.onTraceResult(json),
+  () => stepperController.invalidate(),
+  (json) => exerciseController.onGradeResult(json),
+)
+
+gradeBtn.addEventListener('click', () => {
+  const testCode = exerciseController.getTestCode()
+  if (testCode !== null) runner.runGradeMode(testCode)
+})
 
 const stepRunBtn = document.getElementById('stepRunBtn') as HTMLButtonElement
 stepRunBtn.addEventListener('click', () => runner.runTraceMode())
@@ -196,15 +228,17 @@ const projectLoadDeps = {
   getActiveContent,
   openProjectFile: openProjectFileWithReset,
   setEditorFileName: (path: string) => { editorFileName.textContent = path },
+  onExerciseLoaded: (exercise: ExerciseMeta | undefined, files: FileEntry[]) =>
+    exerciseController.onProjectLoaded(exercise, files),
 }
 
-// --- プロジェクトを開く (.narapy) ---
+// --- プロジェクトを開く (.narapy / .exercise) ---
 const importProjectBtn = document.getElementById('importProjectBtn') as HTMLButtonElement
 importProjectBtn.addEventListener('click', () => {
   openNarapyFilePicker(
     (project) => {
       applyProjectLoad(
-        { files: project.files, directories: project.directories, activeFile: project.activeFile },
+        { files: project.files, directories: project.directories, activeFile: project.activeFile, exercise: project.exercise },
         projectLoadDeps,
       )
     },

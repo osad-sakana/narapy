@@ -1,9 +1,11 @@
 import type { DirectoryEntry, FileEntry } from '../explorer/types'
+import type { ExerciseMeta } from './index'
 
 export interface ProjectLoadInput {
   files: FileEntry[]
   directories: DirectoryEntry[]
   activeFile: string
+  exercise?: ExerciseMeta
 }
 
 export interface ApplyProjectLoadDeps {
@@ -13,6 +15,9 @@ export interface ApplyProjectLoadDeps {
   getActiveContent: () => string
   openProjectFile: (path: string, content: string) => void
   setEditorFileName: (path: string) => void
+  // 演習(.exercise)の読込を検知するための任意フック(issue #65)。exercise が無い
+  // 通常の.narapyプロジェクトでは undefined で呼ばれ、演習パネルを閉じる契機になる
+  onExerciseLoaded?: (exercise: ExerciseMeta | undefined, files: FileEntry[]) => void
 }
 
 // .narapy プロジェクトの読込を適用するオーケストレーション(issue #45)。
@@ -28,4 +33,5 @@ export function applyProjectLoad(input: ProjectLoadInput, deps: ApplyProjectLoad
   const content = deps.getActiveContent()
   deps.openProjectFile(path, content)
   deps.setEditorFileName(path)
+  deps.onExerciseLoaded?.(input.exercise, input.files)
 }

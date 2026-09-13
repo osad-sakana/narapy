@@ -2,17 +2,28 @@ import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate'
 import type { FileEntry, DirectoryEntry } from '../explorer/types'
 import { detectFileKind, guessMime } from '../explorer/fileKind'
 
+// 練習問題の演習パッケージであることを示すメタデータ(issue #65)。
+// problem/test はプロジェクト内のファイルパス（例: 'problem.md' / 'test.py'）を指す。
+// .narapy と同じzipコンテナ（narapy.json + files/）を使い、この任意フィールドの
+// 有無だけで「通常のプロジェクト」と「採点付き演習(.exercise)」を区別する。
+export interface ExerciseMeta {
+  problem: string
+  test: string
+}
+
 export interface NarapyProject {
   version: 2
   files: FileEntry[]
   directories: DirectoryEntry[]
   activeFile: string
+  exercise?: ExerciseMeta
 }
 
 interface NarapyMetadataV2 {
   version: 2
   activeFile: string
   directories: string[]
+  exercise?: ExerciseMeta
 }
 
 interface NarapyMetadataV1 {
@@ -41,6 +52,7 @@ export function buildNarapyArchive(project: NarapyProject) {
     version: 2,
     activeFile: project.activeFile,
     directories: project.directories.map(d => d.path),
+    ...(project.exercise ? { exercise: project.exercise } : {}),
   }
   archive[META_FILENAME] = strToU8(JSON.stringify(metadata, null, 2))
 
@@ -67,7 +79,8 @@ export function openNarapyFilePicker(
 ): void {
   const input = document.createElement('input')
   input.type = 'file'
-  input.accept = '.narapy'
+  // .exercise も同じzipコンテナ形式（exerciseメタデータ付き）なので同じピッカーで開ける(issue #65)
+  input.accept = '.narapy,.exercise'
   input.addEventListener('change', async () => {
     const file = input.files?.[0]
     if (!file) return
@@ -128,6 +141,7 @@ export function parseNarapyArchive(data: Uint8Array): NarapyProject {
     files,
     directories: metaRaw.directories.map(p => ({ path: p })),
     activeFile: metaRaw.activeFile,
+    ...(metaRaw.exercise ? { exercise: metaRaw.exercise } : {}),
   }
 }
 
@@ -158,13 +172,23 @@ function parseLegacyJson(raw: string): NarapyProject {
   }
 }
 
+function isExerciseMeta(value: unknown): value is ExerciseMeta {
+  if (typeof value !== 'object' || value === null) return false
+  const obj = value as Record<string, unknown>
+  return typeof obj['problem'] === 'string' && typeof obj['test'] === 'string'
+}
+
 function isMetaV2(value: unknown): value is NarapyMetadataV2 {
   if (typeof value !== 'object' || value === null) return false
   const obj = value as Record<string, unknown>
   if (obj['version'] !== 2) return false
   if (typeof obj['activeFile'] !== 'string') return false
   if (!Array.isArray(obj['directories'])) return false
-  return obj['directories'].every(d => typeof d === 'string')
+  if (!obj['directories'].every(d => typeof d === 'string')) return false
+  // exercise は任意フィールド。値があるのに形が不正な場合のみ拒否する
+  // （欠けているだけなら通常の .narapy プロジェクトとして扱う）
+  if (obj['exercise'] !== undefined && !isExerciseMeta(obj['exercise'])) return false
+  return true
 }
 
 function isMetaV1(value: unknown): value is NarapyMetadataV1 {

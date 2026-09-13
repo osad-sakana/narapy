@@ -26,6 +26,9 @@ export interface RunnerHandle {
   // ステップ実行トレースを開始する（src/stepper/controller.ts から呼ばれる）。
   // 実行中は何もしない（通常実行中にステップ実行を割り込ませない）。
   runTraceMode: () => void
+  // 演習の採点を開始する（src/exercise/controller.ts から呼ばれる、issue #65）。
+  // 通常実行と同じタイムアウト・停止ボタンの仕組みをそのまま利用する。
+  runGradeMode: (testCode: string) => void
 }
 
 export function initRunner(
@@ -35,6 +38,7 @@ export function initRunner(
   // 通常実行・ステップ実行のどちらを開始する場合でも、古いステップ実行結果
   // （行ハイライト・変数一覧）を残さないよう呼び出す（stepper/controller.ts の invalidate）
   onRunStart?: () => void,
+  onGradeResult?: (json: string) => void,
 ): RunnerHandle {
   const runBtn     = document.getElementById('runBtn')     as HTMLButtonElement
   const copyLogBtn = document.getElementById('copyLogBtn') as HTMLButtonElement
@@ -194,6 +198,11 @@ export function initRunner(
         return
       }
 
+      if (msg.type === 'grade') {
+        onGradeResult?.(msg.payload)
+        return
+      }
+
       if (msg.type === 'stdout') {
         appendLog(msg.payload, 'output')
       } else if (msg.type === 'result') {
@@ -227,7 +236,7 @@ export function initRunner(
 
   attachWorkerHandlers()
 
-  function startRun(mode: 'normal' | 'trace' = 'normal'): void {
+  function startRun(mode: 'normal' | 'trace' | 'grade' = 'normal', testCode?: string): void {
     if (running) return
 
     const code = getValue(editor).trim()
@@ -236,9 +245,9 @@ export function initRunner(
     onRunStart?.()
     setRunning(true)
     clearLog()
-    appendLog('--- 実行開始 ---', 'info')
+    appendLog(mode === 'grade' ? '--- 採点開始 ---' : '--- 実行開始 ---', 'info')
     const { files, directories } = getRunFiles()
-    worker.postMessage({ type: 'run', code, files, directories, mode } satisfies RunPayload)
+    worker.postMessage({ type: 'run', code, files, directories, mode, testCode } satisfies RunPayload)
   }
 
   runBtn.addEventListener('click', () => {
@@ -262,5 +271,8 @@ export function initRunner(
     }, 1500)
   })
 
-  return { runTraceMode: () => startRun('trace') }
+  return {
+    runTraceMode: () => startRun('trace'),
+    runGradeMode: (testCode) => startRun('grade', testCode),
+  }
 }

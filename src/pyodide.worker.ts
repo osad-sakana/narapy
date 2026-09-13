@@ -4,6 +4,7 @@ import { MAX_INPUT_BYTES, type RunFile, type RunPayload } from './types'
 import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from './lib/pyodideLoader'
 import { TURTLE_MODULE_SRC } from './pyodide/turtleModule'
 import { runTrace } from './pyodide/traceRun'
+import { runGrade } from './pyodide/gradeRun'
 import type { PyodideInterface, PyodideModule } from './pyodide/pyodideTypes'
 
 type OutMessage =
@@ -12,6 +13,7 @@ type OutMessage =
   | { type: 'image'; payload: string; title: string }
   | { type: 'turtle'; payload: string }
   | { type: 'trace'; payload: string }
+  | { type: 'grade'; payload: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
   | { type: 'input_request'; prompt: string }
   | { type: 'interrupt_sab'; sab: SharedArrayBuffer }
@@ -267,7 +269,7 @@ function writeFilesToFS(files: RunFile[], directories: string[]): void {
 self.onmessage = async (event: MessageEvent<RunPayload>) => {
   if (event.data.type !== 'run') return
 
-  const { code, files, directories, mode } = event.data
+  const { code, files, directories, mode, testCode } = event.data
 
   try {
     await initPromise
@@ -284,11 +286,19 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
     await pyodide.runPythonAsync('import sys as _sys; _sys.settrace(None); del _sys')
     await cleanupUserModules(files)
     writeFilesToFS(files, directories)
-    await loadExternalPackages(code)
+    // grade モードは test.py 内の import もプリロード対象に含める
+    await loadExternalPackages(mode === 'grade' ? `${code}\n${testCode ?? ''}` : code)
 
     // turtle モジュールを毎回フレッシュ登録（描画状態をリセット）
     pyodide.globals.set('__turtle_src__', TURTLE_MODULE_SRC)
     await pyodide.runPythonAsync(REGISTER_TURTLE_CODE)
+
+    if (mode === 'grade') {
+      const gradeJson = await runGrade(pyodide, code, testCode ?? '')
+      self.postMessage({ type: 'grade', payload: gradeJson } satisfies OutMessage)
+      self.postMessage({ type: 'result', payload: null } satisfies OutMessage)
+      return
+    }
 
     let traceError: string | null = null
     let result: unknown = null

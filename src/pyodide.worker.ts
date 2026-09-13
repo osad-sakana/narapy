@@ -273,7 +273,7 @@ function writeFilesToFS(files: RunFile[], directories: string[]): void {
 self.onmessage = async (event: MessageEvent<RunPayload>) => {
   if (event.data.type !== 'run') return
 
-  const { code, files, directories, testCode } = event.data
+  const { code, files, directories, testCode, entryPath } = event.data
   // types.ts の RunPayload.mode は「省略時は 'normal'」を仕様としているため、
   // 送信側が省略した場合もここで正規化する（mode === 'normal' 判定に一本化するため）
   const mode = event.data.mode ?? 'normal'
@@ -308,7 +308,11 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
       self.postMessage({ type: 'trace', payload: traceJson } satisfies OutMessage)
       traceError = (JSON.parse(traceJson) as { error: string | null }).error
     } else if (mode === 'grade') {
-      const gradeJson = await runGrade(pyodide, code, testCode ?? '', moduleNames)
+      // test.pyが採点対象ファイルを「from main import ...」のようにimportすると、
+      // FS上の実パス（WORK_DIR + entryPath）を含むトレースバックが返ることがある。
+      // 内容はuserCode(=code)と同一なので、これも<exec>ラベルに正規化する
+      const entryFsPath = entryPath ? `${WORK_DIR}/${entryPath}` : null
+      const gradeJson = await runGrade(pyodide, code, testCode ?? '', moduleNames, entryFsPath)
       self.postMessage({ type: 'grade', payload: gradeJson } satisfies OutMessage)
     } else {
       result = await pyodide.runPythonAsync(code)

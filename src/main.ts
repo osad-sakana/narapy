@@ -209,7 +209,7 @@ gradeBtn.addEventListener('click', () => {
   updateFileContent(fileSwitcher.getEditorPath(), getValue(editor))
   const entryFile = getFiles().find(f => f.path === entryPath)
   const code = entryFile?.content.kind === 'text' ? entryFile.content.data : ''
-  runner.runGradeMode(code, testCode)
+  runner.runGradeMode(code, testCode, entryPath)
 })
 
 const stepRunBtn = document.getElementById('stepRunBtn') as HTMLButtonElement

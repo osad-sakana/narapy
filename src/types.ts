@@ -46,6 +46,11 @@ export interface RunPayload {
   mode?: 'normal' | 'trace' | 'grade'
   // mode: 'grade' のときの test.py の内容
   testCode?: string
+  // mode: 'grade' のときの採点対象ファイルのプロジェクト内相対パス（例: 'main.py'）。
+  // test.pyがこのファイルを `from main import ...` のようにimportすると、FS上の
+  // 実パス（/home/pyodide/main.py）を含むトレースバックが返ることがあるため、
+  // それを <exec> ラベルに正しく置換できるよう worker 側へ渡す(issue #65)
+  entryPath?: string
 }
 
 // 演習採点1件分の結果（src/pyodide/gradeModule.ts の run_tests() が返すJSONの要素）

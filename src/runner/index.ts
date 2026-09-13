@@ -29,8 +29,9 @@ export interface RunnerHandle {
   // 演習の採点を開始する（src/exercise/controller.ts から呼ばれる、issue #65）。
   // 通常実行と同じタイムアウト・停止ボタンの仕組みをそのまま利用する。
   // code はエディタの表示中ファイルではなく、演習が採点対象と定めたファイルの内容を
-  // 呼び出し側が明示的に渡す（問題文やtest.pyを開いたまま採点ボタンを押す事故を防ぐため）
-  runGradeMode: (code: string, testCode: string) => void
+  // 呼び出し側が明示的に渡す（問題文やtest.pyを開いたまま採点ボタンを押す事故を防ぐため）。
+  // entryPath はそのファイルのプロジェクト内相対パス（trace/normalには影響しない）
+  runGradeMode: (code: string, testCode: string, entryPath: string) => void
 }
 
 export function initRunner(
@@ -240,7 +241,7 @@ export function initRunner(
 
   attachWorkerHandlers()
 
-  function startRun(mode: 'normal' | 'trace' | 'grade' = 'normal', gradeCode?: string, testCode?: string): void {
+  function startRun(mode: 'normal' | 'trace' | 'grade' = 'normal', gradeCode?: string, testCode?: string, entryPath?: string): void {
     if (running) return
 
     // grade モードはエディタの表示中ファイルではなく、呼び出し側が明示的に渡した
@@ -262,7 +263,7 @@ export function initRunner(
     clearLog()
     appendLog(mode === 'grade' ? '--- 採点開始 ---' : '--- 実行開始 ---', 'info')
     const { files, directories } = getRunFiles()
-    worker.postMessage({ type: 'run', code, files, directories, mode, testCode } satisfies RunPayload)
+    worker.postMessage({ type: 'run', code, files, directories, mode, testCode, entryPath } satisfies RunPayload)
   }
 
   runBtn.addEventListener('click', () => {
@@ -288,6 +289,6 @@ export function initRunner(
 
   return {
     runTraceMode: () => startRun('trace'),
-    runGradeMode: (code, testCode) => startRun('grade', code, testCode),
+    runGradeMode: (code, testCode, entryPath) => startRun('grade', code, testCode, entryPath),
   }
 }

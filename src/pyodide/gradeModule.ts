@@ -83,7 +83,7 @@ def _run_case(user_code, test_code, name, module_names):
     return {"name": name, "passed": True, "message": None}
 
 
-def run_tests(user_source, test_source, user_filename, test_filename, module_names):
+def run_tests(user_source, test_source, user_filename, test_filename, module_names, entry_fs_path):
     try:
         test_names, async_test_names = _extract_test_names(test_source, test_filename)
     except SyntaxError as e:
@@ -131,6 +131,11 @@ def run_tests(user_source, test_source, user_filename, test_filename, module_nam
             tb = _trim_internal_frames(e.__traceback__, (user_filename, test_filename))
             tb_text = "".join(_traceback.format_exception(type(e), e, tb))
             message = tb_text.replace(user_filename, "<exec>").replace(test_filename, "<test>")
+            if entry_fs_path:
+                # test.pyが採点対象ファイルを「from main import ...」のようにimportすると、
+                # FS上の実パス（例: /home/pyodide/main.py）を含むフレームが残ることがある。
+                # 内容はuser_sourceと同一なので<exec>に統一する
+                message = message.replace(entry_fs_path, "<exec>")
             cases.append({"name": name, "passed": False, "message": message.strip()})
 
     return _json.dumps({"cases": cases, "error": None})

@@ -32,7 +32,7 @@ import { createInstructorController } from './instructor/controller'
 import { createInstructorMenuAction, syncInstructorMenuItem, initInstructorBaselineButton } from './instructor/ui'
 import { createStepperController } from './stepper/controller'
 import { createExerciseController } from './exercise/controller'
-import { showProblemModal } from './exercise/problemModal'
+import { createProblemPanel } from './exercise/problemPanel'
 import { renderGradeResult } from './exercise/resultLog'
 
 // createEditor が解決済みテーマを読むため、他の初期化より先に実行する
@@ -154,18 +154,28 @@ const { refresh: refreshExplorer } = createExplorer(explorerContainer, {
 const exerciseControls = document.getElementById('exerciseControls') as HTMLElement
 const problemBtn = document.getElementById('problemBtn') as HTMLButtonElement
 const gradeBtn = document.getElementById('gradeBtn') as HTMLButtonElement
+const problemPanelEl = document.getElementById('problemPanel') as HTMLElement
+const problemPanelBody = document.getElementById('problemPanelBody') as HTMLElement
+const problemPanelCloseBtn = document.getElementById('problemPanelCloseBtn') as HTMLButtonElement
+
+const problemPanel = createProblemPanel(problemPanelEl, problemPanelBody)
 
 const exerciseController = createExerciseController({
   setGradeControlsVisible: (visible) => {
     exerciseControls.classList.toggle('hidden', !visible)
     exerciseControls.classList.toggle('flex', visible)
+    // 通常プロジェクトへ切り替わった後にパネルが残らないようにする
+    if (!visible) problemPanel.hide()
   },
-  showProblem: (problemText) => showProblemModal(problemText),
+  showProblem: (problemText) => problemPanel.show(problemText),
   renderResult: (json) => renderGradeResult(json),
   onBrokenExercise: () => appendLog('⚠️ この演習(.exercise)は壊れているため、問題として読み込めませんでした', 'warn'),
 })
 
-problemBtn.addEventListener('click', () => exerciseController.showProblem())
+// エディタ上部の常設パネルの開閉トグル。表示内容自体はcontroller経由で読み込み時に
+// 一度セット済みのため、ここではパネルの開閉だけを行えばよい
+problemBtn.addEventListener('click', () => problemPanel.toggle())
+problemPanelCloseBtn.addEventListener('click', () => problemPanel.hide())
 
 // --- URLパラメータからの初期プロジェクト読み込み (issue #32) ---
 // #project= > #code= > ?project=<URL> の優先順位で解決する。既存の作業内容がある場合のみ確認する。

@@ -84,18 +84,6 @@ describe('createExerciseController', () => {
     expect(setGradeControlsVisible).toHaveBeenLastCalledWith(false)
   })
 
-  it('showProblem()は最後に読み込んだ演習の問題文を再表示する', () => {
-    const showProblem = vi.fn()
-    const controller = createExerciseController({ setGradeControlsVisible: vi.fn(), showProblem, renderResult: vi.fn() })
-
-    controller.onProjectLoaded({ problem: 'problem.md', test: 'test.py' }, exerciseFiles, 'main.py')
-    showProblem.mockClear()
-
-    controller.showProblem()
-
-    expect(showProblem).toHaveBeenCalledWith('# 足し算')
-  })
-
   it('onGradeResultはrenderResultへそのまま委譲する', () => {
     const renderResult = vi.fn()
     const controller = createExerciseController({ setGradeControlsVisible: vi.fn(), showProblem: vi.fn(), renderResult })

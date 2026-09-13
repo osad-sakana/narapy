@@ -23,7 +23,6 @@ export interface ExerciseController {
   getEntryPath: () => string | null
   getTestCode: () => string | null
   onGradeResult: (json: string) => void
-  showProblem: () => void
 }
 
 export function createExerciseController(deps: ExerciseControllerDeps): ExerciseController {
@@ -44,6 +43,5 @@ export function createExerciseController(deps: ExerciseControllerDeps): Exercise
     getEntryPath: () => current?.entryPath ?? null,
     getTestCode: () => current?.testCode ?? null,
     onGradeResult: deps.renderResult,
-    showProblem: () => { if (current) deps.showProblem(current.problemText) },
   }
 }

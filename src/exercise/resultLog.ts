@@ -15,7 +15,16 @@ export function renderGradeResult(json: string): void {
   }
 
   if (result.error) {
-    appendLog(`[採点エラー] ${result.error}`, 'error')
+    // 「test_ から始まる関数が見つかりません」等の案内文はtranslatePythonErrorに
+    // マッチしない素の日本語文なのでそのまま表示され、SyntaxError等のPython例外は
+    // gradeModule.tsで通常実行と同じトレースバック形式に整形済みなので翻訳が効く
+    const translated = translatePythonError(result.error)
+    if (translated) {
+      appendLog('[採点エラー]', 'error')
+      appendErrorBlock({ ...translated, raw: result.error })
+    } else {
+      appendLog(`[採点エラー] ${result.error}`, 'error')
+    }
     return
   }
 

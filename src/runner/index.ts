@@ -246,7 +246,12 @@ export function initRunner(
     // grade モードはエディタの表示中ファイルではなく、呼び出し側が明示的に渡した
     // 採点対象ファイルの内容を使う（issue #65 レビュー指摘対応）
     const code = mode === 'grade' ? (gradeCode ?? '').trim() : getValue(editor).trim()
-    if (!code) return
+    if (!code) {
+      // grade は採点ボタンを押しても無言で何も起きないと故障に見えるため、
+      // 通常実行と違いログへ理由を残す（採点対象ファイルの削除・リネーム等で空になるケース）
+      if (mode === 'grade') appendLog('[採点エラー] 採点対象のファイルが空です', 'error')
+      return
+    }
 
     onRunStart?.()
     setRunning(true)

@@ -273,7 +273,10 @@ function writeFilesToFS(files: RunFile[], directories: string[]): void {
 self.onmessage = async (event: MessageEvent<RunPayload>) => {
   if (event.data.type !== 'run') return
 
-  const { code, files, directories, mode, testCode } = event.data
+  const { code, files, directories, testCode } = event.data
+  // types.ts の RunPayload.mode は「省略時は 'normal'」を仕様としているため、
+  // 送信側が省略した場合もここで正規化する（mode === 'normal' 判定に一本化するため）
+  const mode = event.data.mode ?? 'normal'
 
   try {
     await initPromise

@@ -16,8 +16,22 @@ import sys as _sys
 import traceback as _traceback
 
 
+# 学生コード自身の except Exception: に飲み込まれて「なぜ不合格か」が
+# 分からなくなる事故を避けるため、Exceptionではなく BaseException を継承する
+class _UnsupportedInput(BaseException):
+    pass
+
+
 def _unsupported_input(prompt=""):
-    raise RuntimeError("採点ではinput()は使用できません")
+    raise _UnsupportedInput()
+
+
+def _format_syntax_error(e, filename):
+    # errorTranslator.ts（通常実行のエラー翻訳）に日本語化させるため、通常実行時と
+    # 同じ形式（"<exec>"をファイル名ラベルにしたトレースバック）で返す。素の
+    # str(e) だと内部の仮想パス（__entry__.py等）が漏れ、翻訳ルールにもマッチしない。
+    detail = "".join(_traceback.format_exception_only(type(e), e))
+    return detail.replace(filename, "<exec>").strip()
 
 
 def _extract_test_names(test_source, filename):
@@ -30,6 +44,14 @@ def _extract_test_names(test_source, filename):
         elif isinstance(node, _ast.AsyncFunctionDef) and node.name.startswith("test_"):
             async_names.append(node.name)
     return names, async_names
+
+
+def _trim_internal_frames(tb, filenames):
+    # run_tests/_run_case 自身のフレームは学生には無関係なので、ユーザーコード or
+    # test.py 由来のフレームに達するまで読み飛ばす（「元のエラーを表示」を煩雑にしないため）
+    while tb is not None and tb.tb_frame.f_code.co_filename not in filenames:
+        tb = tb.tb_next
+    return tb
 
 
 def _run_case(user_code, test_code, name, module_names):
@@ -62,7 +84,7 @@ def run_tests(user_source, test_source, user_filename, test_filename, module_nam
     try:
         test_names, async_test_names = _extract_test_names(test_source, test_filename)
     except SyntaxError as e:
-        return _json.dumps({"cases": [], "error": "テストの構文エラー: {}".format(e)})
+        return _json.dumps({"cases": [], "error": _format_syntax_error(e, test_filename)})
 
     if async_test_names:
         return _json.dumps({
@@ -83,17 +105,19 @@ def run_tests(user_source, test_source, user_filename, test_filename, module_nam
     try:
         user_code = compile(user_source, user_filename, "exec")
     except SyntaxError as e:
-        return _json.dumps({"cases": [], "error": "コードの構文エラー: {}".format(e)})
+        return _json.dumps({"cases": [], "error": _format_syntax_error(e, user_filename)})
 
     try:
         test_code = compile(test_source, test_filename, "exec")
     except SyntaxError as e:
-        return _json.dumps({"cases": [], "error": "テストの構文エラー: {}".format(e)})
+        return _json.dumps({"cases": [], "error": _format_syntax_error(e, test_filename)})
 
     cases = []
     for name in test_names:
         try:
             cases.append(_run_case(user_code, test_code, name, module_names))
+        except _UnsupportedInput:
+            cases.append({"name": name, "passed": False, "message": "採点ではinput()は使用できません"})
         except AssertionError as e:
             message = str(e) if str(e) else "期待した結果と一致しませんでした"
             cases.append({"name": name, "passed": False, "message": message})
@@ -101,9 +125,8 @@ def run_tests(user_source, test_source, user_filename, test_filename, module_nam
             # 停止操作によるものなので、採点結果を返さずそのまま上位へ伝播させる
             raise
         except Exception as e:
-            # errorTranslator.ts（通常実行のエラー翻訳）に日本語化させるため、
-            # 通常実行時と同じ形式（"<exec>"をファイル名ラベルにしたトレースバック）で返す
-            tb_text = "".join(_traceback.format_exception(type(e), e, e.__traceback__))
+            tb = _trim_internal_frames(e.__traceback__, (user_filename, test_filename))
+            tb_text = "".join(_traceback.format_exception(type(e), e, tb))
             cases.append({"name": name, "passed": False, "message": tb_text.replace(user_filename, "<exec>").strip()})
 
     return _json.dumps({"cases": cases, "error": None})

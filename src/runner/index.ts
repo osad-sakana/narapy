@@ -261,6 +261,10 @@ export function initRunner(
     }
 
     onRunStart?.()
+    // stderr 出力で running が false になった状態で入力待ちが残っている場合は、
+    // 古い実行を Worker ごと破棄する（clearLog 経由の KeyboardInterrupt の error メッセージが
+    // 新しい実行を停止扱いにしてしまうのを防ぐ）
+    if (openInputPrompt) hardStop()
     traceNoteShown = false
     setRunning(true)
     clearLog()

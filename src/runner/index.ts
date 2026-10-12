@@ -1,12 +1,12 @@
-import { MAX_INPUT_BYTES, type WorkerMessage, type RunFile, type RunPayload, type TurtleCommands } from '../types'
+import { type WorkerMessage, type RunFile, type RunPayload, type TurtleCommands } from '../types'
 import type { EditorInstance } from '../editor/index'
 import { appendLog, appendErrorBlock, clearLog, getLogText } from './log'
 import { getValue } from '../editor/index'
 import { translatePythonError } from './errorTranslator'
 import { showFigureModal } from './figureModal'
 import { showTurtleModal } from './turtleModal'
-import { showInputModal, type InputModalHandle } from './inputModal'
-import { encodeInputValue } from './encodeInput'
+import type { InputPromptHandle } from './inputPrompt'
+import { handleInputRequest, type InputRequestDeps } from './inputRequest'
 import { RUN_STYLE, STOP_STYLE } from './buttonStyles'
 import { setRunStatus, type RunStatus } from './runStatus'
 
@@ -42,6 +42,8 @@ export function initRunner(
   // （行ハイライト・変数一覧）を残さないよう呼び出す（stepper/controller.ts の invalidate）
   onRunStart?: () => void,
   onGradeResult?: (json: string) => void,
+  // input() の入力欄を見せるため、折りたたまれた実行ログを開く
+  ensureLogVisible: () => void = () => {},
 ): RunnerHandle {
   const runBtn     = document.getElementById('runBtn')     as HTMLButtonElement
   const copyLogBtn = document.getElementById('copyLogBtn') as HTMLButtonElement
@@ -56,7 +58,9 @@ export function initRunner(
   let inputData: Uint8Array | null = null
   let interruptBuffer: Uint8Array | null = null
   let executionTimeoutId: ReturnType<typeof setTimeout> | null = null
-  let openInputModal: InputModalHandle | null = null
+  let openInputPrompt: InputPromptHandle | null = null
+  // ステップ実行の注記（入力値は再生で確認できる旨）を1回の実行につき1度だけ出す
+  let traceNoteShown = false
   // 停止操作のたびに増やす世代カウンタ。gracefulStop の 800ms フォールバックが
   // 発火する前に「停止→即座に再実行」されると、古いタイマーが新しい実行を
   // 誤って hardStop してしまうため、世代が一致する場合のみ実行する。
@@ -106,12 +110,12 @@ export function initRunner(
     inputStatus = null
     inputData = null
     interruptBuffer = null
-    // 開いたままの input() モーダルは古い worker 宛の SAB を握っているので閉じる。
-    // dismiss() が呼ぶ close() は同期実行され、input_request ハンドラの
-    // .then/.finally はその後のマイクロタスクで走るため、そちらが参照する
+    // 開いたままの input() 入力欄は古い worker 宛の入力待ちなので閉じる。
+    // dismiss() が呼ぶ close() は同期実行され、handleInputRequest の続きは
+    // その後のマイクロタスクで走るため、そちらが参照する
     // inputStatus/inputData/running は既にここで更新済みの値を見る。
-    openInputModal?.dismiss()
-    openInputModal = null
+    openInputPrompt?.dismiss()
+    openInputPrompt = null
     attachWorkerHandlers()
     setRunning(false)
   }
@@ -128,18 +132,35 @@ export function initRunner(
     }, INTERRUPT_FALLBACK_MS)
   }
 
-  // 実行中の停止操作（停止ボタン・input() モーダル内の停止ボタン共通）
+  // 実行中の停止操作
   function stopExecution(): void {
     if (!running) return
     if (interruptBuffer) {
       // Pyodide が準備済みであれば graceful stop を試みる
       gracefulStop()
+      // input() の入力待ち中は Worker が Atomics.wait で止まっており KeyboardInterrupt が
+      // 届かないため、入力欄を閉じて待機を解除する（Python 側で KeyboardInterrupt になる）
+      openInputPrompt?.dismiss()
       appendLog('--- 停止シグナルを送信しました ---', 'info')
     } else {
       // Pyodide 初期化中は interrupt buffer が未取得なので即座に強制停止
       hardStop()
       appendLog('--- 実行を強制停止しました ---', 'info')
     }
+  }
+
+  const inputRequestDeps: InputRequestDeps = {
+    getBuffers: () => (inputStatus && inputData ? { status: inputStatus, data: inputData } : null),
+    isRunning: () => running,
+    pauseTimeout: clearExecutionTimeout,
+    resumeTimeout: armExecutionTimeout,
+    ensureLogVisible,
+    consumeTraceNote: () => {
+      if (traceNoteShown) return false
+      traceNoteShown = true
+      return true
+    },
+    onOpen: (handle) => { openInputPrompt = handle },
   }
 
   function attachWorkerHandlers(): void {
@@ -158,28 +179,7 @@ export function initRunner(
       }
 
       if (msg.type === 'input_request') {
-        // ユーザーの入力待ちの間はタイムアウトを止め、考える時間を強制停止のカウントに含めない
-        clearExecutionTimeout()
-        showInputModal(msg.prompt, (handle) => { openInputModal = handle }, stopExecution)
-          .then((value) => {
-            if (!inputStatus || !inputData) return
-            const result = encodeInputValue(value, MAX_INPUT_BYTES)
-            if (!result.ok) {
-              // SAB のデータ領域を超える入力は書き込めないためキャンセル扱いにする
-              if (value !== null) {
-                appendLog(`--- 入力が長すぎます（${MAX_INPUT_BYTES}バイトまで） ---`, 'warn')
-              }
-              Atomics.store(inputStatus, 0, -1)
-            } else {
-              inputData.set(result.bytes)
-              Atomics.store(inputStatus, 0, result.bytes.length)
-            }
-            Atomics.notify(inputStatus, 0)
-          })
-          .finally(() => {
-            openInputModal = null
-            if (running) armExecutionTimeout()
-          })
+        void handleInputRequest(inputRequestDeps, msg.prompt, msg.preview)
         return
       }
 
@@ -259,6 +259,7 @@ export function initRunner(
     }
 
     onRunStart?.()
+    traceNoteShown = false
     setRunning(true)
     clearLog()
     appendLog(mode === 'grade' ? '--- 採点開始 ---' : '--- 実行開始 ---', 'info')

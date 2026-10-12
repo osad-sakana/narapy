@@ -32,6 +32,14 @@ export function appendLog(text: string, kind: LogKind): void {
   log.scrollTop = log.scrollHeight
 }
 
+// 入力欄など、テキスト以外の要素をログ末尾へ差し込む
+export function appendLogElement(el: HTMLElement): void {
+  const log = getOutputLog()
+  removePlaceholder(log)
+  log.appendChild(el)
+  log.scrollTop = log.scrollHeight
+}
+
 export interface ErrorBlock {
   line: number | null
   errorType: string

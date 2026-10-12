@@ -3,6 +3,7 @@
 import { MAX_INPUT_BYTES, type RunFile, type RunPayload } from './types'
 import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from './lib/pyodideLoader'
 import { TURTLE_MODULE_SRC } from './pyodide/turtleModule'
+import { INPUT_MODULE_SRC } from './pyodide/inputModule'
 import { runTrace } from './pyodide/traceRun'
 import { runGrade } from './pyodide/gradeRun'
 import type { PyodideInterface, PyodideModule } from './pyodide/pyodideTypes'
@@ -15,7 +16,7 @@ type OutMessage =
   | { type: 'trace'; payload: string }
   | { type: 'grade'; payload: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
-  | { type: 'input_request'; prompt: string }
+  | { type: 'input_request'; prompt: string; preview: string | null }
   | { type: 'interrupt_sab'; sab: SharedArrayBuffer }
 
 const WORK_DIR = '/home/pyodide'
@@ -86,20 +87,34 @@ const inputData = new Uint8Array(INPUT_SAB, 4)
 // 起動直後にSABをメインスレッドへ送り、input_request の受け取り準備をさせる
 self.postMessage({ type: 'input_sab', sab: INPUT_SAB } satisfies OutMessage)
 
-// Python の input(prompt) を直接置き換える関数。
-// stdin オプションではなく globals.set を使うことで：
-// (1) stdout にプロンプトが流れないためログが汚れない
-// (2) prompt 引数を直接受け取れる
-function customInput(prompt: unknown): string {
+// builtins.input から呼ばれる入力待ち関数（pyodide/inputModule.ts の install に渡す）。
+// プロンプトの表示とエコーは Python 側が stdout 経由で行うため、ここではメインスレッドへの
+// 入力要求と同期待ちだけを担う。preview はステップ実行の記録中に隠れている print の出力。
+// 戻り値が undefined（Python では None）のときは停止操作によるキャンセルを表す。
+function readInputFromMain(prompt: unknown, preview: unknown): string | undefined {
   const promptStr = String(prompt ?? '')
+  const previewStr = typeof preview === 'string' ? preview : null
   Atomics.store(inputStatus, 0, 0)
-  self.postMessage({ type: 'input_request', prompt: promptStr } satisfies OutMessage)
+  self.postMessage({ type: 'input_request', prompt: promptStr, preview: previewStr } satisfies OutMessage)
   Atomics.wait(inputStatus, 0, 0)
   const len = Atomics.load(inputStatus, 0)
-  if (len < 0) return '' // キャンセル
+  if (len < 0) return undefined
   const bytes = inputData.slice(0, len)
   return new TextDecoder().decode(bytes)
 }
+
+// _narapy_io モジュールを登録し builtins.input を差し替える。import・一時変数は関数内に
+// 閉じ込める（EXTRACT_FIGS_CODE と同じ理由）。pristineGlobalNames の記録より前に呼ぶこと。
+const INSTALL_INPUT_CODE = `
+def __narapy_install_input__():
+    import sys as _sys, types as _types
+    m = _types.ModuleType('_narapy_io')
+    exec(__narapy_io_src__, m.__dict__)
+    _sys.modules['_narapy_io'] = m
+    m.install(__narapy_read_input__)
+
+__narapy_install_input__()
+`
 
 let pyodide: PyodideInterface | null = null
 let isReady = false
@@ -132,8 +147,10 @@ async function initPyodide(): Promise<void> {
     },
   })
 
-  // builtins.input を上書きして prompt 引数を直接受け取る
-  pyodide.globals.set('input', customInput)
+  // builtins.input を差し替える（import した自作モジュール内の input() も同じ経路になる）
+  pyodide.globals.set('__narapy_io_src__', INPUT_MODULE_SRC)
+  pyodide.globals.set('__narapy_read_input__', readInputFromMain)
+  await pyodide.runPythonAsync(INSTALL_INPUT_CODE)
 
   // ユーザーコード実行前の時点でグローバル名一覧を記録する（トレース用）
   const namesJson = await pyodide.runPythonAsync('import json as _json; _json.dumps(list(globals().keys()))') as string

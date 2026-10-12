@@ -1,7 +1,6 @@
 import { MAX_INPUT_BYTES } from '../types'
-import { appendLogElement } from './log'
-import { encodeInputValue } from './encodeInput'
-import { tooLongMessage } from './inputFormat'
+import { appendLogElement, setBeforeClearHook } from './log'
+import { decideSubmit } from './inputFormat'
 
 export interface InputPromptHandle {
   dismiss: () => void
@@ -14,49 +13,62 @@ export interface InputPromptResult {
 
 let nextPromptId = 0
 
+interface InputRow {
+  row: HTMLElement
+  input: HTMLInputElement
+  error: HTMLElement
+}
+
+function buildInputRow(prompt: string): InputRow {
+  const inputId = `inlineInput-${nextPromptId++}`
+
+  const row = document.createElement('div')
+  row.className = 'flex flex-col gap-0.5 my-0.5'
+  // 入力欄自体はログのコピー対象にしない（確定した値は Python のエコー行で残る）
+  row.dataset.logExclude = 'true'
+
+  const line = document.createElement('div')
+  line.className = 'flex items-baseline gap-2'
+
+  const input = document.createElement('input')
+  input.id = inputId
+  input.type = 'text'
+  input.autocomplete = 'off'
+  input.spellcheck = false
+  input.setAttribute('aria-label', prompt || 'input()')
+  input.className = 'flex-1 min-w-0 px-2 py-0.5 rounded bg-editor text-ink text-sm border border-line focus:border-accent focus:outline-none'
+
+  if (prompt) {
+    const label = document.createElement('label')
+    label.htmlFor = inputId
+    label.className = 'text-code whitespace-pre-wrap break-all'
+    label.textContent = prompt
+    line.appendChild(label)
+  }
+  line.appendChild(input)
+
+  const error = document.createElement('div')
+  error.className = 'text-danger text-xs'
+  error.setAttribute('role', 'alert')
+
+  row.appendChild(line)
+  row.appendChild(error)
+  return { row, input, error }
+}
+
 // Python の input() に対応する、実行ログ末尾のインライン入力欄。
 // モーダルと違い直前の出力を隠さず、ツールバーの停止ボタンも常に押せる。
 // 確定すると入力欄は消え、「プロンプト+入力値」は Python 側のエコーとしてログに残る。
 //
-// onOpen で dismiss 関数を受け取れる。停止操作でワーカーごと再生成する際に、
-// 開いたままの入力欄を外部から閉じるために使う（その場合は null で解決される）。
+// onOpen で dismiss 関数を受け取れる。停止操作やログ消去で開いたままの入力欄を
+// 外部から閉じるために使う（その場合は null で解決される）。
 export function showInlineInput(
   prompt: string,
   onOpen?: (handle: InputPromptHandle) => void,
 ): Promise<InputPromptResult | null> {
   return new Promise((resolve) => {
     const previouslyFocused = document.activeElement as HTMLElement | null
-    const inputId = `inlineInput-${nextPromptId++}`
-
-    const row = document.createElement('div')
-    row.className = 'flex flex-col gap-0.5 my-0.5'
-    // 入力欄自体はログのコピー対象にしない（確定した値は Python のエコー行で残る）
-    row.dataset.logExclude = 'true'
-
-    const line = document.createElement('div')
-    line.className = 'flex items-baseline gap-2'
-
-    const label = document.createElement('label')
-    label.htmlFor = inputId
-    label.className = 'text-code whitespace-pre-wrap break-all'
-    label.textContent = prompt
-
-    const input = document.createElement('input')
-    input.id = inputId
-    input.type = 'text'
-    input.autocomplete = 'off'
-    input.spellcheck = false
-    input.setAttribute('aria-label', prompt || 'input()')
-    input.className = 'flex-1 min-w-0 px-2 py-0.5 rounded bg-editor text-ink text-sm border border-line focus:border-accent focus:outline-none'
-
-    const error = document.createElement('div')
-    error.className = 'text-danger text-xs'
-    error.setAttribute('role', 'alert')
-
-    if (prompt) line.appendChild(label)
-    line.appendChild(input)
-    row.appendChild(line)
-    row.appendChild(error)
+    const { row, input, error } = buildInputRow(prompt)
     appendLogElement(row)
 
     let closed = false
@@ -64,27 +76,27 @@ export function showInlineInput(
       if (closed) return
       closed = true
       row.remove()
+      setBeforeClearHook(null)
       previouslyFocused?.focus()
       resolve(result)
     }
 
-    // IME 変換確定の Enter は送信しない。既定動作（フォーカス中ボタンのクリック）を
-    // 止めておかないと、フォーカスを戻した先の実行/停止ボタンが発火してしまう。
+    // Enter の既定動作（フォーカス中ボタンのクリック）を止めておかないと、
+    // フォーカスを戻した先の実行/停止ボタンが発火してしまう。
     input.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (e.key !== 'Enter' || e.isComposing) return
+      const decision = decideSubmit(e, input.value, MAX_INPUT_BYTES)
+      if (decision.action === 'ignore') return
       e.preventDefault()
-      const encoded = encodeInputValue(input.value, MAX_INPUT_BYTES)
-      if (!encoded.ok) {
+      if (decision.action === 'error') {
         // 上限超過は黙って空文字にせず、入力欄を開いたまま理由を示す
-        if (encoded.reason === 'too_long') {
-          error.textContent = tooLongMessage(encoded.byteLength, MAX_INPUT_BYTES)
-        }
+        error.textContent = decision.message
         return
       }
-      close({ value: input.value, bytes: encoded.bytes })
+      close({ value: decision.value, bytes: decision.bytes })
     })
     input.addEventListener('input', () => { error.textContent = '' })
 
+    setBeforeClearHook(() => close(null))
     onOpen?.({ dismiss: () => close(null) })
     input.focus()
   })

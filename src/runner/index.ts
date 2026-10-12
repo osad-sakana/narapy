@@ -121,8 +121,8 @@ export function initRunner(
   }
 
   // interrupt buffer で KeyboardInterrupt を注入し、800ms 後も停止していなければ hardStop
-  function gracefulStop(): void {
-    if (interruptBuffer) {
+  function gracefulStop(sendSignal = true): void {
+    if (interruptBuffer && sendSignal) {
       interruptBuffer[0] = 2 // SIGINT → Python が KeyboardInterrupt を発生させる
     }
     const generation = runGeneration
@@ -137,9 +137,11 @@ export function initRunner(
     if (!running) return
     if (interruptBuffer) {
       // Pyodide が準備済みであれば graceful stop を試みる
-      gracefulStop()
-      // input() の入力待ち中は Worker が Atomics.wait で止まっており KeyboardInterrupt が
-      // 届かないため、入力欄を閉じて待機を解除する（Python 側で KeyboardInterrupt になる）
+      // input() の入力待ち中は Worker が Atomics.wait で止まっており SIGINT が届かないため、
+      // 入力欄を閉じて待機を解除する（Python 側で KeyboardInterrupt になる）。
+      // SIGINT も立てると KeyboardInterrupt が二重に出得るので、この場合は立てない
+      const waitingForInput = openInputPrompt !== null
+      gracefulStop(!waitingForInput)
       openInputPrompt?.dismiss()
       appendLog('--- 停止シグナルを送信しました ---', 'info')
     } else {

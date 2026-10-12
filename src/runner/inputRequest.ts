@@ -43,10 +43,9 @@ export async function handleInputRequest(
   deps.onOpen(null)
 
   const buffers = deps.getBuffers()
-  if (deps.isRunning()) {
-    setRunStatus('running')
-    deps.resumeTimeout()
-  }
+  // stderr 出力後など running が false の間は、タイムアウトを再開せず待機表示だけ戻す
+  setRunStatus(deps.isRunning() ? 'running' : 'idle')
+  if (deps.isRunning()) deps.resumeTimeout()
   if (!buffers) return // hardStop 済み（古い Worker 宛の SAB には書かない）
 
   if (result === null) {

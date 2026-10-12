@@ -61,7 +61,9 @@ class _CappedStdout(_io.StringIO):
         text = self.getvalue()
         chunk = text[self._preview_pos:]
         self._preview_pos = len(text)
-        return chunk[-_MAX_PREVIEW:]
+        if len(chunk) > _MAX_PREVIEW:
+            return "…(省略)\n" + chunk[-_MAX_PREVIEW:]
+        return chunk
 
     # input() がエコーした行は呼び出し側（JS）が実行ログへ直接出すので、次回の取り出しから除く
     def mark_input_echoed(self):

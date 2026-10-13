@@ -33,6 +33,7 @@ function createFakeEditor() {
   const models = new Map<string, { getValue: () => string }>()
   let attachedPath = 'main.py'
   const setCallsByPath: Record<string, unknown[][]> = {}
+  const focus = vi.fn()
 
   function ensureModel(path: string, text: string): void {
     if (!models.has(path)) models.set(path, { getValue: () => text })
@@ -50,10 +51,12 @@ function createFakeEditor() {
   const editor = {
     createDecorationsCollection: () => collection,
     getModel: () => models.get(attachedPath) ?? null,
+    focus,
   } as unknown as EditorInstance
 
   return {
     editor,
+    focus,
     setContent: (path: string, text: string) => {
       ensureModel(path, text)
       models.set(path, { getValue: () => text })
@@ -92,6 +95,21 @@ describe('instructor controller', () => {
     const controller = createInstructorController({ editor: fake.editor, getEditorPath: () => 'main.py' })
     controller.recordBaseline()
     expect(buildDecorationsMock).not.toHaveBeenCalled()
+  })
+
+  it('recordBaseline はOFF中はエディタにフォーカスしない', () => {
+    const fake = createFakeEditor()
+    const controller = createInstructorController({ editor: fake.editor, getEditorPath: () => 'main.py' })
+    controller.recordBaseline()
+    expect(fake.focus).not.toHaveBeenCalled()
+  })
+
+  it('基準を記録したらエディタにフォーカスする', () => {
+    const fake = createFakeEditor()
+    const controller = createInstructorController({ editor: fake.editor, getEditorPath: () => 'main.py' })
+    controller.toggle()
+    controller.recordBaseline()
+    expect(fake.focus).toHaveBeenCalledTimes(1)
   })
 
   it('ON→基準記録→編集→デバウンス経過後に装飾が再計算される', () => {

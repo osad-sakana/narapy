@@ -3,7 +3,7 @@ import { encodeInputValue } from './encodeInput'
 
 describe('encodeInputValue', () => {
   it('キャンセル（null）は ok: false を返す', () => {
-    expect(encodeInputValue(null, 10)).toEqual({ ok: false })
+    expect(encodeInputValue(null, 10)).toEqual({ ok: false, reason: 'cancel' })
   })
 
   it('空文字は ok: true, 長さ0のバイト列を返す', () => {
@@ -23,14 +23,14 @@ describe('encodeInputValue', () => {
     expect(result.ok).toBe(true)
   })
 
-  it('上限を超える入力は ok: false になる', () => {
+  it('上限を超える入力は too_long になりバイト数を返す', () => {
     const result = encodeInputValue('x'.repeat(5000), 4092)
-    expect(result).toEqual({ ok: false })
+    expect(result).toEqual({ ok: false, reason: 'too_long', byteLength: 5000 })
   })
 
   it('マルチバイト文字はUTF-8バイト数で上限判定される', () => {
     // "あ" は UTF-8 で3バイト
     const result = encodeInputValue('あ', 2)
-    expect(result).toEqual({ ok: false })
+    expect(result).toEqual({ ok: false, reason: 'too_long', byteLength: 3 })
   })
 })

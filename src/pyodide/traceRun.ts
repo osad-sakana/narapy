@@ -17,8 +17,8 @@ const MAX_STEPS = 800
 const MAX_DEPTH = 20
 
 // トレーサ本体を _narapy_trace という独立モジュールとして sys.modules に登録する。
-// __main__ の名前空間を汚さないことで、input() 用に差し込んだ customInput など
-// 既存のグローバル状態と衝突しない（turtle モジュールの毎回フレッシュ登録と同じパターン）。
+// __main__ の名前空間を汚さないことで、_narapy_io など
+// 既存のモジュールと衝突しない（turtle モジュールの毎回フレッシュ登録と同じパターン）。
 // import・一時変数を関数内に閉じ込め、__main__ に "_sys"/"_types" 等が残って
 // 同名のユーザー変数を上書きしないようにする（pyodide.worker.ts のEXTRACT系と同じ理由）。
 const REGISTER_TRACE_CODE = `
@@ -32,7 +32,7 @@ __narapy_register_trace__()
 `
 
 // globals() を __main__ コンテキストで実行されるこの関数内で呼ぶことで、
-// run_trace に __main__ の実際の名前空間（customInput が差し込まれた input を含む）
+// run_trace に __main__ の実際の名前空間（ユーザーが定義した名前を含む）
 // を渡す。_narapy_trace モジュール内で globals() を呼ぶと _narapy_trace 自身の
 // 名前空間が返ってしまうため、呼び出し側（__main__ で定義された関数）で取得する
 // 必要がある（関数内で呼んでも globals() はその関数が定義されたモジュール、

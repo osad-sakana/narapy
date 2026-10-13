@@ -89,6 +89,8 @@ export function createInstructorController(deps: InstructorControllerDeps): Inst
     if (!isOn) return
     baseline = { path: deps.getEditorPath(), text: deps.editor.getModel()?.getValue() ?? '' }
     recomputeDecorations()
+    // ボタンクリックでフォーカスが外れたままだと、続けて講義用コードを打ち始められない
+    deps.editor.focus()
   }
 
   function discardBaseline(): void {

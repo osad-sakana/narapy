@@ -38,6 +38,12 @@ function buildInputRow(prompt: string): InputRow {
   input.setAttribute('aria-label', prompt || 'input()')
   input.className = 'flex-1 min-w-0 px-2 py-0.5 rounded bg-editor text-ink text-sm border border-line focus:border-accent focus:outline-none'
 
+  // これが input() の入力欄だと一目で分かるよう、小さな赤いバッジを添える
+  const badge = document.createElement('span')
+  badge.textContent = 'input'
+  badge.className = 'text-[10px] leading-none font-bold text-danger border border-danger/60 rounded px-1 py-0.5 shrink-0 self-center'
+  line.appendChild(badge)
+
   if (prompt) {
     const label = document.createElement('label')
     label.htmlFor = inputId

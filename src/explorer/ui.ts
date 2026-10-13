@@ -7,6 +7,7 @@ import {
   deleteFile,
   deleteDirectory,
   upsertFile,
+  moveEntry,
 } from './store'
 import type { TreeDirNode, TreeFileNode, TreeNode } from './types'
 import { buildTree } from './tree'
@@ -29,6 +30,8 @@ import {
 } from './icons'
 import { closeMenu, isMenuOpenFor, openMenu, type MenuItem } from './menu'
 import { createResizeHandle } from './resize'
+import { planMove, type MoveSource } from './move'
+import { blockInternalDrop, makeDraggable, makeDropTarget } from './moveDnd'
 import {
   collectFilesFromDataTransfer,
   formatBytes,
@@ -88,13 +91,18 @@ export function createExplorer(
     autoExpand(tree, expanded, active)
 
     container.innerHTML = ''
-    container.appendChild(buildHeader())
+    const header = buildHeader()
+    container.appendChild(header)
 
     const list = document.createElement('div')
     list.className = 'flex-1 overflow-y-auto py-1 min-h-0 relative'
     list.appendChild(renderTree(tree, active, 0))
     container.appendChild(list)
     container.appendChild(resizeHandle)
+
+    // ルートへ移動する先（フォルダに入れた項目を取り出す）。ツリーが長くても届くようヘッダーも対象にする
+    makeDropTarget(list, rootDrop)
+    makeDropTarget(header, rootDrop)
 
     attachDropHandlers(container, list)
   }
@@ -257,6 +265,34 @@ export function createExplorer(
     })
   }
 
+  function canMoveTo(source: MoveSource, destDir: string): boolean {
+    return planMove(
+      { files: getFiles().map(f => f.path), directories: getDirectories().map(d => d.path) },
+      source,
+      destDir,
+    ).ok
+  }
+
+  function moveTo(source: MoveSource, destDir: string): void {
+    const activeBefore = getActiveFile()
+    const result = moveEntry(source, destDir)
+    if (!result.ok) {
+      if (result.reason === 'conflict') window.alert('移動先に同じ名前の項目があります')
+      return
+    }
+    // 旧パスのファイルは削除と同じ扱い（エディタのモデル破棄・講師モードの基準破棄）にする
+    for (const move of result.fileMoves) onFileDeleted(move.from)
+    for (const move of result.dirMoves) {
+      if (expanded.delete(move.from)) expanded.add(move.to)
+    }
+    if (destDir) expanded.add(destDir)
+    const activeAfter = getActiveFile()
+    if (activeAfter !== activeBefore) onFileSelect(activeAfter)
+    else render()
+  }
+
+  const rootDrop = { destDir: '', canDrop: canMoveTo, onDrop: moveTo }
+
   function renderTree(nodes: TreeNode[], active: string, depth: number): HTMLElement {
     const ul = document.createElement('ul')
     ul.className = 'flex flex-col'
@@ -354,6 +390,8 @@ export function createExplorer(
     })
 
     row.appendChild(btn)
+    makeDraggable(row, { type: 'dir', path: node.path })
+    makeDropTarget(row, { destDir: node.path, canDrop: canMoveTo, onDrop: moveTo })
     attachRowMenu(row, `${node.path}/`, [
       { label: 'フォルダを削除', iconPath: ICON_TRASH, danger: true, onSelect: () => removeDirectory(node) },
     ])
@@ -410,6 +448,8 @@ export function createExplorer(
     })
 
     li.appendChild(btn)
+    makeDraggable(li, { type: 'file', path: node.path })
+    blockInternalDrop(li)
     attachRowMenu(li, node.path, [
       { label: '削除', iconPath: ICON_TRASH, danger: true, onSelect: () => removeFile(node, active) },
     ])

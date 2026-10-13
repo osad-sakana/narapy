@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createDefaultProject, createTextFile, createDirectory, deleteFile, getActiveContent, getActiveFile, hasUserContent, loadProject, setActiveFile, updateFileContent } from './store'
+import { createDefaultProject, createTextFile, createDirectory, deleteFile, getActiveContent, getActiveFile, getDirectories, getFile, hasUserContent, loadProject, moveEntry, setActiveFile, updateFileContent } from './store'
 
 // state はモジュール単位のシングルトンなので、各テスト前にデフォルト状態へ明示的に戻す。
 describe('hasUserContent', () => {
@@ -107,5 +107,57 @@ describe('createDefaultProject', () => {
     expect(first.files[0].content.kind).toBe('text')
     if (first.files[0].content.kind === 'text') first.files[0].content.data = '書き換え'
     expect(second.files[0].content).toEqual({ kind: 'text', data: '' })
+  })
+})
+
+describe('moveEntry', () => {
+  beforeEach(() => {
+    loadProject(
+      [
+        { path: 'main.py', content: { kind: 'text', data: 'メイン' } },
+        { path: 'data/a.csv', content: { kind: 'text', data: 'a,b' } },
+        { path: 'data/img.png', content: { kind: 'binary', data: new Uint8Array([1]), mime: 'image/png' } },
+      ],
+      [{ path: 'data' }, { path: 'lib' }],
+      'main.py',
+    )
+  })
+
+  it('ファイルを移動すると内容を保ったままパスが変わる', () => {
+    const result = moveEntry({ type: 'file', path: 'main.py' }, 'lib')
+    expect(result.ok).toBe(true)
+    expect(getFile('main.py')).toBeUndefined()
+    expect(getFile('lib/main.py')?.content).toEqual({ kind: 'text', data: 'メイン' })
+  })
+
+  it('アクティブファイルを移動するとアクティブも新しいパスになる', () => {
+    moveEntry({ type: 'file', path: 'main.py' }, 'lib')
+    expect(getActiveFile()).toBe('lib/main.py')
+  })
+
+  it('非アクティブファイルの移動ではアクティブは変わらない', () => {
+    moveEntry({ type: 'file', path: 'data/a.csv' }, '')
+    expect(getActiveFile()).toBe('main.py')
+  })
+
+  it('フォルダを移動すると配下のファイル（バイナリ含む）とフォルダが移る', () => {
+    const result = moveEntry({ type: 'dir', path: 'data' }, 'lib')
+    expect(result.ok).toBe(true)
+    expect(getFile('lib/data/a.csv')?.content.kind).toBe('text')
+    expect(getFile('lib/data/img.png')?.content.kind).toBe('binary')
+    expect(getDirectories().map(d => d.path).sort()).toEqual(['lib', 'lib/data'])
+  })
+
+  it('アクティブファイルを含むフォルダを移動するとアクティブも追従する', () => {
+    setActiveFile('data/a.csv')
+    moveEntry({ type: 'dir', path: 'data' }, 'lib')
+    expect(getActiveFile()).toBe('lib/data/a.csv')
+  })
+
+  it('失敗した場合は状態を変えない', () => {
+    createTextFile('lib/main.py', '別')
+    const result = moveEntry({ type: 'file', path: 'main.py' }, 'lib')
+    expect(result).toEqual({ ok: false, reason: 'conflict' })
+    expect(getFile('main.py')?.content).toEqual({ kind: 'text', data: 'メイン' })
   })
 })

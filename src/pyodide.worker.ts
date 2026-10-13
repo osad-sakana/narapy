@@ -72,6 +72,21 @@ def __narapy_extract_turtle__():
 __narapy_extract_turtle__()
 `
 
+// 通常実行・ステップ実行の開始時に、直前の実行で作られたユーザー変数を消す。ユーザーコードは
+// __main__ の globals で動くため、消さないと前回の値が次の実行に引き継がれる。
+// 初期化直後に無かった名前だけを対象にし、"__x__" 形式はフレームワークが渡す内部名なので残す。
+// 一時変数は関数内に閉じ込める（EXTRACT_FIGS_CODE と同じ理由）。
+const RESET_USER_GLOBALS_CODE = `
+def __narapy_reset_globals__():
+    g = globals()
+    known = frozenset(__narapy_known_names__)
+    for n in [n for n in g if n not in known]:
+        if not (n.startswith("__") and n.endswith("__")):
+            del g[n]
+
+__narapy_reset_globals__()
+`
+
 // Pyodide への KeyboardInterrupt 注入用バッファ
 // buffer[0] に 2（SIGINT）を書き込むと Python が KeyboardInterrupt を発生させる
 const INTERRUPT_SAB = new SharedArrayBuffer(1)
@@ -317,6 +332,11 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
     // turtle モジュールを毎回フレッシュ登録（描画状態をリセット）
     pyodide.globals.set('__turtle_src__', TURTLE_MODULE_SRC)
     await pyodide.runPythonAsync(REGISTER_TURTLE_CODE)
+
+    if (mode === 'normal' || mode === 'trace') {
+      pyodide.globals.set('__narapy_known_names__', pristineGlobalNames)
+      await pyodide.runPythonAsync(RESET_USER_GLOBALS_CODE)
+    }
 
     let traceError: string | null = null
     let result: unknown = null

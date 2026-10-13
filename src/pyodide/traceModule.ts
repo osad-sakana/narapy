@@ -290,10 +290,21 @@ def _format_error(filename):
     return text.replace(filename, "<exec>").strip()
 
 
+def _reset_user_globals(main_globals, known_names):
+    # ユーザーコードは __main__ の globals で exec するため、直前の実行（通常実行・
+    # ステップ実行とも）の変数が残っていると、1ステップ目から前回の値が見えてしまう。
+    # 初期化直後に無かった名前だけを消す。"__x__" 形式はフレームワークが渡す
+    # __trace_src__ 等なので残す。
+    for name in [n for n in main_globals if n not in known_names]:
+        if not (name.startswith("__") and name.endswith("__")):
+            del main_globals[name]
+
+
 def run_trace(source, filename, max_steps, max_depth, main_globals, known_names):
     # 直前の実行が settrace を残していないことを保証する（防御的）
     _sys.settrace(None)
     known_names = frozenset(known_names)
+    _reset_user_globals(main_globals, known_names)
     stdout_buffer = _CappedStdout()
     recorder = _Recorder(filename, max_steps, max_depth, known_names, stdout_buffer)
 

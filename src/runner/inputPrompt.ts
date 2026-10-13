@@ -36,7 +36,7 @@ function buildInputRow(prompt: string): InputRow {
   input.autocomplete = 'off'
   input.spellcheck = false
   input.setAttribute('aria-label', prompt || 'input()')
-  input.className = 'flex-1 min-w-0 px-2 py-0.5 rounded bg-editor text-ink text-sm border border-line focus:border-accent focus:outline-none'
+  input.className = 'flex-1 min-w-0 px-2 py-0.5 rounded bg-editor text-ink text-sm border border-danger/60 focus:border-danger focus:outline-none'
 
   // これが input() の入力欄だと一目で分かるよう、小さな赤いバッジを添える
   const badge = document.createElement('span')

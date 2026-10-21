@@ -159,6 +159,14 @@ JSON に記録し、メインスレッド側でスクラブ再生する record-t
   **停止操作で interrupt buffer（SIGINT）を使わないこと**: yield 中の SIGINT は Pyodide の
   イベントループ内部（`webloop`）や `cancel()` 自身の `runPython` に当たって例外になり、
   モーダルが閉じなくなる。`cancel()` は失敗してもモーダルを閉じられるよう例外を投げない。
+- **実行は直列化する**（`pygameRunner.ts` の `runQueue`）。モーダルを閉じても停止は協調的・非同期なので、
+  古い実行が生きている間に次の実行が FS・canvas・停止フラグへ触ると 2 つのゲームが混ざる。
+  - 起動前にモーダルが閉じられた実行は起動しない（`shouldAbort`）。起動してから `cancel` しても、
+    `await` しかしないコードは停止フラグを見ないため止まらず、順番待ちを塞ぐ。
+  - 停止後 `STOP_TIMEOUT_MS`（5 秒）たっても前の実行が終わらない場合（`try: ... except: pass` が停止を
+    握りつぶす等）は、その Pyodide を見限って作り直す。古いインスタンスの出力・通知は `instanceId`（世代）の
+    不一致で遮断する。待ち続けると以降の実行がすべて止まる。
+  - 停止フラグ検知時は、例外を投げる前に `run_sync` で制御を返す。`except:` に握りつぶされてもタブが固まらない。
 - **ウォッチドッグ**（`watchdog.ts` / `watchdog.worker.ts` / `stallMonitor.ts`）が、yield しないループ
   （`while True: pass` 等）でメインスレッドが固まったときの唯一の復帰手段。メインスレッドの心拍を
   別 Worker が SharedArrayBuffer 越しに監視し、5 秒止まったら interrupt buffer に SIGINT を書く

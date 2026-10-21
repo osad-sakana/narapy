@@ -7,6 +7,16 @@ vi.mock('../lib/pyodideLoader', () => ({
   verifiedImport: (...args: unknown[]) => verifiedImport(...args),
 }))
 
+const watchdog = {
+  interruptBuffer: new Uint8Array(1),
+  wasStalled: vi.fn(() => false),
+  stop: vi.fn(),
+}
+const startWatchdog = vi.fn(async () => watchdog)
+vi.mock('./watchdog', () => ({
+  startWatchdog: () => startWatchdog(),
+}))
+
 interface Deferred {
   promise: Promise<unknown>
   resolve: (v?: unknown) => void
@@ -34,6 +44,7 @@ function createFakePyodide() {
     }),
     canvas: { setCanvas2D: vi.fn() },
     globals: { set: vi.fn(), get: vi.fn() },
+    setInterruptBuffer: vi.fn(),
     runPython: vi.fn((code: string) => (code.includes('ensure_future') ? task.promise : undefined)),
   }
   return { pyodide, task, jsModules }
@@ -67,6 +78,7 @@ const canvas = {} as HTMLCanvasElement
 describe('startPygame', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    watchdog.wasStalled.mockReturnValue(false)
   })
 
   it('SRI 検証つきで Pyodide を読み込み、pygame-ce を導入してから実行する', async () => {
@@ -149,5 +161,39 @@ describe('startPygame', () => {
     await expect(mod.startPygame('a', canvas, createIO())).rejects.toThrow('network')
     await expect(mod.startPygame('a', canvas, createIO())).resolves.toBeDefined()
     expect(loadPyodide).toHaveBeenCalledTimes(2)
+  })
+
+  it('ウォッチドッグの interrupt buffer を Pyodide に設定する', async () => {
+    const { mod, fake } = await setup()
+    await mod.startPygame('a', canvas, createIO())
+    expect(startWatchdog).toHaveBeenCalledTimes(1)
+    expect(fake.pyodide.setInterruptBuffer).toHaveBeenCalledWith(watchdog.interruptBuffer)
+  })
+
+  it('終了時（正常・例外・キャンセル）にウォッチドッグを止める', async () => {
+    const { mod, fake } = await setup()
+    const session = await mod.startPygame('a', canvas, createIO())
+    expect(watchdog.stop).not.toHaveBeenCalled()
+    fake.task.resolve()
+    await session.done
+    expect(watchdog.stop).toHaveBeenCalledTimes(1)
+  })
+
+  it('ウォッチドッグに止められた場合は PygameStalledError で reject する', async () => {
+    const { mod, fake } = await setup()
+    const session = await mod.startPygame('a', canvas, createIO())
+    watchdog.wasStalled.mockReturnValue(true)
+    fake.task.reject(new Error('KeyboardInterrupt'))
+    await expect(session.done).rejects.toBeInstanceOf(mod.PygameStalledError)
+    expect(watchdog.stop).toHaveBeenCalledTimes(1)
+  })
+
+  it('ユーザーの停止操作を優先し、cancel 後は PygameStalledError にしない', async () => {
+    const { mod, fake } = await setup()
+    const session = await mod.startPygame('a', canvas, createIO())
+    session.cancel()
+    watchdog.wasStalled.mockReturnValue(true)
+    fake.task.reject(new Error('CancelledError'))
+    await expect(session.done).resolves.toBeUndefined()
   })
 })

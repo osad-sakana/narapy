@@ -1,4 +1,4 @@
-import { startPygame, type PygameSession } from './pygameRunner'
+import { PygameStalledError, startPygame, type PygameSession } from './pygameRunner'
 import { appendErrorBlock, appendLog } from '../runner/log'
 import { translatePythonError } from '../runner/errorTranslator'
 
@@ -105,6 +105,15 @@ export function showPygameModal(code: string, hooks: PygameModalHooks): void {
       await session.done
       if (!closed) statusEl.textContent = '終了しました'
     } catch (err) {
+      if (err instanceof PygameStalledError) {
+        appendLog(`--- ${err.message} ---`, 'warn')
+        appendLog(
+          'ゲームのループ内で `await asyncio.sleep(0)` を呼ぶと、ブラウザが固まらずに動きます（`async def main()` + `await main()` の形にします）。',
+          'info',
+        )
+        close()
+        return
+      }
       const raw = err instanceof Error ? err.message : String(err)
       const translated = translatePythonError(raw)
       if (translated) {

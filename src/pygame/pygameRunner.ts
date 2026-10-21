@@ -1,5 +1,6 @@
 import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from '../lib/pyodideLoader'
 import type { PyodideInterface, PyodideModule } from '../pyodide/pyodideTypes'
+import { startWatchdog } from './watchdog'
 
 // SDL は <canvas> と DOM イベントを必要とするため、Worker ではなくメインスレッドの
 // 専用 Pyodide で実行する（issue #73 の PoC）。通常実行の Worker とは完全に分離する。
@@ -7,6 +8,14 @@ interface MainPyodide extends PyodideInterface {
   runPython: (code: string) => unknown
   canvas: { setCanvas2D: (canvas: HTMLCanvasElement) => void }
   registerJsModule: (name: string, module: object) => void
+}
+
+// await を含まないループでメインスレッドが固まり、ウォッチドッグに止められたことを表す
+export class PygameStalledError extends Error {
+  constructor() {
+    super('応答がなかったため実行を停止しました')
+    this.name = 'PygameStalledError'
+  }
 }
 
 export interface PygameIO {
@@ -104,6 +113,9 @@ export async function startPygame(
   currentCaption = io.onCaption
   pyodide.canvas.setCanvas2D(canvas)
   pyodide.globals.set('__narapy_pygame_src__', code)
+  // 同期ループでメインスレッドが固まっても復帰できるよう、別 Worker に心拍を監視させる
+  const watchdog = await startWatchdog()
+  pyodide.setInterruptBuffer(watchdog.interruptBuffer)
   // await した PyProxy は Pyodide が破棄するため、キャンセル用に Task を Python 側のグローバルにも保持する
   const task = pyodide.runPython(
     'import asyncio\n__narapy_pygame_task__ = asyncio.ensure_future(__narapy_pygame_main__(__narapy_pygame_src__))\n__narapy_pygame_task__',
@@ -115,10 +127,13 @@ export async function startPygame(
     .then(() => undefined)
     .catch((err: unknown) => {
       if (cancelled) return
+      // ウォッチドッグの割り込みによる KeyboardInterrupt は、Python 例外ではなく専用エラーにする
+      if (watchdog.wasStalled()) throw new PygameStalledError()
       throw err
     })
     .finally(() => {
       finished = true
+      watchdog.stop()
     })
 
   return {

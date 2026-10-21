@@ -5,6 +5,11 @@ import type { PygameIO, PygameSession } from './pygameRunner'
 const startPygame = vi.fn()
 vi.mock('./pygameRunner', () => ({
   startPygame: (...args: unknown[]) => startPygame(...args),
+  PygameStalledError: class PygameStalledError extends Error {
+    constructor() {
+      super('応答がなかったため実行を停止しました')
+    }
+  },
 }))
 
 const appendLog = vi.fn()
@@ -19,6 +24,7 @@ vi.mock('../runner/errorTranslator', () => ({
   translatePythonError: (...args: unknown[]) => translatePythonError(...args),
 }))
 
+import { PygameStalledError } from './pygameRunner'
 import { showPygameModal } from './pygameModal'
 
 function createSession(done: Promise<void> = new Promise(() => {})): PygameSession {
@@ -179,5 +185,18 @@ describe('showPygameModal', () => {
     document.title = 'other'
     await flush()
     expect(document.title).toBe('other')
+  })
+
+  it('固まって止められた場合は await asyncio.sleep(0) の案内を出してモーダルを閉じる', async () => {
+    startPygame.mockResolvedValue(createSession(Promise.reject(new PygameStalledError())))
+    const h = hooks()
+    showPygameModal('x', h)
+    await flush()
+
+    expect(appendLog).toHaveBeenCalledWith('--- 応答がなかったため実行を停止しました ---', 'warn')
+    expect(appendLog).toHaveBeenCalledWith(expect.stringContaining('await asyncio.sleep(0)'), 'info')
+    expect(appendErrorBlock).not.toHaveBeenCalled()
+    expect(modal()).toBeNull()
+    expect(h.onClose).toHaveBeenCalledTimes(1)
   })
 })

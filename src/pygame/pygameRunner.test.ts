@@ -46,8 +46,9 @@ function createFakeFs() {
   }
 }
 
-// loadPyodide が返す偽の Pyodide。ensure_future を呼ぶ runPython だけ制御可能な Task を返す
-function createFakePyodide() {
+// loadPyodide が返す偽の Pyodide。ゲーム本体を走らせる runPythonAsync だけ制御可能な Promise を返す
+// （JSPI の可否を確認する can_run_sync の呼び出しは canRunSync を即座に返す）
+function createFakePyodide(canRunSync: boolean) {
   const task = deferred()
   const jsModules: Record<string, Record<string, (...args: never[]) => void>> = {}
   const pyodide = {
@@ -59,15 +60,18 @@ function createFakePyodide() {
     globals: { set: vi.fn(), get: vi.fn() },
     FS: createFakeFs(),
     setInterruptBuffer: vi.fn(),
-    runPython: vi.fn((code: string) => (code.includes('ensure_future') ? task.promise : undefined)),
+    runPython: vi.fn((_code: string): unknown => undefined),
+    runPythonAsync: vi.fn((code: string) =>
+      code.includes('can_run_sync') ? Promise.resolve(canRunSync) : task.promise,
+    ),
   }
   return { pyodide, task, jsModules }
 }
 
-async function setup() {
+async function setup(canRunSync = true) {
   vi.resetModules()
   verifiedImport.mockReset()
-  const fake = createFakePyodide()
+  const fake = createFakePyodide(canRunSync)
   let stdout: ((text: string) => void) | undefined
   const loadPyodide = vi.fn(async (opts: { stdout: (text: string) => void }) => {
     stdout = opts.stdout
@@ -94,6 +98,7 @@ describe('startPygame', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     watchdog.wasStalled.mockReturnValue(false)
+    watchdog.interruptBuffer[0] = 0
   })
 
   it('SRI 検証つきで Pyodide を読み込み、pygame-ce を導入してから実行する', async () => {
@@ -151,23 +156,64 @@ describe('startPygame', () => {
     await expect(session.done).rejects.toThrow('NameError: x')
   })
 
-  it('cancel は Task を cancel し、その結果の CancelledError は握りつぶす', async () => {
+  it('cancel は停止フラグを立て（同期ループ用）、Task を cancel する（非同期ループ用）', async () => {
     const { mod, fake } = await setup()
     const session = await mod.startPygame('a', canvas, createIO(), emptyProject)
     session.cancel()
-    expect(fake.pyodide.runPython).toHaveBeenCalledWith('__narapy_pygame_task__.cancel()')
-    fake.task.reject(new Error('CancelledError'))
+    expect(fake.pyodide.globals.set).toHaveBeenCalledWith('__narapy_pygame_stop__', true)
+    expect(fake.pyodide.runPython).toHaveBeenCalledWith('__narapy_pygame_cancel__()')
+  })
+
+  it('cancel では interrupt buffer に書かない（イベントループ内部に当たって壊れるため）', async () => {
+    const { mod } = await setup()
+    const session = await mod.startPygame('a', canvas, createIO(), emptyProject)
+    session.cancel()
+    expect(watchdog.interruptBuffer[0]).toBe(0)
+  })
+
+  it('cancel が内部で失敗しても例外を投げない（モーダルを必ず閉じられるように）', async () => {
+    const { mod, fake } = await setup()
+    const session = await mod.startPygame('a', canvas, createIO(), emptyProject)
+    fake.pyodide.runPython.mockImplementation((() => { throw new Error('boom') }) as never)
+    expect(() => session.cancel()).not.toThrow()
+  })
+
+  it('cancel の結果として起きる例外（KeyboardInterrupt / CancelledError）は握りつぶす', async () => {
+    const { mod, fake } = await setup()
+    const session = await mod.startPygame('a', canvas, createIO(), emptyProject)
+    session.cancel()
+    fake.task.reject(new Error('pyodide.ffi.ConversionError: Conversion from python to javascript failed'))
     await expect(session.done).resolves.toBeUndefined()
   })
 
-  it('終了後の cancel は何もしない', async () => {
+  it('終了後の cancel は何もしない（古い SIGINT を残さない）', async () => {
     const { mod, fake } = await setup()
     const session = await mod.startPygame('a', canvas, createIO(), emptyProject)
     fake.task.resolve()
     await session.done
     fake.pyodide.runPython.mockClear()
+    fake.pyodide.globals.set.mockClear()
     session.cancel()
     expect(fake.pyodide.runPython).not.toHaveBeenCalled()
+    expect(fake.pyodide.globals.set).not.toHaveBeenCalled()
+  })
+
+  it('ゲームは runPythonAsync 経由で開始する（JSPI の run_sync が使えるスタックにするため）', async () => {
+    const { mod, fake } = await setup()
+    await mod.startPygame('a', canvas, createIO(), emptyProject)
+    expect(fake.pyodide.runPythonAsync).toHaveBeenCalledWith('await __narapy_pygame_main__(__narapy_pygame_src__)')
+  })
+
+  it('JSPI が使えるブラウザでは syncLoop が true になる', async () => {
+    const { mod } = await setup(true)
+    const session = await mod.startPygame('a', canvas, createIO(), emptyProject)
+    expect(session.syncLoop).toBe(true)
+  })
+
+  it('JSPI が使えないブラウザでは syncLoop が false になる（async 方式にフォールバック）', async () => {
+    const { mod } = await setup(false)
+    const session = await mod.startPygame('a', canvas, createIO(), emptyProject)
+    expect(session.syncLoop).toBe(false)
   })
 
   it('読み込みに失敗しても次回は再試行できる', async () => {
@@ -245,9 +291,10 @@ describe('startPygame', () => {
       const { mod, fake } = await setup()
       const order: string[] = []
       fake.pyodide.FS.writeFile = ((path: string) => { order.push(`write:${path}`) }) as never
-      fake.pyodide.runPython.mockImplementation(((code: string) => {
-        if (code.includes('ensure_future')) order.push('task')
-        return code.includes('ensure_future') ? fake.task.promise : undefined
+      fake.pyodide.runPythonAsync.mockImplementation(((code: string) => {
+        if (code.includes('can_run_sync')) return Promise.resolve(true)
+        order.push('task')
+        return fake.task.promise
       }) as never)
       await mod.startPygame('x', canvas, createIO(), project)
 

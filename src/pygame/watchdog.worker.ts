@@ -6,6 +6,7 @@ import {
   FIELD_PAUSED,
   FIELD_STALLED,
   HEARTBEAT_INTERVAL_MS,
+  HIDDEN_STALL_MS,
   INT32_OFFSET,
   SIGINT,
   STALL_MS,
@@ -37,6 +38,7 @@ self.onmessage = (event: MessageEvent<WatchdogMessage>) => {
       Atomics.load(fields, FIELD_HEARTBEAT),
       Atomics.load(fields, FIELD_PAUSED) === 1,
       STALL_MS,
+      HIDDEN_STALL_MS,
     )
     state = result.state
     if (result.stalled) {

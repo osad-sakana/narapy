@@ -27,8 +27,8 @@ vi.mock('../runner/errorTranslator', () => ({
 import { PygameStalledError } from './pygameRunner'
 import { showPygameModal } from './pygameModal'
 
-function createSession(done: Promise<void> = new Promise(() => {})): PygameSession {
-  return { done, cancel: vi.fn() }
+function createSession(done: Promise<void> = new Promise(() => {}), syncLoop = true): PygameSession {
+  return { done, cancel: vi.fn(), syncLoop }
 }
 
 const project = { files: [], directories: [] }
@@ -189,16 +189,26 @@ describe('showPygameModal', () => {
     expect(document.title).toBe('other')
   })
 
-  it('固まって止められた場合は await asyncio.sleep(0) の案内を出してモーダルを閉じる', async () => {
-    startPygame.mockResolvedValue(createSession(Promise.reject(new PygameStalledError())))
+  it('同期ループ対応のブラウザで固まった場合は、ループ内で flip / tick を呼ぶよう案内する', async () => {
+    startPygame.mockResolvedValue(createSession(Promise.reject(new PygameStalledError()), true))
     const h = hooks()
     showPygameModal('x', project, h)
     await flush()
 
     expect(appendLog).toHaveBeenCalledWith('--- 応答がなかったため実行を停止しました ---', 'warn')
-    expect(appendLog).toHaveBeenCalledWith(expect.stringContaining('await asyncio.sleep(0)'), 'info')
+    expect(appendLog).toHaveBeenCalledWith(expect.stringContaining('pygame.display.flip()'), 'info')
+    expect(appendLog).not.toHaveBeenCalledWith(expect.stringContaining('asyncio'), 'info')
     expect(appendErrorBlock).not.toHaveBeenCalled()
     expect(modal()).toBeNull()
     expect(h.onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('同期ループ非対応のブラウザで固まった場合は、await asyncio.sleep(0) の書き方を案内する', async () => {
+    startPygame.mockResolvedValue(createSession(Promise.reject(new PygameStalledError()), false))
+    showPygameModal('x', project, hooks())
+    await flush()
+
+    expect(appendLog).toHaveBeenCalledWith(expect.stringContaining('await asyncio.sleep(0)'), 'info')
+    expect(modal()).toBeNull()
   })
 })

@@ -2,6 +2,13 @@ import { PygameStalledError, startPygame, type PygameProject, type PygameSession
 import { appendErrorBlock, appendLog } from '../runner/log'
 import { translatePythonError } from '../runner/errorTranslator'
 
+// ブラウザが同期ループ（JSPI）に対応しているかで、固まったときの直し方が変わる
+function stallGuidance(syncLoop: boolean): string {
+  return syncLoop
+    ? 'ゲームのメインループの中で pygame.display.flip() / pygame.event.get() / Clock.tick() などを呼んでください。呼ばないループはブラウザが固まって止められません。'
+    : 'このブラウザでは、ゲームのループ内で `await asyncio.sleep(0)` を呼ぶ必要があります（`async def main()` + `await main()` の形にします）。'
+}
+
 const INITIAL_SIZE = { width: 640, height: 480 }
 
 export interface PygameModalHooks {
@@ -107,10 +114,7 @@ export function showPygameModal(code: string, project: PygameProject, hooks: Pyg
     } catch (err) {
       if (err instanceof PygameStalledError) {
         appendLog(`--- ${err.message} ---`, 'warn')
-        appendLog(
-          'ゲームのループ内で `await asyncio.sleep(0)` を呼ぶと、ブラウザが固まらずに動きます（`async def main()` + `await main()` の形にします）。',
-          'info',
-        )
+        appendLog(stallGuidance(session?.syncLoop ?? false), 'info')
         close()
         return
       }

@@ -10,6 +10,8 @@ export const FIELD_STALLED = 2
 export const SIGINT = 2
 // 心拍がこの時間止まったら、同期ループでブラウザが固まっているとみなす
 export const STALL_MS = 5000
+// タブが非表示の間はタイマーが 1 分に 1 回まで間引かれるため、それより長くする
+export const HIDDEN_STALL_MS = 90_000
 export const HEARTBEAT_INTERVAL_MS = 500
 export const READY_TIMEOUT_MS = 3000
 

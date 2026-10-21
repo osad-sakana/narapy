@@ -8,7 +8,8 @@ import { startWatchdog } from './watchdog'
 // SDL は <canvas> と DOM イベントを必要とするため、Worker ではなくメインスレッドの
 // 専用 Pyodide で実行する（issue #73 の PoC）。通常実行の Worker とは完全に分離する。
 interface MainPyodide extends PyodideInterface {
-  runPython: (code: string) => unknown
+  runPython: (code: string, options?: { filename?: string }) => unknown
+  runPythonAsync: (code: string, options?: { filename?: string }) => Promise<unknown>
   canvas: { setCanvas2D: (canvas: HTMLCanvasElement) => void }
   registerJsModule: (name: string, module: object) => void
 }
@@ -28,6 +29,11 @@ export interface PygameProject {
 }
 
 const WORK_DIR = '/home/pyodide'
+
+// ブートストラップのラッパー関数のフレームに使うファイル名。ユーザーコードの "<exec>" と別にしないと、
+// C 関数内で起きたエラー（set_mode(800, 600) 等）の行番号がラッパー内の行を指してしまう
+// （errorTranslator は最後の File "<exec>", line N を採用するため）
+const WRAPPER_FILENAME = '<narapy_pygame>'
 
 export interface PygameIO {
   onStdout: (text: string) => void
@@ -56,6 +62,10 @@ let currentCaption: (title: string) => void = () => {}
 let syncLoopSupported = false
 // 前回の実行で FS に書いたファイル。次回の同期で、無くなったものを消すために保持する
 let writtenPaths: ReadonlySet<string> = new Set()
+// 直近の実行の完了を表す Promise。実行は 1 つずつ直列に行う。モーダルを閉じても停止は協調的・非同期で、
+// 古い実行が生きている間に次の実行が FS・canvas・停止フラグへ触ると、2 つのゲームが混ざったり
+// 古い停止要求が新しい実行を止めたりする
+let runQueue: Promise<void> = Promise.resolve()
 
 function loadMainPyodide(onLoading: (text: string) => void): Promise<MainPyodide> {
   if (!pyodidePromise) {
@@ -76,7 +86,7 @@ function loadMainPyodide(onLoading: (text: string) => void): Promise<MainPyodide
         resize: (width: number, height: number) => currentResize(width, height),
         caption: (title: string) => currentCaption(title),
       })
-      pyodide.runPython(BOOTSTRAP_CODE)
+      pyodide.runPython(BOOTSTRAP_CODE, { filename: WRAPPER_FILENAME })
       syncLoopSupported = (await pyodide.runPythonAsync(CAN_RUN_SYNC_CODE)) === true
       return pyodide
     })().catch((err) => {
@@ -94,7 +104,28 @@ export async function startPygame(
   io: PygameIO,
   project: PygameProject,
 ): Promise<PygameSession> {
-  const pyodide = await loadMainPyodide(io.onLoading)
+  // 同期的に（await より前に）自分の順番を確保する。後続の呼び出しは自分の完了を待つ
+  const previous = runQueue
+  let release!: () => void
+  runQueue = new Promise<void>((resolve) => { release = resolve })
+  try {
+    const pyodide = await loadMainPyodide(io.onLoading)
+    await previous
+    return await launch(pyodide, code, canvas, io, project, release)
+  } catch (err) {
+    release()
+    throw err
+  }
+}
+
+async function launch(
+  pyodide: MainPyodide,
+  code: string,
+  canvas: HTMLCanvasElement,
+  io: PygameIO,
+  project: PygameProject,
+  release: () => void,
+): Promise<PygameSession> {
   currentStdout = io.onStdout
   currentResize = io.onResize
   currentCaption = io.onCaption
@@ -109,7 +140,7 @@ export async function startPygame(
   pyodide.setInterruptBuffer(watchdog.interruptBuffer)
   // runPythonAsync 経由で開始する。同期コード全体が JSPI の suspend 可能なスタック上で走り、
   // パッチ済みの flip / tick / event.get が run_sync でブラウザへ制御を返せる
-  const run = pyodide.runPythonAsync(RUN_MAIN_CODE)
+  const run = pyodide.runPythonAsync(RUN_MAIN_CODE, { filename: WRAPPER_FILENAME })
 
   let cancelled = false
   let finished = false
@@ -124,7 +155,10 @@ export async function startPygame(
     })
     .finally(() => {
       finished = true
+      // 終了間際にウォッチドッグが書いた SIGINT を、次の実行の prepare に当てない
+      watchdog.interruptBuffer[0] = 0
       watchdog.stop()
+      release()
     })
 
   return {

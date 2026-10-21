@@ -4,7 +4,7 @@
 export const WATCHDOG_SAB_BYTES = 16
 export const INT32_OFFSET = 4
 export const FIELD_HEARTBEAT = 0
-export const FIELD_PAUSED = 1
+export const FIELD_HIDDEN = 1
 export const FIELD_STALLED = 2
 
 export const SIGINT = 2

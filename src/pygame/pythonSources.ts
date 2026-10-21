@@ -70,9 +70,15 @@ def __narapy_install_sync_patches__():
     def sleep_in_browser(seconds, original):
         check_stop()
         if can_run_sync():
-            run_sync(asyncio.sleep(seconds))
+            # 長い待機でも停止ボタンに反応できるよう、短く区切って停止フラグを確認する
+            deadline = time.monotonic() + seconds
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                run_sync(asyncio.sleep(min(remaining, 0.05)))
+                check_stop()
             state['last'] = time.monotonic()
-            check_stop()
         else:
             original(seconds)
 

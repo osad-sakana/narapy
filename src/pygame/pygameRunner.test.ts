@@ -114,17 +114,21 @@ describe('startPygame', () => {
   })
 
   it('2 回目以降は Pyodide を再読み込みしない', async () => {
-    const { mod, loadPyodide } = await setup()
-    await mod.startPygame('a', canvas, createIO(), emptyProject)
+    const { mod, fake, loadPyodide } = await setup()
+    const first = await mod.startPygame('a', canvas, createIO(), emptyProject)
+    fake.task.resolve()
+    await first.done
     await mod.startPygame('b', canvas, createIO(), emptyProject)
     expect(loadPyodide).toHaveBeenCalledTimes(1)
   })
 
   it('標準出力は直近の実行の onStdout に流れる', async () => {
-    const { mod, emitStdout } = await setup()
+    const { mod, fake, emitStdout } = await setup()
     const first = createIO()
     const second = createIO()
-    await mod.startPygame('a', canvas, first, emptyProject)
+    const firstSession = await mod.startPygame('a', canvas, first, emptyProject)
+    fake.task.resolve()
+    await firstSession.done
     await mod.startPygame('b', canvas, second, emptyProject)
     emitStdout('hello')
     expect(first.onStdout).not.toHaveBeenCalled()
@@ -201,7 +205,19 @@ describe('startPygame', () => {
   it('ゲームは runPythonAsync 経由で開始する（JSPI の run_sync が使えるスタックにするため）', async () => {
     const { mod, fake } = await setup()
     await mod.startPygame('a', canvas, createIO(), emptyProject)
-    expect(fake.pyodide.runPythonAsync).toHaveBeenCalledWith('await __narapy_pygame_main__(__narapy_pygame_src__)')
+    expect(fake.pyodide.runPythonAsync).toHaveBeenCalledWith(
+      'await __narapy_pygame_main__(__narapy_pygame_src__)',
+      { filename: '<narapy_pygame>' },
+    )
+  })
+
+  it('ブートストラップとゲーム開始は <exec> 以外のファイル名で実行する（エラー行番号がユーザーコードを指すように）', async () => {
+    const { mod, fake } = await setup()
+    await mod.startPygame('a', canvas, createIO(), emptyProject)
+    expect(fake.pyodide.runPython).toHaveBeenCalledWith(
+      expect.stringContaining('__narapy_install_sync_patches__'),
+      { filename: '<narapy_pygame>' },
+    )
   })
 
   it('JSPI が使えるブラウザでは syncLoop が true になる', async () => {
@@ -303,7 +319,9 @@ describe('startPygame', () => {
 
     it('2 回目の実行では、無くなったアセットを FS から消す', async () => {
       const { mod, fake } = await setup()
-      await mod.startPygame('x', canvas, createIO(), project)
+      const first = await mod.startPygame('x', canvas, createIO(), project)
+      fake.task.resolve()
+      await first.done
       await mod.startPygame('x', canvas, createIO(), {
         files: [{ kind: 'text', path: 'main.py', data: 'import pygame' }],
         directories: [],
@@ -312,5 +330,70 @@ describe('startPygame', () => {
       expect(fake.pyodide.FS.files.has('/home/pyodide/assets/player.png')).toBe(false)
       expect(fake.pyodide.FS.files.has('/home/pyodide/main.py')).toBe(true)
     })
+  })
+
+  describe('実行の直列化', () => {
+    // 呼び出しごとに別の Promise を返し、各 run の終了を個別に制御できる偽 Pyodide
+    async function setupSerial() {
+      const ctx = await setup()
+      const runs: Deferred[] = []
+      ctx.fake.pyodide.runPythonAsync.mockImplementation(((code: string) => {
+        if (code.includes('can_run_sync')) return Promise.resolve(true)
+        const d = deferred()
+        runs.push(d)
+        return d.promise
+      }) as never)
+      return { ...ctx, runs }
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+    it('前の実行が終わるまで、次の実行は FS・停止フラグ・ソースに触れない', async () => {
+      const { mod, fake, runs } = await setupSerial()
+      const first = await mod.startPygame('first', canvas, createIO(), emptyProject)
+
+      const secondPromise = mod.startPygame('second', canvas, createIO(), emptyProject)
+      await flush()
+      expect(runs).toHaveLength(1)
+      expect(fake.pyodide.globals.set).not.toHaveBeenCalledWith('__narapy_pygame_src__', 'second')
+
+      runs[0].resolve()
+      await first.done
+      const second = await secondPromise
+      expect(runs).toHaveLength(2)
+      expect(fake.pyodide.globals.set).toHaveBeenCalledWith('__narapy_pygame_src__', 'second')
+      second.cancel()
+    })
+
+    it('前の実行が例外で終わっても、次の実行は開始できる', async () => {
+      const { mod, runs } = await setupSerial()
+      const first = await mod.startPygame('first', canvas, createIO(), emptyProject)
+      const secondPromise = mod.startPygame('second', canvas, createIO(), emptyProject)
+
+      runs[0].reject(new Error('NameError: x'))
+      await expect(first.done).rejects.toThrow('NameError: x')
+      await expect(secondPromise).resolves.toBeDefined()
+    })
+
+    it('前の実行の開始（読み込み）が失敗しても、次の実行は待たされ続けない', async () => {
+      const { mod, loadPyodide } = await setupSerial()
+      loadPyodide.mockRejectedValueOnce(new Error('network'))
+      // 同時に始めた 2 つは同じ読み込みの失敗を共有するが、どちらも待たされ続けない
+      const firstPromise = mod.startPygame('first', canvas, createIO(), emptyProject)
+      const secondPromise = mod.startPygame('second', canvas, createIO(), emptyProject)
+      await expect(firstPromise).rejects.toThrow('network')
+      await expect(secondPromise).rejects.toThrow('network')
+
+      // 失敗した実行が順番を握ったままにならず、その後の実行は開始できる
+      await expect(mod.startPygame('third', canvas, createIO(), emptyProject)).resolves.toBeDefined()
+    })
+  })
+
+  it('実行が終わったら、ウォッチドッグが残した SIGINT を次の実行へ持ち越さない', async () => {
+    const { mod, fake } = await setup()
+    const session = await mod.startPygame('a', canvas, createIO(), emptyProject)
+    watchdog.interruptBuffer[0] = 2
+    fake.task.resolve()
+    await session.done
+    expect(watchdog.interruptBuffer[0]).toBe(0)
   })
 })

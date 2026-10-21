@@ -62,3 +62,27 @@ describe('routeRun', () => {
     expect(routeRun('grade', PLAIN)).toEqual({ kind: 'worker' })
   })
 })
+
+describe('routeRun（import 先ファイル）', () => {
+  const files = [
+    { kind: 'text' as const, path: 'game.py', data: 'import pygame\n' },
+    { kind: 'text' as const, path: 'plain.py', data: 'x = 1\n' },
+    { kind: 'text' as const, path: 'unused.py', data: 'import pygame\n' },
+  ]
+
+  it('main が import する別ファイルだけが pygame を使う場合も、通常実行は pygame 経路にする', () => {
+    expect(routeRun('normal', 'import game\ngame.run()', '', files)).toEqual({ kind: 'pygame' })
+  })
+
+  it('import されていないファイルの pygame は無視する', () => {
+    expect(routeRun('normal', 'import plain', '', files)).toEqual({ kind: 'worker' })
+  })
+
+  it('ステップ実行でも、import 先が pygame を使うなら実行しない', () => {
+    expect(routeRun('trace', 'import game', '', files).kind).toBe('unsupported')
+  })
+
+  it('採点では test.py が import する先の pygame も見る', () => {
+    expect(routeRun('grade', 'x = 1', 'import game', files).kind).toBe('unsupported')
+  })
+})

@@ -1,6 +1,6 @@
 import {
   FIELD_HEARTBEAT,
-  FIELD_PAUSED,
+  FIELD_HIDDEN,
   FIELD_STALLED,
   HEARTBEAT_INTERVAL_MS,
   INT32_OFFSET,
@@ -29,16 +29,23 @@ export async function startWatchdog(): Promise<Watchdog> {
   const worker = new Worker(new URL('./watchdog.worker.ts', import.meta.url), { type: 'module' })
 
   const syncVisibility = (): void => {
-    Atomics.store(fields, FIELD_PAUSED, document.hidden ? 1 : 0)
+    Atomics.store(fields, FIELD_HIDDEN, document.hidden ? 1 : 0)
+    // 長時間の非表示中は心拍が間引かれて古くなっている。表示に戻った瞬間に閾値が 5 秒へ
+    // 切り替わるので、すぐ心拍を進めて健全なゲームを誤検知しないようにする
+    if (!document.hidden) Atomics.add(fields, FIELD_HEARTBEAT, 1)
   }
   syncVisibility()
   document.addEventListener('visibilitychange', syncVisibility)
 
   const heartbeat = setInterval(() => Atomics.add(fields, FIELD_HEARTBEAT, 1), HEARTBEAT_INTERVAL_MS)
   const ready = new Promise<void>((resolve) => {
-    worker.onmessage = () => resolve()
-    worker.onerror = () => resolve()
-    setTimeout(resolve, READY_TIMEOUT_MS)
+    const timeout = setTimeout(resolve, READY_TIMEOUT_MS)
+    const settle = (): void => {
+      clearTimeout(timeout)
+      resolve()
+    }
+    worker.onmessage = settle
+    worker.onerror = settle
   })
   worker.postMessage({ type: 'start', sab } satisfies WatchdogMessage)
   await ready

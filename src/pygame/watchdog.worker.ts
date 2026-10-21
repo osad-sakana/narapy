@@ -3,7 +3,7 @@
 import { nextStallState, INITIAL_STALL_STATE } from './stallMonitor'
 import {
   FIELD_HEARTBEAT,
-  FIELD_PAUSED,
+  FIELD_HIDDEN,
   FIELD_STALLED,
   HEARTBEAT_INTERVAL_MS,
   HIDDEN_STALL_MS,
@@ -36,7 +36,7 @@ self.onmessage = (event: MessageEvent<WatchdogMessage>) => {
       state,
       Date.now(),
       Atomics.load(fields, FIELD_HEARTBEAT),
-      Atomics.load(fields, FIELD_PAUSED) === 1,
+      Atomics.load(fields, FIELD_HIDDEN) === 1,
       STALL_MS,
       HIDDEN_STALL_MS,
     )

@@ -246,12 +246,12 @@ export function initRunner(
   // pygame はメインスレッドの専用 Pyodide でモーダル内に実行する（issue #73）。
   // 開いている間はエディタを編集不可にし、二重起動も防ぐ。
   let pygameOpen = false
-  function openPygame(code: string): void {
+  function openPygame(code: string, project: { files: RunFile[]; directories: string[] }): void {
     if (pygameOpen) return
     onRunStart?.()
     clearLog()
     appendLog('--- 実行開始（Pygame） ---', 'info')
-    showPygameModal(code, getRunFiles(), {
+    showPygameModal(code, project, {
       onOpen: () => {
         pygameOpen = true
         editor.updateOptions({ readOnly: true })
@@ -283,9 +283,10 @@ export function initRunner(
       return
     }
 
-    const route = routeRun(mode, code, testCode)
+    const project = getRunFiles()
+    const route = routeRun(mode, code, testCode, project.files)
     if (route.kind === 'pygame') {
-      openPygame(code)
+      openPygame(code, project)
       return
     }
     if (route.kind === 'unsupported') {
@@ -299,7 +300,7 @@ export function initRunner(
     setRunning(true)
     clearLog()
     appendLog(mode === 'grade' ? '--- 採点開始 ---' : '--- 実行開始 ---', 'info')
-    const { files, directories } = getRunFiles()
+    const { files, directories } = project
     worker.postMessage({ type: 'run', code, files, directories, mode, testCode, entryPath } satisfies RunPayload)
   }
 

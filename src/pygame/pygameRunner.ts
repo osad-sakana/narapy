@@ -14,6 +14,8 @@ export interface PygameIO {
   onLoading: (text: string) => void
   // pygame.display.set_mode() が返した Surface のサイズ。canvas とモーダルの寸法合わせに使う
   onResize: (width: number, height: number) => void
+  // pygame.display.set_caption() で設定されたウィンドウタイトル
+  onCaption: (title: string) => void
 }
 
 export interface PygameSession {
@@ -37,6 +39,13 @@ async def __narapy_pygame_main__(src):
             return surface
         set_mode.__narapy_wrapped__ = True
         pygame.display.set_mode = set_mode
+    if not getattr(pygame.display.set_caption, '__narapy_wrapped__', False):
+        orig_set_caption = pygame.display.set_caption
+        def set_caption(*args, **kwargs):
+            orig_set_caption(*args, **kwargs)
+            narapy_host.caption(pygame.display.get_caption()[0])
+        set_caption.__narapy_wrapped__ = True
+        pygame.display.set_caption = set_caption
     ns = {'__name__': '__main__'}
     try:
         res = eval(compile(src, '<main>', 'exec', ast.PyCF_ALLOW_TOP_LEVEL_AWAIT), ns)
@@ -52,6 +61,7 @@ let pyodidePromise: Promise<MainPyodide> | null = null
 // loadPyodide の stdout は初期化時に固定されるため、実行ごとに差し替え可能な出力先を経由する
 let currentStdout: (text: string) => void = () => {}
 let currentResize: (width: number, height: number) => void = () => {}
+let currentCaption: (title: string) => void = () => {}
 
 function loadMainPyodide(onLoading: (text: string) => void): Promise<MainPyodide> {
   if (!pyodidePromise) {
@@ -70,6 +80,7 @@ function loadMainPyodide(onLoading: (text: string) => void): Promise<MainPyodide
       await pyodide.loadPackage('pygame-ce')
       pyodide.registerJsModule('narapy_host', {
         resize: (width: number, height: number) => currentResize(width, height),
+        caption: (title: string) => currentCaption(title),
       })
       pyodide.runPython(BOOTSTRAP_CODE)
       return pyodide
@@ -90,6 +101,7 @@ export async function startPygame(
   const pyodide = await loadMainPyodide(io.onLoading)
   currentStdout = io.onStdout
   currentResize = io.onResize
+  currentCaption = io.onCaption
   pyodide.canvas.setCanvas2D(canvas)
   pyodide.globals.set('__narapy_pygame_src__', code)
   // await した PyProxy は Pyodide が破棄するため、キャンセル用に Task を Python 側のグローバルにも保持する

@@ -55,6 +55,14 @@ export function showPygameModal(code: string, hooks: PygameModalHooks): void {
   backdrop.appendChild(card)
   document.body.appendChild(backdrop)
 
+  // SDL は初期化時や set_caption で document.title を書き換えるため、モーダルの間は元のタイトルに戻し続ける
+  const pageTitle = document.title
+  const titleObserver = new MutationObserver(() => {
+    if (document.title !== pageTitle) document.title = pageTitle
+  })
+  const titleNode = document.querySelector('title')
+  if (titleNode) titleObserver.observe(titleNode, { childList: true, characterData: true, subtree: true })
+
   let session: PygameSession | null = null
   let closed = false
 
@@ -62,6 +70,8 @@ export function showPygameModal(code: string, hooks: PygameModalHooks): void {
     if (closed) return
     closed = true
     session?.cancel()
+    titleObserver.disconnect()
+    document.title = pageTitle
     backdrop.remove()
     hooks.onClose()
   }
@@ -74,6 +84,9 @@ export function showPygameModal(code: string, hooks: PygameModalHooks): void {
     try {
       session = await startPygame(code, canvas, {
         onStdout: (text) => appendLog(text, 'output'),
+        onCaption: (title) => {
+          titleEl.textContent = `🎮 ${title}`
+        },
         onResize: (width, height) => {
           canvas.width = width
           canvas.height = height

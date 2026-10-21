@@ -117,4 +117,29 @@ describe('applyUrlLoad', () => {
     })
     expect(onExerciseLoaded).toHaveBeenCalledWith(undefined, dummyProject.files, dummyProject.activeFile)
   })
+
+  it('読み込み成功時に onSharedLinkLoaded を出所つきで呼ぶ', async () => {
+    const onSharedLinkLoaded = vi.fn()
+    await applyUrlLoad({
+      resolve: async () => ({ project: dummyProject, source: 'code' }),
+      hasUserContent: () => false,
+      loadProject: vi.fn(),
+      refreshExplorer: vi.fn(),
+      onSharedLinkLoaded,
+    })
+    expect(onSharedLinkLoaded).toHaveBeenCalledWith('code')
+  })
+
+  it('上書き確認でキャンセルしたら onSharedLinkLoaded を呼ばない', async () => {
+    const onSharedLinkLoaded = vi.fn()
+    await applyUrlLoad({
+      resolve: async () => ({ project: dummyProject, source: 'project' }),
+      hasUserContent: () => true,
+      confirm: () => false,
+      loadProject: vi.fn(),
+      refreshExplorer: vi.fn(),
+      onSharedLinkLoaded,
+    })
+    expect(onSharedLinkLoaded).not.toHaveBeenCalled()
+  })
 })

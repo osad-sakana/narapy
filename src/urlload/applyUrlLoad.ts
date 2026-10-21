@@ -11,6 +11,8 @@ export interface ApplyUrlLoadDeps {
   resolve?: () => Promise<UrlLoadResult | null>
   // #project=/?project=<URL> で読み込んだものが演習(.exercise)かどうかを検知する
   // 任意フック(issue #65)。通常の.narapyプロジェクトでは undefined で呼ばれる
+  // 共有リンク由来のプロジェクトを読み込んだ直後に呼ぶ(pygame 実行前の確認に使う)
+  onSharedLinkLoaded?: (source: UrlLoadResult['source']) => void
   onExerciseLoaded?: (exercise: ExerciseMeta | undefined, files: FileEntry[], activeFile: string) => void
 }
 
@@ -26,5 +28,6 @@ export async function applyUrlLoad(deps: ApplyUrlLoadDeps): Promise<void> {
 
   deps.loadProject(result.project.files, result.project.directories, result.project.activeFile)
   deps.refreshExplorer()
+  deps.onSharedLinkLoaded?.(result.source)
   deps.onExerciseLoaded?.(result.project.exercise, result.project.files, result.project.activeFile)
 }

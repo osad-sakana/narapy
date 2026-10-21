@@ -6,7 +6,7 @@ import { createEditor, createEditorModelHost, getValue } from './editor/index'
 import { createFileOpener, createModelRegistry } from './editor/modelRegistry'
 import { initFontSizeControls } from './editor/fontSize'
 import { downloadNarapyProject, openNarapyFilePicker, type ExerciseMeta } from './fileio/index'
-import type { FileEntry } from './explorer/types'
+import type { DirectoryEntry, FileEntry } from './explorer/types'
 import { createExplorer } from './explorer/ui'
 import { initAbout } from './about/index'
 import {
@@ -23,6 +23,7 @@ import {
   hasUserContent,
 } from './explorer/store'
 import { applyUrlLoad } from './urlload/applyUrlLoad'
+import { clearSharedLinkMark, markLoadedFromSharedLink } from './pygame/sharedLinkGuard'
 import { applyProjectLoad } from './fileio/applyProjectLoad'
 import { createFileSwitcher } from './editor/fileSwitcher'
 import { initTheme } from './theme/index'
@@ -184,6 +185,7 @@ try {
     hasUserContent,
     loadProject,
     refreshExplorer,
+    onSharedLinkLoaded: markLoadedFromSharedLink,
     onExerciseLoaded: (exercise, files, activeFile) => exerciseController.onProjectLoaded(exercise, files, activeFile),
   })
 } catch (err) {
@@ -246,7 +248,11 @@ instructorController.setStateChangeListener(() => {
 // プロジェクト読込系オーケストレーション（.narapy を開く／新規作成）が共有する依存。
 // 別々に組み立てると、どちらかだけ直して食い違う事故が起きうるため一箇所にまとめる。
 const projectLoadDeps = {
-  loadProject,
+  // 共有リンク由来ではないプロジェクトに置き換わったら、pygame 実行前の確認対象から外す
+  loadProject: (files: FileEntry[], directories: DirectoryEntry[], activeFile: string) => {
+    clearSharedLinkMark()
+    loadProject(files, directories, activeFile)
+  },
   refreshExplorer,
   getActiveFile,
   getActiveContent,

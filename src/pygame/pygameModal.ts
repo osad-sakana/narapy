@@ -1,4 +1,4 @@
-import { PygameStalledError, startPygame, type PygameSession } from './pygameRunner'
+import { PygameStalledError, startPygame, type PygameProject, type PygameSession } from './pygameRunner'
 import { appendErrorBlock, appendLog } from '../runner/log'
 import { translatePythonError } from '../runner/errorTranslator'
 
@@ -12,7 +12,7 @@ export interface PygameModalHooks {
 
 // pygame をモーダル内の canvas で実行する。モーダルが全画面を覆い、開いている間は
 // エディタを編集できない。閉じるボタンで実行を中断する（Esc はゲーム側のキー入力に使えるよう閉じる操作にしない）。
-export function showPygameModal(code: string, hooks: PygameModalHooks): void {
+export function showPygameModal(code: string, project: PygameProject, hooks: PygameModalHooks): void {
   hooks.onOpen()
 
   const backdrop = document.createElement('div')
@@ -95,7 +95,7 @@ export function showPygameModal(code: string, hooks: PygameModalHooks): void {
           statusEl.textContent = text
           appendLog(text, 'info')
         },
-      })
+      }, project)
       if (closed) {
         session.cancel()
         return

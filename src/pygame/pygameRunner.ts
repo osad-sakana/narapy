@@ -1,5 +1,7 @@
 import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from '../lib/pyodideLoader'
 import type { PyodideInterface, PyodideModule } from '../pyodide/pyodideTypes'
+import type { RunFile } from '../types'
+import { syncFiles, topLevelPyModuleNames } from './fsSync'
 import { startWatchdog } from './watchdog'
 
 // SDL は <canvas> と DOM イベントを必要とするため、Worker ではなくメインスレッドの
@@ -17,6 +19,14 @@ export class PygameStalledError extends Error {
     this.name = 'PygameStalledError'
   }
 }
+
+// エクスプローラー上のプロジェクト（画像・フォント・.py 等）。通常実行の Worker と同じ形式
+export interface PygameProject {
+  files: RunFile[]
+  directories: string[]
+}
+
+const WORK_DIR = '/home/pyodide'
 
 export interface PygameIO {
   onStdout: (text: string) => void
@@ -37,6 +47,17 @@ export interface PygameSession {
 // 例外・キャンセルのどちらでも pygame.quit() を実行して次回実行に状態を持ち越さない。
 // import・一時変数は関数内に閉じ込める（グローバルにユーザー変数と衝突する名前を残さない）。
 const BOOTSTRAP_CODE = `
+# 作業ディレクトリへ移動し、前回実行の直下モジュール（import helper 等）を sys.modules から外して
+# 編集後の内容が再 import されるようにする
+def __narapy_pygame_prepare__(workdir, names):
+    import os, sys, importlib
+    os.chdir(workdir)
+    for name in names:
+        sys.modules.pop(name, None)
+    importlib.invalidate_caches()
+
+# ユーザーコードのファイル名は通常実行と同じ "<exec>" にする（エラー翻訳が行番号を
+# File "<exec>", line N から抽出するため。別名だとこのラッパー内の行番号を拾ってしまう）
 async def __narapy_pygame_main__(src):
     import ast, sys, pygame, narapy_host
     # set_mode は canvas 要素のサイズを変えないため、返した Surface のサイズをホストへ通知する
@@ -57,7 +78,7 @@ async def __narapy_pygame_main__(src):
         pygame.display.set_caption = set_caption
     ns = {'__name__': '__main__'}
     try:
-        res = eval(compile(src, '<main>', 'exec', ast.PyCF_ALLOW_TOP_LEVEL_AWAIT), ns)
+        res = eval(compile(src, '<exec>', 'exec', ast.PyCF_ALLOW_TOP_LEVEL_AWAIT), ns)
         if res is not None:
             await res
     finally:
@@ -71,6 +92,8 @@ let pyodidePromise: Promise<MainPyodide> | null = null
 let currentStdout: (text: string) => void = () => {}
 let currentResize: (width: number, height: number) => void = () => {}
 let currentCaption: (title: string) => void = () => {}
+// 前回の実行で FS に書いたファイル。次回の同期で、無くなったものを消すために保持する
+let writtenPaths: ReadonlySet<string> = new Set()
 
 function loadMainPyodide(onLoading: (text: string) => void): Promise<MainPyodide> {
   if (!pyodidePromise) {
@@ -106,12 +129,17 @@ export async function startPygame(
   code: string,
   canvas: HTMLCanvasElement,
   io: PygameIO,
+  project: PygameProject,
 ): Promise<PygameSession> {
   const pyodide = await loadMainPyodide(io.onLoading)
   currentStdout = io.onStdout
   currentResize = io.onResize
   currentCaption = io.onCaption
   pyodide.canvas.setCanvas2D(canvas)
+  writtenPaths = syncFiles(pyodide.FS, WORK_DIR, writtenPaths, project.files, project.directories)
+  pyodide.runPython(
+    `__narapy_pygame_prepare__(${JSON.stringify(WORK_DIR)}, ${JSON.stringify(topLevelPyModuleNames(project.files))})`,
+  )
   pyodide.globals.set('__narapy_pygame_src__', code)
   // 同期ループでメインスレッドが固まっても復帰できるよう、別 Worker に心拍を監視させる
   const watchdog = await startWatchdog()

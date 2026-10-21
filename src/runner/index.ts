@@ -251,7 +251,7 @@ export function initRunner(
     onRunStart?.()
     clearLog()
     appendLog('--- 実行開始（Pygame） ---', 'info')
-    showPygameModal(code, {
+    showPygameModal(code, getRunFiles(), {
       onOpen: () => {
         pygameOpen = true
         editor.updateOptions({ readOnly: true })

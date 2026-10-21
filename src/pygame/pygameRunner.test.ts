@@ -33,6 +33,19 @@ function deferred(): Deferred {
   return { promise, resolve, reject }
 }
 
+function createFakeFs() {
+  const dirs = new Set<string>(['/', '/home'])
+  const files = new Map<string, string | Uint8Array>()
+  return {
+    dirs,
+    files,
+    analyzePath: (path: string) => ({ exists: dirs.has(path) || files.has(path) }),
+    mkdir: (path: string) => { dirs.add(path) },
+    writeFile: (path: string, data: string | Uint8Array) => { files.set(path, data) },
+    unlink: (path: string) => { files.delete(path) },
+  }
+}
+
 // loadPyodide が返す偽の Pyodide。ensure_future を呼ぶ runPython だけ制御可能な Task を返す
 function createFakePyodide() {
   const task = deferred()
@@ -44,6 +57,7 @@ function createFakePyodide() {
     }),
     canvas: { setCanvas2D: vi.fn() },
     globals: { set: vi.fn(), get: vi.fn() },
+    FS: createFakeFs(),
     setInterruptBuffer: vi.fn(),
     runPython: vi.fn((code: string) => (code.includes('ensure_future') ? task.promise : undefined)),
   }
@@ -74,6 +88,7 @@ function createIO() {
 }
 
 const canvas = {} as HTMLCanvasElement
+const emptyProject = { files: [], directories: [] }
 
 describe('startPygame', () => {
   beforeEach(() => {
@@ -84,7 +99,7 @@ describe('startPygame', () => {
   it('SRI 検証つきで Pyodide を読み込み、pygame-ce を導入してから実行する', async () => {
     const { mod, fake } = await setup()
     const io = createIO()
-    await mod.startPygame('import pygame', canvas, io)
+    await mod.startPygame('import pygame', canvas, io, emptyProject)
 
     expect(verifiedImport).toHaveBeenCalledWith('https://cdn.example/pyodide/pyodide.mjs', 'sha384-test')
     expect(fake.pyodide.loadPackage).toHaveBeenCalledWith('pygame-ce')
@@ -95,8 +110,8 @@ describe('startPygame', () => {
 
   it('2 回目以降は Pyodide を再読み込みしない', async () => {
     const { mod, loadPyodide } = await setup()
-    await mod.startPygame('a', canvas, createIO())
-    await mod.startPygame('b', canvas, createIO())
+    await mod.startPygame('a', canvas, createIO(), emptyProject)
+    await mod.startPygame('b', canvas, createIO(), emptyProject)
     expect(loadPyodide).toHaveBeenCalledTimes(1)
   })
 
@@ -104,8 +119,8 @@ describe('startPygame', () => {
     const { mod, emitStdout } = await setup()
     const first = createIO()
     const second = createIO()
-    await mod.startPygame('a', canvas, first)
-    await mod.startPygame('b', canvas, second)
+    await mod.startPygame('a', canvas, first, emptyProject)
+    await mod.startPygame('b', canvas, second, emptyProject)
     emitStdout('hello')
     expect(first.onStdout).not.toHaveBeenCalled()
     expect(second.onStdout).toHaveBeenCalledWith('hello')
@@ -114,7 +129,7 @@ describe('startPygame', () => {
   it('Python 側の set_mode / set_caption 通知を直近の実行のコールバックへ中継する', async () => {
     const { mod, fake } = await setup()
     const io = createIO()
-    await mod.startPygame('a', canvas, io)
+    await mod.startPygame('a', canvas, io, emptyProject)
     const host = fake.jsModules['narapy_host']
     host.resize(480 as never, 320 as never)
     host.caption('My Game' as never)
@@ -124,21 +139,21 @@ describe('startPygame', () => {
 
   it('スクリプトが正常終了すると done が resolve する', async () => {
     const { mod, fake } = await setup()
-    const session = await mod.startPygame('a', canvas, createIO())
+    const session = await mod.startPygame('a', canvas, createIO(), emptyProject)
     fake.task.resolve()
     await expect(session.done).resolves.toBeUndefined()
   })
 
   it('Python 例外は done の reject として伝わる', async () => {
     const { mod, fake } = await setup()
-    const session = await mod.startPygame('a', canvas, createIO())
+    const session = await mod.startPygame('a', canvas, createIO(), emptyProject)
     fake.task.reject(new Error('NameError: x'))
     await expect(session.done).rejects.toThrow('NameError: x')
   })
 
   it('cancel は Task を cancel し、その結果の CancelledError は握りつぶす', async () => {
     const { mod, fake } = await setup()
-    const session = await mod.startPygame('a', canvas, createIO())
+    const session = await mod.startPygame('a', canvas, createIO(), emptyProject)
     session.cancel()
     expect(fake.pyodide.runPython).toHaveBeenCalledWith('__narapy_pygame_task__.cancel()')
     fake.task.reject(new Error('CancelledError'))
@@ -147,7 +162,7 @@ describe('startPygame', () => {
 
   it('終了後の cancel は何もしない', async () => {
     const { mod, fake } = await setup()
-    const session = await mod.startPygame('a', canvas, createIO())
+    const session = await mod.startPygame('a', canvas, createIO(), emptyProject)
     fake.task.resolve()
     await session.done
     fake.pyodide.runPython.mockClear()
@@ -158,21 +173,21 @@ describe('startPygame', () => {
   it('読み込みに失敗しても次回は再試行できる', async () => {
     const { mod, loadPyodide } = await setup()
     loadPyodide.mockRejectedValueOnce(new Error('network'))
-    await expect(mod.startPygame('a', canvas, createIO())).rejects.toThrow('network')
-    await expect(mod.startPygame('a', canvas, createIO())).resolves.toBeDefined()
+    await expect(mod.startPygame('a', canvas, createIO(), emptyProject)).rejects.toThrow('network')
+    await expect(mod.startPygame('a', canvas, createIO(), emptyProject)).resolves.toBeDefined()
     expect(loadPyodide).toHaveBeenCalledTimes(2)
   })
 
   it('ウォッチドッグの interrupt buffer を Pyodide に設定する', async () => {
     const { mod, fake } = await setup()
-    await mod.startPygame('a', canvas, createIO())
+    await mod.startPygame('a', canvas, createIO(), emptyProject)
     expect(startWatchdog).toHaveBeenCalledTimes(1)
     expect(fake.pyodide.setInterruptBuffer).toHaveBeenCalledWith(watchdog.interruptBuffer)
   })
 
   it('終了時（正常・例外・キャンセル）にウォッチドッグを止める', async () => {
     const { mod, fake } = await setup()
-    const session = await mod.startPygame('a', canvas, createIO())
+    const session = await mod.startPygame('a', canvas, createIO(), emptyProject)
     expect(watchdog.stop).not.toHaveBeenCalled()
     fake.task.resolve()
     await session.done
@@ -181,7 +196,7 @@ describe('startPygame', () => {
 
   it('ウォッチドッグに止められた場合は PygameStalledError で reject する', async () => {
     const { mod, fake } = await setup()
-    const session = await mod.startPygame('a', canvas, createIO())
+    const session = await mod.startPygame('a', canvas, createIO(), emptyProject)
     watchdog.wasStalled.mockReturnValue(true)
     fake.task.reject(new Error('KeyboardInterrupt'))
     await expect(session.done).rejects.toBeInstanceOf(mod.PygameStalledError)
@@ -190,10 +205,65 @@ describe('startPygame', () => {
 
   it('ユーザーの停止操作を優先し、cancel 後は PygameStalledError にしない', async () => {
     const { mod, fake } = await setup()
-    const session = await mod.startPygame('a', canvas, createIO())
+    const session = await mod.startPygame('a', canvas, createIO(), emptyProject)
     session.cancel()
     watchdog.wasStalled.mockReturnValue(true)
     fake.task.reject(new Error('CancelledError'))
     await expect(session.done).resolves.toBeUndefined()
+  })
+
+  describe('エクスプローラー上のファイル', () => {
+    const project = {
+      files: [
+        { kind: 'text' as const, path: 'main.py', data: 'import pygame' },
+        { kind: 'text' as const, path: 'helper.py', data: 'X = 1' },
+        { kind: 'binary' as const, path: 'assets/player.png', data: new Uint8Array([1, 2, 3]) },
+      ],
+      directories: ['assets', 'empty'],
+    }
+
+    it('画像等のバイナリも含めて作業ディレクトリへ書き込んでから実行する', async () => {
+      const { mod, fake } = await setup()
+      await mod.startPygame('x', canvas, createIO(), project)
+
+      expect(fake.pyodide.FS.files.get('/home/pyodide/assets/player.png')).toEqual(new Uint8Array([1, 2, 3]))
+      expect(fake.pyodide.FS.files.get('/home/pyodide/helper.py')).toBe('X = 1')
+      expect(fake.pyodide.FS.dirs.has('/home/pyodide/empty')).toBe(true)
+    })
+
+    it('作業ディレクトリへ移動し、直下の .py モジュールのキャッシュを掃除する', async () => {
+      const { mod, fake } = await setup()
+      await mod.startPygame('x', canvas, createIO(), project)
+
+      const prepare = fake.pyodide.runPython.mock.calls
+        .map(([code]) => code as string)
+        .find((code) => code.startsWith('__narapy_pygame_prepare__('))
+      expect(prepare).toBe('__narapy_pygame_prepare__("/home/pyodide", ["main","helper"])')
+    })
+
+    it('実行前（ゲーム Task の開始前）にファイルを書き込む', async () => {
+      const { mod, fake } = await setup()
+      const order: string[] = []
+      fake.pyodide.FS.writeFile = ((path: string) => { order.push(`write:${path}`) }) as never
+      fake.pyodide.runPython.mockImplementation(((code: string) => {
+        if (code.includes('ensure_future')) order.push('task')
+        return code.includes('ensure_future') ? fake.task.promise : undefined
+      }) as never)
+      await mod.startPygame('x', canvas, createIO(), project)
+
+      expect(order.indexOf('write:/home/pyodide/assets/player.png')).toBeLessThan(order.indexOf('task'))
+    })
+
+    it('2 回目の実行では、無くなったアセットを FS から消す', async () => {
+      const { mod, fake } = await setup()
+      await mod.startPygame('x', canvas, createIO(), project)
+      await mod.startPygame('x', canvas, createIO(), {
+        files: [{ kind: 'text', path: 'main.py', data: 'import pygame' }],
+        directories: [],
+      })
+
+      expect(fake.pyodide.FS.files.has('/home/pyodide/assets/player.png')).toBe(false)
+      expect(fake.pyodide.FS.files.has('/home/pyodide/main.py')).toBe(true)
+    })
   })
 })

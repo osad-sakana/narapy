@@ -31,6 +31,8 @@ function createSession(done: Promise<void> = new Promise(() => {})): PygameSessi
   return { done, cancel: vi.fn() }
 }
 
+const project = { files: [], directories: [] }
+
 function hooks() {
   return { onOpen: vi.fn(), onClose: vi.fn() }
 }
@@ -57,18 +59,18 @@ describe('showPygameModal', () => {
   it('開いた直後に onOpen を呼び、全画面の dialog を表示する', () => {
     startPygame.mockReturnValue(new Promise(() => {}))
     const h = hooks()
-    showPygameModal('import pygame', h)
+    showPygameModal('import pygame', project, h)
 
     expect(h.onOpen).toHaveBeenCalledTimes(1)
     expect(modal()?.getAttribute('aria-modal')).toBe('true')
     expect(modal()?.className).toContain('fixed inset-0')
     expect(status()).toBe('読み込み中...')
-    expect(startPygame).toHaveBeenCalledWith('import pygame', canvas(), expect.any(Object))
+    expect(startPygame).toHaveBeenCalledWith('import pygame', canvas(), expect.any(Object), project)
   })
 
   it('読み込み完了で「実行中」になり、canvas にフォーカスする', async () => {
     startPygame.mockResolvedValue(createSession())
-    showPygameModal('x', hooks())
+    showPygameModal('x', project, hooks())
     await flush()
 
     expect(status()).toBe('実行中')
@@ -78,7 +80,7 @@ describe('showPygameModal', () => {
   it('スクリプトが終了するとモーダルは開いたまま「終了しました」を表示する', async () => {
     startPygame.mockResolvedValue(createSession(Promise.resolve()))
     const h = hooks()
-    showPygameModal('x', h)
+    showPygameModal('x', project, h)
     await flush()
 
     expect(status()).toBe('終了しました')
@@ -90,7 +92,7 @@ describe('showPygameModal', () => {
     const session = createSession()
     startPygame.mockResolvedValue(session)
     const h = hooks()
-    showPygameModal('x', h)
+    showPygameModal('x', project, h)
     await flush()
 
     const btn = closeButton()
@@ -105,7 +107,7 @@ describe('showPygameModal', () => {
   it('Escape ではゲーム入力用に閉じない', async () => {
     startPygame.mockResolvedValue(createSession())
     const h = hooks()
-    showPygameModal('x', h)
+    showPygameModal('x', project, h)
     await flush()
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
@@ -117,7 +119,7 @@ describe('showPygameModal', () => {
     let resolveStart!: (s: PygameSession) => void
     startPygame.mockReturnValue(new Promise<PygameSession>((r) => { resolveStart = r }))
     const h = hooks()
-    showPygameModal('x', h)
+    showPygameModal('x', project, h)
 
     closeButton().click()
     expect(h.onClose).toHaveBeenCalledTimes(1)
@@ -131,7 +133,7 @@ describe('showPygameModal', () => {
   it('開始に失敗したらエラーをログへ出してモーダルを閉じる', async () => {
     startPygame.mockRejectedValue(new Error('network down'))
     const h = hooks()
-    showPygameModal('x', h)
+    showPygameModal('x', project, h)
     await flush()
 
     expect(appendLog).toHaveBeenCalledWith('[エラー] network down', 'error')
@@ -145,7 +147,7 @@ describe('showPygameModal', () => {
     const session = createSession(Promise.reject(new Error('NameError: x')))
     startPygame.mockResolvedValue(session)
     const h = hooks()
-    showPygameModal('x', h)
+    showPygameModal('x', project, h)
     await flush()
 
     expect(appendErrorBlock).toHaveBeenCalledWith({ ...translated, raw: 'NameError: x' })
@@ -154,7 +156,7 @@ describe('showPygameModal', () => {
 
   it('set_mode / set_caption の通知で canvas サイズとタイトルを更新する', async () => {
     startPygame.mockResolvedValue(createSession())
-    showPygameModal('x', hooks())
+    showPygameModal('x', project, hooks())
     await flush()
 
     const io = startPygame.mock.calls[0][2] as PygameIO
@@ -168,7 +170,7 @@ describe('showPygameModal', () => {
 
   it('SDL が document.title を書き換えても元のタイトルへ戻す', async () => {
     startPygame.mockResolvedValue(createSession())
-    showPygameModal('x', hooks())
+    showPygameModal('x', project, hooks())
     await flush()
 
     document.title = 'pygame window'
@@ -178,7 +180,7 @@ describe('showPygameModal', () => {
 
   it('閉じた後は document.title の監視を止める', async () => {
     startPygame.mockResolvedValue(createSession())
-    showPygameModal('x', hooks())
+    showPygameModal('x', project, hooks())
     await flush()
     closeButton().click()
 
@@ -190,7 +192,7 @@ describe('showPygameModal', () => {
   it('固まって止められた場合は await asyncio.sleep(0) の案内を出してモーダルを閉じる', async () => {
     startPygame.mockResolvedValue(createSession(Promise.reject(new PygameStalledError())))
     const h = hooks()
-    showPygameModal('x', h)
+    showPygameModal('x', project, h)
     await flush()
 
     expect(appendLog).toHaveBeenCalledWith('--- 応答がなかったため実行を停止しました ---', 'warn')

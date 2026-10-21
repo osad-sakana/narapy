@@ -2,6 +2,7 @@ import type { DirectoryEntry, FileContent, FileEntry, FileState } from './types'
 import type { RunFile } from '../types'
 import { loadState, saveState } from './persistence'
 import { getAncestorDirs } from './paths'
+import { planMove, type MovePlan, type MoveSource } from './move'
 
 const DEFAULT_STATE: FileState = {
   files: [{ path: 'main.py', content: { kind: 'text', data: '' } }],
@@ -152,6 +153,28 @@ export function deleteDirectory(path: string): boolean {
   state = { ...state, directories }
   persist()
   return true
+}
+
+// ファイル・フォルダを destDir（ルートは空文字）へ移動する。失敗時は状態を変えない。
+// 内容は共有したままパスだけを付け替え、アクティブファイルが移動対象なら追従させる。
+export function moveEntry(source: MoveSource, destDir: string): MovePlan {
+  const plan = planMove(
+    { files: state.files.map(f => f.path), directories: state.directories.map(d => d.path) },
+    source,
+    destDir,
+  )
+  if (!plan.ok) return plan
+
+  const fileTo = new Map(plan.fileMoves.map(m => [m.from, m.to]))
+  const dirTo = new Map(plan.dirMoves.map(m => [m.from, m.to]))
+  state = {
+    files: state.files.map(f => fileTo.has(f.path) ? { path: fileTo.get(f.path)!, content: f.content } : f),
+    directories: state.directories.map(d => dirTo.has(d.path) ? { path: dirTo.get(d.path)! } : d),
+    activeFile: fileTo.get(state.activeFile) ?? state.activeFile,
+  }
+  if (destDir) ensureAncestorDirsMutating(`${destDir}/_`)
+  persist()
+  return plan
 }
 
 function ensureAncestorDirsMutating(path: string): void {

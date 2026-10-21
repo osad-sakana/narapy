@@ -32,6 +32,14 @@ export function appendLog(text: string, kind: LogKind): void {
   log.scrollTop = log.scrollHeight
 }
 
+// 入力欄など、テキスト以外の要素をログ末尾へ差し込む
+export function appendLogElement(el: HTMLElement): void {
+  const log = getOutputLog()
+  removePlaceholder(log)
+  log.appendChild(el)
+  log.scrollTop = log.scrollHeight
+}
+
 export interface ErrorBlock {
   line: number | null
   errorType: string
@@ -131,7 +139,17 @@ export function appendErrorBlock(block: ErrorBlock): void {
   log.scrollTop = log.scrollHeight
 }
 
+// ログを消す直前に呼ぶフック。開いたままの input() 入力欄を閉じるために使う
+// （入力欄だけが DOM から消えると Worker が入力待ちのまま止まってしまう）。
+// 入力待ちだった実行は KeyboardInterrupt で中断される。
+let beforeClearHook: (() => void) | null = null
+
+export function setBeforeClearHook(hook: (() => void) | null): void {
+  beforeClearHook = hook
+}
+
 export function clearLog(): void {
+  beforeClearHook?.()
   getOutputLog().innerHTML = PLACEHOLDER_HTML
 }
 

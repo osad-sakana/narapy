@@ -11,7 +11,8 @@ export type WorkerMessage =
   | { type: 'trace'; payload: string }
   | { type: 'grade'; payload: string }
   | { type: 'input_sab'; sab: SharedArrayBuffer }
-  | { type: 'input_request'; prompt: string }
+  // preview はステップ実行の記録中だけ入る、まだ表示されていない print の出力（通常実行では null）
+  | { type: 'input_request'; prompt: string; preview: string | null }
   | { type: 'interrupt_sab'; sab: SharedArrayBuffer }
 
 // turtle 互換モジュール（src/pyodide/turtleModule.ts）が出力する描画データ。

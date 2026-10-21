@@ -14,6 +14,7 @@ import ast as _ast
 import contextlib as _contextlib
 import sys as _sys
 import traceback as _traceback
+import builtins as _builtins
 
 
 # 学生コード自身の except Exception: に飲み込まれて「なぜ不合格か」が
@@ -71,15 +72,22 @@ def _run_case(user_code, test_code, name, module_names):
     # コードが採点では不合格になってしまう。
     case_globals = {"__name__": "__main__", "input": _unsupported_input}
     stdout_buffer = _io.StringIO()
-    with _contextlib.redirect_stdout(stdout_buffer):
-        exec(user_code, case_globals)
-    # test_xxx() から標準出力を検証できるよう、キャプチャした出力をこの名前で渡す
-    case_globals["__narapy_stdout__"] = stdout_buffer.getvalue()
-    exec(test_code, case_globals)
-    fn = case_globals.get(name)
-    if fn is None:
-        return {"name": name, "passed": False, "message": "テスト関数が見つかりません"}
-    fn()
+    # importした自作モジュール内のinput()も採点では使えないよう builtins 側も差し替える。
+    # 戻し忘れると以降の通常実行が壊れるため、必ず finally で元に戻す。
+    original_input = _builtins.input
+    _builtins.input = _unsupported_input
+    try:
+        with _contextlib.redirect_stdout(stdout_buffer):
+            exec(user_code, case_globals)
+        # test_xxx() から標準出力を検証できるよう、キャプチャした出力をこの名前で渡す
+        case_globals["__narapy_stdout__"] = stdout_buffer.getvalue()
+        exec(test_code, case_globals)
+        fn = case_globals.get(name)
+        if fn is None:
+            return {"name": name, "passed": False, "message": "テスト関数が見つかりません"}
+        fn()
+    finally:
+        _builtins.input = original_input
     return {"name": name, "passed": True, "message": None}
 
 

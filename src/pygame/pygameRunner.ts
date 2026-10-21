@@ -6,11 +6,14 @@ import type { PyodideInterface, PyodideModule } from '../pyodide/pyodideTypes'
 interface MainPyodide extends PyodideInterface {
   runPython: (code: string) => unknown
   canvas: { setCanvas2D: (canvas: HTMLCanvasElement) => void }
+  registerJsModule: (name: string, module: object) => void
 }
 
 export interface PygameIO {
   onStdout: (text: string) => void
   onLoading: (text: string) => void
+  // pygame.display.set_mode() が返した Surface のサイズ。canvas とモーダルの寸法合わせに使う
+  onResize: (width: number, height: number) => void
 }
 
 export interface PygameSession {
@@ -24,7 +27,16 @@ export interface PygameSession {
 // import・一時変数は関数内に閉じ込める（グローバルにユーザー変数と衝突する名前を残さない）。
 const BOOTSTRAP_CODE = `
 async def __narapy_pygame_main__(src):
-    import ast, sys
+    import ast, sys, pygame, narapy_host
+    # set_mode は canvas 要素のサイズを変えないため、返した Surface のサイズをホストへ通知する
+    if not getattr(pygame.display.set_mode, '__narapy_wrapped__', False):
+        orig_set_mode = pygame.display.set_mode
+        def set_mode(*args, **kwargs):
+            surface = orig_set_mode(*args, **kwargs)
+            narapy_host.resize(*surface.get_size())
+            return surface
+        set_mode.__narapy_wrapped__ = True
+        pygame.display.set_mode = set_mode
     ns = {'__name__': '__main__'}
     try:
         res = eval(compile(src, '<main>', 'exec', ast.PyCF_ALLOW_TOP_LEVEL_AWAIT), ns)
@@ -39,6 +51,7 @@ async def __narapy_pygame_main__(src):
 let pyodidePromise: Promise<MainPyodide> | null = null
 // loadPyodide の stdout は初期化時に固定されるため、実行ごとに差し替え可能な出力先を経由する
 let currentStdout: (text: string) => void = () => {}
+let currentResize: (width: number, height: number) => void = () => {}
 
 function loadMainPyodide(onLoading: (text: string) => void): Promise<MainPyodide> {
   if (!pyodidePromise) {
@@ -55,6 +68,9 @@ function loadMainPyodide(onLoading: (text: string) => void): Promise<MainPyodide
       })) as MainPyodide
       onLoading('pygame-ce を読み込み中...')
       await pyodide.loadPackage('pygame-ce')
+      pyodide.registerJsModule('narapy_host', {
+        resize: (width: number, height: number) => currentResize(width, height),
+      })
       pyodide.runPython(BOOTSTRAP_CODE)
       return pyodide
     })().catch((err) => {
@@ -73,6 +89,7 @@ export async function startPygame(
 ): Promise<PygameSession> {
   const pyodide = await loadMainPyodide(io.onLoading)
   currentStdout = io.onStdout
+  currentResize = io.onResize
   pyodide.canvas.setCanvas2D(canvas)
   pyodide.globals.set('__narapy_pygame_src__', code)
   // await した PyProxy は Pyodide が破棄するため、キャンセル用に Task を Python 側のグローバルにも保持する

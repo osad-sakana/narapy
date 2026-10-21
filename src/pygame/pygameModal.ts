@@ -74,6 +74,10 @@ export function showPygameModal(code: string, hooks: PygameModalHooks): void {
     try {
       session = await startPygame(code, canvas, {
         onStdout: (text) => appendLog(text, 'output'),
+        onResize: (width, height) => {
+          canvas.width = width
+          canvas.height = height
+        },
         onLoading: (text) => {
           statusEl.textContent = text
           appendLog(text, 'info')

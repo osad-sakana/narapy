@@ -221,4 +221,25 @@ describe('showPygameModal', () => {
     expect(appendLog).toHaveBeenCalledWith(expect.stringContaining('await asyncio.sleep(0)'), 'info')
     expect(modal()).toBeNull()
   })
+
+  it('canvas の外（モーダル本体）に、パスワードを入力しないよう促す常設の注意書きを出す', () => {
+    startPygame.mockReturnValue(new Promise(() => {}))
+    showPygameModal('x', project, hooks())
+
+    const notice = modal()!.querySelector('[data-testid="pygame-warning"]')
+    expect(notice).not.toBeNull()
+    expect(notice!.textContent).toContain('この画面はプログラムが描画しています')
+    expect(notice!.textContent).toContain('パスワードなどを入力しないでください')
+    expect(notice!.getAttribute('role')).toBe('note')
+    expect(notice!.contains(canvas())).toBe(false)
+    expect(canvas().parentElement!.contains(notice)).toBe(false)
+  })
+
+  it('注意書きは実行が終わっても、エラーで閉じる前まで表示され続ける', async () => {
+    startPygame.mockResolvedValue(createSession(Promise.resolve()))
+    showPygameModal('x', project, hooks())
+    await flush()
+
+    expect(modal()!.querySelector('[data-testid="pygame-warning"]')).not.toBeNull()
+  })
 })

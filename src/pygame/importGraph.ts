@@ -28,6 +28,8 @@ function splitNames(list: string): string[] {
 function importedNameList(code: string, match: RegExpMatchArray): string {
   const [whole, , paren, firstLine] = match
   if (!paren) return firstLine
+  // 同じ行で閉じていれば、後続の行は別の文
+  if (firstLine.includes(')')) return firstLine.split(')')[0]
   const rest = code.slice(match.index! + whole.length, match.index! + whole.length + MAX_PAREN_LIST_CHARS)
   const close = rest.indexOf(')')
   return close < 0 ? firstLine : firstLine + rest.slice(0, close)

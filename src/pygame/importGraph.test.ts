@@ -41,6 +41,12 @@ describe('importedModules', () => {
     )
   })
 
+  it('同じ行で閉じる括弧つき from import は、後続の行から名前を拾わない', () => {
+    const code = 'from util import (helper)\nx = f(1,\n  game)\n'
+    expect(names(code)).toEqual(expect.arrayContaining(['util', 'util.helper']))
+    expect(names(code)).not.toContain('util.game')
+  })
+
   it('コメント・文字列中の import は拾わない', () => {
     expect(importedModules('# import secret\nprint("import hidden")')).toEqual([])
   })

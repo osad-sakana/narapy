@@ -462,7 +462,7 @@ describe('startPygame', () => {
 
 // 前の実行が停止に応答しない（`except:` で停止を握りつぶすループなど）場合の見限り
 describe('停止に応答しない実行の見限り', () => {
-  async function setupMulti() {
+  async function setupMulti(options: { gateSecondLoad?: boolean } = {}) {
     vi.resetModules()
     verifiedImport.mockReset()
     const instances: Array<{
@@ -470,7 +470,10 @@ describe('停止に応答しない実行の見限り', () => {
       runs: Deferred[]
       stdout: (text: string) => void
     }> = []
+    // 2 つ目のインスタンスの読み込みを任意のタイミングまで遅らせるための関門
+    const secondLoadGate = deferred()
     const loadPyodide = vi.fn(async (opts: { stdout: (text: string) => void }) => {
+      if (options.gateSecondLoad && instances.length === 1) await secondLoadGate.promise
       const fake = createFakePyodide(true)
       const runs: Deferred[] = []
       fake.pyodide.runPythonAsync.mockImplementation(((code: string) => {
@@ -484,7 +487,7 @@ describe('停止に応答しない実行の見限り', () => {
     })
     verifiedImport.mockResolvedValue({ loadPyodide })
     const mod = await import('./pygameRunner')
-    return { mod, loadPyodide, instances }
+    return { mod, loadPyodide, instances, secondLoadGate }
   }
 
   beforeEach(() => {
@@ -558,5 +561,47 @@ describe('停止に応答しない実行の見限り', () => {
     const io = createIO()
     await mod.startPygame('third', canvas, io, emptyProject)
     expect(io.onLoading).not.toHaveBeenCalledWith(expect.stringContaining('停止を待っています'))
+  })
+
+  it('順番待ちの間に閉じられて次が開かれても、次は見限り後の新しいインスタンスで起動する', async () => {
+    const { mod, loadPyodide, instances } = await setupMulti()
+    const a = await mod.startPygame('A', canvas, createIO(), emptyProject)
+    a.cancel() // A は停止を握りつぶして終わらない
+
+    // B を開き、4 秒後に閉じて C を開く（B は見限りの直後に abort で release される）
+    let bClosed = false
+    const bPromise = mod.startPygame('B', canvas, createIO(), emptyProject, () => bClosed)
+    await vi.advanceTimersByTimeAsync(4000)
+    bClosed = true
+    const cPromise = mod.startPygame('C', canvas, createIO(), emptyProject)
+    await vi.advanceTimersByTimeAsync(mod.STOP_TIMEOUT_MS)
+    await bPromise
+    await cPromise
+
+    expect(loadPyodide).toHaveBeenCalledTimes(2)
+    expect(instances[0].runs).toHaveLength(1) // A だけ
+    expect(instances[1].runs).toHaveLength(1) // C
+  })
+
+  it('前の実行がまだ起動していない（自分も待機中の）間は見限らず、Pyodide を重複して読み込まない', async () => {
+    const { mod, loadPyodide, secondLoadGate } = await setupMulti({ gateSecondLoad: true })
+    const a = await mod.startPygame('A', canvas, createIO(), emptyProject)
+    a.cancel()
+
+    let bClosed = false
+    const bPromise = mod.startPygame('B', canvas, createIO(), emptyProject, () => bClosed)
+    await vi.advanceTimersByTimeAsync(4000)
+    bClosed = true
+    const cPromise = mod.startPygame('C', canvas, createIO(), emptyProject)
+
+    // B は 5 秒で A を見限り、2 つ目の Pyodide を読み込み始める（関門で止めている）。
+    // C のタイマーが B の読み込み中に切れても、B は起動前なので C は見限らない
+    await vi.advanceTimersByTimeAsync(mod.STOP_TIMEOUT_MS * 2)
+    expect(loadPyodide).toHaveBeenCalledTimes(2)
+
+    secondLoadGate.resolve()
+    await bPromise
+    await cPromise
+    expect(loadPyodide).toHaveBeenCalledTimes(2)
   })
 })

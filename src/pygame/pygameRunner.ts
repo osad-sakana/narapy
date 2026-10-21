@@ -80,8 +80,16 @@ const RECREATE_MESSAGE = '前の実行が停止に応答しないため、Python
 // 以降の実行がすべて止まるため、超えたらその Pyodide を見限って作り直す
 export const STOP_TIMEOUT_MS = 5000
 
-// 直近の実行の release。見限るとき、終わらない実行の順番待ち数を残さないために強制的に呼ぶ
-let lastRelease: (() => void) | null = null
+// 実行 1 回ぶんの順番。launched は実際に実行を起動した（Python が走り始めた）かどうか。
+// 見限りは「起動済みなのに終わらない」実行にだけ行う。起動前の実行は、自分も前の実行を待っているだけで、
+// その待ち時間は自分の見限りタイマーで別に区切られる（二重に見限ったり、見限り後のインスタンスを取り違えない）
+interface RunSlot {
+  launched: boolean
+  release: () => void
+}
+
+// 直近の順番。次の実行が、前の実行の状態を知るために使う
+let lastSlot: RunSlot | null = null
 
 // 見限った Pyodide を捨てる。次の loadMainPyodide が新しいインスタンスを作る。
 // 古いインスタンスの実行は残り続けうるが、出力・通知は世代の不一致で遮断される
@@ -109,7 +117,7 @@ function noopSession(): PygameSession {
 function loadMainPyodide(onLoading: (text: string) => void): Promise<MainPyodide> {
   if (!pyodidePromise) {
     const id = ++instanceId
-    pyodidePromise = (async () => {
+    const promise: Promise<MainPyodide> = (async () => {
       onLoading('Pygame 用の Python 環境を読み込み中...')
       const { loadPyodide } = (await verifiedImport(
         `${PYODIDE_CDN}pyodide.mjs`,
@@ -130,10 +138,12 @@ function loadMainPyodide(onLoading: (text: string) => void): Promise<MainPyodide
       syncLoopSupported = (await pyodide.runPythonAsync(CAN_RUN_SYNC_CODE)) === true
       return pyodide
     })().catch((err) => {
-      // 失敗した Promise を保持すると以降ずっと再試行できないため破棄する
-      pyodidePromise = null
+      // 失敗した Promise を保持すると以降ずっと再試行できないため破棄する。
+      // ただし、その間に見限りで作り直された別のインスタンスのキャッシュは消さない
+      if (pyodidePromise === promise) pyodidePromise = null
       throw err
     })
+    pyodidePromise = promise
   }
   return pyodidePromise
 }
@@ -152,7 +162,7 @@ export async function startPygame(
   const waiting = activeRuns > 0
   activeRuns += 1
   const previous = runQueue
-  const previousRelease = lastRelease
+  const previousSlot = lastSlot
   let resolveSlot!: () => void
   runQueue = new Promise<void>((resolve) => { resolveSlot = resolve })
   let released = false
@@ -162,21 +172,26 @@ export async function startPygame(
     activeRuns -= 1
     resolveSlot()
   }
-  lastRelease = release
+  const slot: RunSlot = { launched: false, release }
+  lastSlot = slot
   try {
-    let pyodide = await loadMainPyodide(io.onLoading)
+    await loadMainPyodide(io.onLoading)
     if (waiting) io.onLoading(WAITING_MESSAGE)
-    if (!(await settledWithin(previous, STOP_TIMEOUT_MS))) {
+    while (!(await settledWithin(previous, STOP_TIMEOUT_MS))) {
+      // 前の実行がまだ起動していないなら、見限らずに待ち続ける
+      if (!previousSlot?.launched) continue
       io.onLoading(RECREATE_MESSAGE)
-      previousRelease?.()
+      previousSlot.release()
       abandonMainPyodide()
-      pyodide = await loadMainPyodide(io.onLoading)
+      break
     }
+    // 待っている間に見限りで作り直されうるので、必ず現在のインスタンスを取り直す（読み込み済みなら即座に返る）
+    const pyodide = await loadMainPyodide(io.onLoading)
     if (shouldAbort()) {
       release()
       return noopSession()
     }
-    return await launch(pyodide, code, canvas, io, project, release, shouldAbort)
+    return await launch(pyodide, code, canvas, io, project, slot, shouldAbort)
   } catch (err) {
     release()
     throw err
@@ -189,7 +204,7 @@ async function launch(
   canvas: HTMLCanvasElement,
   io: PygameIO,
   project: PygameProject,
-  release: () => void,
+  slot: RunSlot,
   shouldAbort: () => boolean,
 ): Promise<PygameSession> {
   currentStdout = io.onStdout
@@ -203,9 +218,10 @@ async function launch(
   const watchdog = await startWatchdog()
   if (shouldAbort()) {
     watchdog.stop()
-    release()
+    slot.release()
     return noopSession()
   }
+  slot.launched = true
   pyodide.setInterruptBuffer(watchdog.interruptBuffer)
   // runPythonAsync 経由で開始する。同期コード全体が JSPI の suspend 可能なスタック上で走り、
   // パッチ済みの flip / tick / event.get が run_sync でブラウザへ制御を返せる
@@ -227,7 +243,7 @@ async function launch(
       // 終了間際にウォッチドッグが書いた SIGINT を、次の実行の prepare に当てない
       watchdog.interruptBuffer[0] = 0
       watchdog.stop()
-      release()
+      slot.release()
     })
 
   return {

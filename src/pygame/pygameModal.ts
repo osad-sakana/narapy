@@ -102,7 +102,7 @@ export function showPygameModal(code: string, project: PygameProject, hooks: Pyg
           statusEl.textContent = text
           appendLog(text, 'info')
         },
-      }, project)
+      }, project, () => closed)
       if (closed) {
         session.cancel()
         return

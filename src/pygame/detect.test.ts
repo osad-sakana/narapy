@@ -86,3 +86,13 @@ describe('routeRun（import 先ファイル）', () => {
     expect(routeRun('grade', 'x = 1', 'import game', files).kind).toBe('unsupported')
   })
 })
+
+describe('usesPygame の性能', () => {
+  it('長い 1 行の入力でも、二次時間のバックトラックで固まらない', () => {
+    for (const line of [`import${' '.repeat(40_000)}x`, `from${' '.repeat(40_000)}x`, `import ${'a,'.repeat(20_000)}`]) {
+      const start = performance.now()
+      usesPygame(line)
+      expect(performance.now() - start).toBeLessThan(250)
+    }
+  })
+})

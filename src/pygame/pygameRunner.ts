@@ -66,6 +66,15 @@ let writtenPaths: ReadonlySet<string> = new Set()
 // 古い実行が生きている間に次の実行が FS・canvas・停止フラグへ触ると、2 つのゲームが混ざったり
 // 古い停止要求が新しい実行を止めたりする
 let runQueue: Promise<void> = Promise.resolve()
+// 順番待ちを含め、まだ完了していない実行の数。前の実行が残っているかをモーダルの表示に使う
+let activeRuns = 0
+
+const WAITING_MESSAGE = '前の実行の停止を待っています...'
+
+// 起動前にモーダルが閉じられていたときに返す、何もしないセッション
+function noopSession(): PygameSession {
+  return { done: Promise.resolve(), cancel: () => {}, syncLoop: syncLoopSupported }
+}
 
 function loadMainPyodide(onLoading: (text: string) => void): Promise<MainPyodide> {
   if (!pyodidePromise) {
@@ -98,20 +107,38 @@ function loadMainPyodide(onLoading: (text: string) => void): Promise<MainPyodide
   return pyodidePromise
 }
 
+// shouldAbort は、起動前にモーダルが閉じられたかを返す。読み込み・順番待ち・ウォッチドッグ起動の
+// 待ち時間の間に閉じられた実行を、見えない場所で起動させないために使う
+// （起動してから cancel しても、await しかしないコードは停止フラグを見ないので止まらない）。
 export async function startPygame(
   code: string,
   canvas: HTMLCanvasElement,
   io: PygameIO,
   project: PygameProject,
+  shouldAbort: () => boolean = () => false,
 ): Promise<PygameSession> {
   // 同期的に（await より前に）自分の順番を確保する。後続の呼び出しは自分の完了を待つ
+  const waiting = activeRuns > 0
+  activeRuns += 1
   const previous = runQueue
-  let release!: () => void
-  runQueue = new Promise<void>((resolve) => { release = resolve })
+  let resolveSlot!: () => void
+  runQueue = new Promise<void>((resolve) => { resolveSlot = resolve })
+  let released = false
+  const release = (): void => {
+    if (released) return
+    released = true
+    activeRuns -= 1
+    resolveSlot()
+  }
   try {
     const pyodide = await loadMainPyodide(io.onLoading)
+    if (waiting) io.onLoading(WAITING_MESSAGE)
     await previous
-    return await launch(pyodide, code, canvas, io, project, release)
+    if (shouldAbort()) {
+      release()
+      return noopSession()
+    }
+    return await launch(pyodide, code, canvas, io, project, release, shouldAbort)
   } catch (err) {
     release()
     throw err
@@ -125,6 +152,7 @@ async function launch(
   io: PygameIO,
   project: PygameProject,
   release: () => void,
+  shouldAbort: () => boolean,
 ): Promise<PygameSession> {
   currentStdout = io.onStdout
   currentResize = io.onResize
@@ -137,6 +165,11 @@ async function launch(
   pyodide.globals.set('__narapy_pygame_src__', code)
   // 同期ループでメインスレッドが固まっても復帰できるよう、別 Worker に心拍を監視させる
   const watchdog = await startWatchdog()
+  if (shouldAbort()) {
+    watchdog.stop()
+    release()
+    return noopSession()
+  }
   pyodide.setInterruptBuffer(watchdog.interruptBuffer)
   // runPythonAsync 経由で開始する。同期コード全体が JSPI の suspend 可能なスタック上で走り、
   // パッチ済みの flip / tick / event.get が run_sync でブラウザへ制御を返せる

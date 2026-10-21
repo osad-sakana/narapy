@@ -1,29 +1,53 @@
 import { describe, expect, it } from 'vitest'
 import type { RunFile } from '../types'
-import { collectImportedSources, importedModuleNames } from './importGraph'
+import { collectImportedSources, importedModules } from './importGraph'
 
 const text = (path: string, data: string): RunFile => ({ kind: 'text', path, data })
+const names = (code: string) => importedModules(code).map((m) => `${'.'.repeat(m.level)}${m.name}`)
 
-describe('importedModuleNames', () => {
+describe('importedModules', () => {
   it('import / from import の対象を拾う', () => {
     const code = ['import os', 'import a, b as c', 'from game import run', 'from pkg.sub import x, y'].join('\n')
-    expect(importedModuleNames(code)).toEqual(
+    expect(names(code)).toEqual(
       expect.arrayContaining(['os', 'a', 'b', 'game', 'game.run', 'pkg.sub', 'pkg.sub.x', 'pkg.sub.y']),
     )
   })
 
-  it('相対 import は先頭のドットを外して扱う', () => {
-    expect(importedModuleNames('from . import helper\nfrom .util import f')).toEqual(
-      expect.arrayContaining(['helper', 'util', 'util.f']),
+  it('相対 import はドットの数（level）を保持する', () => {
+    expect(importedModules('from . import helper')).toEqual([{ level: 1, name: 'helper' }])
+    expect(importedModules('from .util import f')).toEqual(
+      expect.arrayContaining([{ level: 1, name: 'util' }, { level: 1, name: 'util.f' }]),
+    )
+    expect(importedModules('from ..pkg import g')).toEqual(
+      expect.arrayContaining([{ level: 2, name: 'pkg' }, { level: 2, name: 'pkg.g' }]),
     )
   })
 
+  it('括弧つきの複数行 import の最初の行を拾う', () => {
+    expect(names('from pkg import (a as x, b)')).toEqual(expect.arrayContaining(['pkg', 'pkg.a', 'pkg.b']))
+  })
+
   it('コメント・文字列中の import は拾わない', () => {
-    expect(importedModuleNames('# import secret\nprint("import hidden")')).toEqual([])
+    expect(importedModules('# import secret\nprint("import hidden")')).toEqual([])
   })
 
   it('インデントされた import（関数内など）も拾う', () => {
-    expect(importedModuleNames('def f():\n    import late')).toContain('late')
+    expect(names('def f():\n    import late')).toContain('late')
+  })
+
+  it('長い 1 行の入力でも、二次時間のバックトラックで固まらない', () => {
+    const n = 40_000
+    const lines = [
+      `from ${'.'.repeat(n)} x`,
+      `from${' '.repeat(n)}x`,
+      `import${' '.repeat(n)}x`,
+      `import a${' '.repeat(n)}b`,
+    ]
+    for (const line of lines) {
+      const start = performance.now()
+      importedModules(line)
+      expect(performance.now() - start).toBeLessThan(250)
+    }
   })
 })
 
@@ -66,5 +90,48 @@ describe('collectImportedSources', () => {
       text('game.txt', 'import pygame'),
     ]
     expect(collectImportedSources(['import game'], files)).toEqual([])
+  })
+
+  describe('相対 import は import 元ファイルのパッケージ基準で解決する', () => {
+    it('game/__init__.py の `from .app import App` は game/app.py を指す', () => {
+      const files = [
+        text('game/__init__.py', 'from .app import App'),
+        text('game/app.py', 'import pygame'),
+      ]
+      expect(collectImportedSources(['from game import App'], files)).toEqual(
+        expect.arrayContaining(['import pygame']),
+      )
+    })
+
+    it('ルートに同名ファイルがあっても、パッケージ内のほうを辿る', () => {
+      const files = [
+        text('game/__init__.py', 'from .app import App'),
+        text('game/app.py', 'import pygame'),
+        text('app.py', 'x = 1'),
+      ]
+      const sources = collectImportedSources(['from game import App'], files)
+      expect(sources).toContain('import pygame')
+      expect(sources).not.toContain('x = 1')
+    })
+
+    it('`from . import helper` はサブモジュール helper を指す', () => {
+      const files = [text('pkg/__init__.py', 'from . import helper'), text('pkg/helper.py', 'import pygame')]
+      expect(collectImportedSources(['import pkg'], files)).toContain('import pygame')
+    })
+
+    it('`from .. import x` は 1 つ上のパッケージを指す', () => {
+      const files = [
+        text('top/__init__.py', ''),
+        text('top/inner/__init__.py', ''),
+        text('top/inner/mod.py', 'from .. import sibling'),
+        text('top/sibling.py', 'import pygame'),
+      ]
+      expect(collectImportedSources(['import top.inner.mod'], files)).toContain('import pygame')
+    })
+
+    it('ルート直下のファイルの相対 import はルート基準になる', () => {
+      const files = [text('main_mod.py', 'from . import helper'), text('helper.py', 'import pygame')]
+      expect(collectImportedSources(['import main_mod'], files)).toContain('import pygame')
+    })
   })
 })

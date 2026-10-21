@@ -1,39 +1,65 @@
 import type { RunFile } from '../types'
 
-// 行頭（インデント可）の import 文だけを対象にする（コメント・文字列中を誤検出しない。detect.ts と同じ方針）
-const IMPORT_STMT = /^[ \t]*import[ \t]+([^#\n]+)/gm
-const FROM_IMPORT_STMT = /^[ \t]*from[ \t]+(\.*[\w.]*)[ \t]+import[ \t]+([^#\n]+)/gm
+// 行頭（インデント可）の import 文だけを対象にする（コメント・文字列中を誤検出しない。detect.ts と同じ方針）。
+// 共有リンクで開いた任意の .py にも毎回かかるため、隣り合う量指定子が同じ文字を取り合う形
+// （`[ \\t]+` と `[^#\\n]*` など）を避け、長い 1 行でも線形時間で終わるようにしている。
+const IMPORT_STMT = /^[ \t]*import[ \t]([^#\n]+)/gm
+const FROM_IMPORT_STMT = /^[ \t]*from[ \t]+(\.*\w[\w.]*|\.+)[ \t]+import[ \t]([^#\n]+)/gm
+
+export interface ImportRef {
+  // 相対 import のドットの数（絶対 import は 0）
+  level: number
+  // ドット区切りのモジュール名（`from . import x` のように名前が無いときは import した名前）
+  name: string
+}
 
 function splitNames(list: string): string[] {
   return list
     .replace(/[()]/g, ' ')
     .split(',')
-    .map((part) => part.trim().split(/\s+as\s+/)[0].trim())
+    .map((part) => part.trim().split(/\s/)[0])
     .filter((name) => /^[\w.]+$/.test(name))
 }
 
-// コードが import しうるモジュール名（ドット区切り）。`from pkg import x` の x はサブモジュールの
-// 可能性があるので `pkg.x` も候補に含める。相対 import は先頭のドットを外して作業ディレクトリ基準で扱う。
-export function importedModuleNames(code: string): string[] {
-  const names: string[] = []
+// コードが import しうるモジュール。`from pkg import x` の x はサブモジュールの可能性があるので
+// `pkg.x` も候補に含める。
+export function importedModules(code: string): ImportRef[] {
+  const refs: ImportRef[] = []
   for (const match of code.matchAll(IMPORT_STMT)) {
-    names.push(...splitNames(match[1]))
+    for (const name of splitNames(match[1])) refs.push({ level: 0, name })
   }
   for (const match of code.matchAll(FROM_IMPORT_STMT)) {
-    const module = match[1].replace(/^\.+/, '')
-    if (module) names.push(module)
+    const level = match[1].length - match[1].replace(/^\.+/, '').length
+    const module = match[1].slice(level)
+    if (module) refs.push({ level, name: module })
     for (const name of splitNames(match[2])) {
-      names.push(module ? `${module}.${name}` : name)
+      refs.push({ level, name: module ? `${module}.${name}` : name })
     }
   }
-  return names
+  return refs
 }
 
-// モジュール名に対応するファイルパスの候補（a.b → a.py / a/__init__.py / a/b.py / a/b/__init__.py）
-function candidatePaths(moduleName: string): string[] {
-  const parts = moduleName.split('.')
+function dirname(path: string): string {
+  const idx = path.lastIndexOf('/')
+  return idx < 0 ? '' : path.slice(0, idx)
+}
+
+function join(base: string, path: string): string {
+  return base ? `${base}/${path}` : path
+}
+
+// モジュール参照に対応するファイルパスの候補（a.b → a.py / a/__init__.py / a/b.py / a/b/__init__.py）。
+// 絶対 import はプロジェクトのルート基準、相対 import は import 元ファイルのパッケージ基準で、
+// level - 1 個ぶん親ディレクトリへ上る。
+function candidatePaths(ref: ImportRef, importerDir: string): string[] {
+  let base = ''
+  if (ref.level > 0) {
+    base = importerDir
+    for (let i = 1; i < ref.level; i++) base = dirname(base)
+  }
+  const parts = ref.name.split('.')
   return parts.flatMap((_, i) => {
-    const path = parts.slice(0, i + 1).join('/')
+    const path = join(base, parts.slice(0, i + 1).join('/'))
     return [`${path}.py`, `${path}/__init__.py`]
   })
 }
@@ -51,16 +77,17 @@ export function collectImportedSources(
 
   const visited = new Set<string>()
   const sources: string[] = []
-  const queue = [...roots]
+  // エントリ（エディタの内容）はルート直下のファイル扱い
+  const queue = roots.map((code) => ({ code, dir: '' }))
   while (queue.length > 0) {
-    const code = queue.shift() as string
-    for (const name of importedModuleNames(code)) {
-      for (const path of candidatePaths(name)) {
+    const { code, dir } = queue.shift() as { code: string; dir: string }
+    for (const ref of importedModules(code)) {
+      for (const path of candidatePaths(ref, dir)) {
         const data = textFiles.get(path)
         if (data === undefined || visited.has(path)) continue
         visited.add(path)
         sources.push(data)
-        queue.push(data)
+        queue.push({ code: data, dir: dirname(path) })
       }
     }
   }

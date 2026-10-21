@@ -65,7 +65,7 @@ describe('showPygameModal', () => {
     expect(modal()?.getAttribute('aria-modal')).toBe('true')
     expect(modal()?.className).toContain('fixed inset-0')
     expect(status()).toBe('読み込み中...')
-    expect(startPygame).toHaveBeenCalledWith('import pygame', canvas(), expect.any(Object), project)
+    expect(startPygame).toHaveBeenCalledWith('import pygame', canvas(), expect.any(Object), project, expect.any(Function))
   })
 
   it('読み込み完了で「実行中」になり、canvas にフォーカスする', async () => {
@@ -86,6 +86,16 @@ describe('showPygameModal', () => {
     expect(status()).toBe('終了しました')
     expect(modal()).not.toBeNull()
     expect(h.onClose).not.toHaveBeenCalled()
+  })
+
+  it('開始前に閉じられたかを startPygame が確認できるよう、閉じた状態を渡す', async () => {
+    startPygame.mockReturnValue(new Promise(() => {}))
+    showPygameModal('x', project, hooks())
+    const isClosed = startPygame.mock.calls[0][4] as () => boolean
+
+    expect(isClosed()).toBe(false)
+    closeButton().click()
+    expect(isClosed()).toBe(true)
   })
 
   it('停止して閉じるで実行を cancel し、モーダルを消して onClose を 1 回だけ呼ぶ', async () => {

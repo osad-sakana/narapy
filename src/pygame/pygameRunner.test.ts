@@ -386,6 +386,68 @@ describe('startPygame', () => {
       // 失敗した実行が順番を握ったままにならず、その後の実行は開始できる
       await expect(mod.startPygame('third', canvas, createIO(), emptyProject)).resolves.toBeDefined()
     })
+
+    it('モーダルが閉じられている（abort）場合は、順番が来ても実行を起動しない', async () => {
+      const { mod, fake, runs } = await setupSerial()
+      const io = createIO()
+      const session = await mod.startPygame('x', canvas, io, emptyProject, () => true)
+
+      await expect(session.done).resolves.toBeUndefined()
+      expect(runs).toHaveLength(0)
+      expect(fake.pyodide.globals.set).not.toHaveBeenCalledWith('__narapy_pygame_src__', 'x')
+      expect(startWatchdog).not.toHaveBeenCalled()
+      expect(() => session.cancel()).not.toThrow()
+    })
+
+    it('順番待ちの間に閉じられた実行は起動せず、後続の実行を妨げない', async () => {
+      const { mod, runs } = await setupSerial()
+      const first = await mod.startPygame('first', canvas, createIO(), emptyProject)
+      let closed = false
+      const queued = mod.startPygame('queued', canvas, createIO(), emptyProject, () => closed)
+      const third = mod.startPygame('third', canvas, createIO(), emptyProject)
+      await flush()
+
+      closed = true
+      runs[0].resolve()
+      await first.done
+      const queuedSession = await queued
+      await expect(queuedSession.done).resolves.toBeUndefined()
+
+      await third
+      expect(runs).toHaveLength(2) // first と third だけが起動した
+    })
+
+    it('ウォッチドッグの起動を待つ間に閉じられた場合も、実行を起動せず後始末する', async () => {
+      const { mod, runs } = await setupSerial()
+      // 1 回目の確認（順番待ちの後）は通り、2 回目（ウォッチドッグ起動後）で閉じられている
+      const checks = [false, true]
+      const session = await mod.startPygame('x', canvas, createIO(), emptyProject, () => checks.shift() ?? true)
+
+      await expect(session.done).resolves.toBeUndefined()
+      expect(runs).toHaveLength(0)
+      expect(watchdog.stop).toHaveBeenCalledTimes(1)
+      // 順番を握ったままにならない
+      await expect(mod.startPygame('next', canvas, createIO(), emptyProject)).resolves.toBeDefined()
+    })
+
+    it('前の実行が残っている間は、順番待ちであることを読み込み表示で知らせる', async () => {
+      const { mod, runs } = await setupSerial()
+      await mod.startPygame('first', canvas, createIO(), emptyProject)
+      const io = createIO()
+      const queued = mod.startPygame('second', canvas, io, emptyProject)
+      await flush()
+
+      expect(io.onLoading).toHaveBeenCalledWith('前の実行の停止を待っています...')
+      runs[0].resolve()
+      await queued
+    })
+
+    it('前の実行が無いときは順番待ちの表示を出さない', async () => {
+      const { mod } = await setupSerial()
+      const io = createIO()
+      await mod.startPygame('first', canvas, io, emptyProject)
+      expect(io.onLoading).not.toHaveBeenCalledWith('前の実行の停止を待っています...')
+    })
   })
 
   it('実行が終わったら、ウォッチドッグが残した SIGINT を次の実行へ持ち越さない', async () => {

@@ -45,6 +45,13 @@ export function showPygameModal(code: string, project: PygameProject, hooks: Pyg
   closeBtn.className = 'text-muted hover:text-ink text-sm font-bold transition-colors px-3 h-7 flex items-center justify-center rounded hover:bg-hover'
   closeBtn.textContent = '■ 停止して閉じる'
 
+  // canvas の外（モーダル本体）に置く。canvas に描かれた偽の入力画面にだまされないための常設の注意書き
+  const warningEl = document.createElement('div')
+  warningEl.className = 'px-4 py-1.5 text-xs text-ink bg-hover border-b border-line'
+  warningEl.setAttribute('role', 'note')
+  warningEl.dataset.testid = 'pygame-warning'
+  warningEl.textContent = '⚠ この画面はプログラムが描画しています。パスワードなどを入力しないでください。'
+
   const canvasContainer = document.createElement('div')
   canvasContainer.className = 'overflow-auto p-2 flex items-center justify-center bg-black'
 
@@ -58,7 +65,7 @@ export function showPygameModal(code: string, project: PygameProject, hooks: Pyg
 
   header.append(titleEl, statusEl, closeBtn)
   canvasContainer.appendChild(canvas)
-  card.append(header, canvasContainer)
+  card.append(header, warningEl, canvasContainer)
   backdrop.appendChild(card)
   document.body.appendChild(backdrop)
 

@@ -9,7 +9,7 @@ import { showInputModal, type InputModalHandle } from './inputModal'
 import { encodeInputValue } from './encodeInput'
 import { RUN_STYLE, STOP_STYLE } from './buttonStyles'
 import { setRunStatus, type RunStatus } from './runStatus'
-import { usesPygame } from '../pygame/detect'
+import { routeRun } from '../pygame/detect'
 import { showPygameModal } from '../pygame/pygameModal'
 
 // 60 秒間応答がなければ Worker を強制終了する
@@ -283,8 +283,15 @@ export function initRunner(
       return
     }
 
-    if (mode === 'normal' && usesPygame(code)) {
+    const route = routeRun(mode, code, testCode)
+    if (route.kind === 'pygame') {
       openPygame(code)
+      return
+    }
+    if (route.kind === 'unsupported') {
+      // 押しても無言で何も起きないと故障に見えるため、理由をログへ残す
+      clearLog()
+      appendLog(route.message, 'warn')
       return
     }
 

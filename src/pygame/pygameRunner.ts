@@ -1,7 +1,7 @@
 import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from '../lib/pyodideLoader'
 import type { PyodideInterface, PyodideModule } from '../pyodide/pyodideTypes'
 import type { RunFile } from '../types'
-import { syncFiles, topLevelPyModuleNames } from './fsSync'
+import { syncFiles } from './fsSync'
 import { BOOTSTRAP_CODE, CANCEL_CODE, CAN_RUN_SYNC_CODE, RUN_MAIN_CODE, STOP_FLAG } from './pythonSources'
 import { startWatchdog } from './watchdog'
 
@@ -54,6 +54,9 @@ export interface PygameSession {
 }
 
 let pyodidePromise: Promise<MainPyodide> | null = null
+// 読み込んだ Pyodide インスタンスの世代。停止に応答しない実行を見限って作り直したあと、
+// 古いインスタンスの出力・通知が新しい実行へ流れ込まないよう、コールバックは世代が一致するときだけ中継する
+let instanceId = 0
 // loadPyodide の stdout は初期化時に固定されるため、実行ごとに差し替え可能な出力先を経由する
 let currentStdout: (text: string) => void = () => {}
 let currentResize: (width: number, height: number) => void = () => {}
@@ -70,6 +73,33 @@ let runQueue: Promise<void> = Promise.resolve()
 let activeRuns = 0
 
 const WAITING_MESSAGE = '前の実行の停止を待っています...'
+const RECREATE_MESSAGE = '前の実行が停止に応答しないため、Python 環境を作り直しています...'
+
+// 停止を要求してから、前の実行が終わるのを待つ上限。`try: ... except: pass` のように
+// 停止（KeyboardInterrupt / CancelledError）を握りつぶすループは終わらず、待ち続けると
+// 以降の実行がすべて止まるため、超えたらその Pyodide を見限って作り直す
+export const STOP_TIMEOUT_MS = 5000
+
+// 直近の実行の release。見限るとき、終わらない実行の順番待ち数を残さないために強制的に呼ぶ
+let lastRelease: (() => void) | null = null
+
+// 見限った Pyodide を捨てる。次の loadMainPyodide が新しいインスタンスを作る。
+// 古いインスタンスの実行は残り続けうるが、出力・通知は世代の不一致で遮断される
+function abandonMainPyodide(): void {
+  pyodidePromise = null
+  writtenPaths = new Set()
+}
+
+// previous が settle すれば true、ms 経っても settle しなければ false
+function settledWithin(previous: Promise<void>, ms: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), ms)
+    void previous.then(() => {
+      clearTimeout(timer)
+      resolve(true)
+    })
+  })
+}
 
 // 起動前にモーダルが閉じられていたときに返す、何もしないセッション
 function noopSession(): PygameSession {
@@ -78,6 +108,7 @@ function noopSession(): PygameSession {
 
 function loadMainPyodide(onLoading: (text: string) => void): Promise<MainPyodide> {
   if (!pyodidePromise) {
+    const id = ++instanceId
     pyodidePromise = (async () => {
       onLoading('Pygame 用の Python 環境を読み込み中...')
       const { loadPyodide } = (await verifiedImport(
@@ -86,14 +117,14 @@ function loadMainPyodide(onLoading: (text: string) => void): Promise<MainPyodide
       )) as PyodideModule
       const pyodide = (await loadPyodide({
         indexURL: PYODIDE_CDN,
-        stdout: (text) => currentStdout(text),
-        stderr: (text) => currentStdout(text),
+        stdout: (text) => { if (id === instanceId) currentStdout(text) },
+        stderr: (text) => { if (id === instanceId) currentStdout(text) },
       })) as MainPyodide
       onLoading('pygame-ce を読み込み中...')
       await pyodide.loadPackage('pygame-ce')
       pyodide.registerJsModule('narapy_host', {
-        resize: (width: number, height: number) => currentResize(width, height),
-        caption: (title: string) => currentCaption(title),
+        resize: (width: number, height: number) => { if (id === instanceId) currentResize(width, height) },
+        caption: (title: string) => { if (id === instanceId) currentCaption(title) },
       })
       pyodide.runPython(BOOTSTRAP_CODE, { filename: WRAPPER_FILENAME })
       syncLoopSupported = (await pyodide.runPythonAsync(CAN_RUN_SYNC_CODE)) === true
@@ -121,6 +152,7 @@ export async function startPygame(
   const waiting = activeRuns > 0
   activeRuns += 1
   const previous = runQueue
+  const previousRelease = lastRelease
   let resolveSlot!: () => void
   runQueue = new Promise<void>((resolve) => { resolveSlot = resolve })
   let released = false
@@ -130,10 +162,16 @@ export async function startPygame(
     activeRuns -= 1
     resolveSlot()
   }
+  lastRelease = release
   try {
-    const pyodide = await loadMainPyodide(io.onLoading)
+    let pyodide = await loadMainPyodide(io.onLoading)
     if (waiting) io.onLoading(WAITING_MESSAGE)
-    await previous
+    if (!(await settledWithin(previous, STOP_TIMEOUT_MS))) {
+      io.onLoading(RECREATE_MESSAGE)
+      previousRelease?.()
+      abandonMainPyodide()
+      pyodide = await loadMainPyodide(io.onLoading)
+    }
     if (shouldAbort()) {
       release()
       return noopSession()
@@ -159,9 +197,7 @@ async function launch(
   currentCaption = io.onCaption
   pyodide.canvas.setCanvas2D(canvas)
   writtenPaths = syncFiles(pyodide.FS, WORK_DIR, writtenPaths, project.files, project.directories)
-  pyodide.runPython(
-    `__narapy_pygame_prepare__(${JSON.stringify(WORK_DIR)}, ${JSON.stringify(topLevelPyModuleNames(project.files))})`,
-  )
+  pyodide.runPython(`__narapy_pygame_prepare__(${JSON.stringify(WORK_DIR)})`)
   pyodide.globals.set('__narapy_pygame_src__', code)
   // 同期ループでメインスレッドが固まっても復帰できるよう、別 Worker に心拍を監視させる
   const watchdog = await startWatchdog()

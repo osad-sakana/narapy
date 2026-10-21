@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const verifiedImport = vi.fn()
 vi.mock('../lib/pyodideLoader', () => ({
@@ -293,14 +293,14 @@ describe('startPygame', () => {
       expect(fake.pyodide.FS.dirs.has('/home/pyodide/empty')).toBe(true)
     })
 
-    it('作業ディレクトリへ移動し、直下の .py モジュールのキャッシュを掃除する', async () => {
+    it('作業ディレクトリへ移動し、作業ディレクトリ配下のモジュールのキャッシュを掃除する', async () => {
       const { mod, fake } = await setup()
       await mod.startPygame('x', canvas, createIO(), project)
 
       const prepare = fake.pyodide.runPython.mock.calls
         .map(([code]) => code as string)
         .find((code) => code.startsWith('__narapy_pygame_prepare__('))
-      expect(prepare).toBe('__narapy_pygame_prepare__("/home/pyodide", ["main","helper"])')
+      expect(prepare).toBe('__narapy_pygame_prepare__("/home/pyodide")')
     })
 
     it('実行前（ゲーム Task の開始前）にファイルを書き込む', async () => {
@@ -457,5 +457,106 @@ describe('startPygame', () => {
     fake.task.resolve()
     await session.done
     expect(watchdog.interruptBuffer[0]).toBe(0)
+  })
+})
+
+// 前の実行が停止に応答しない（`except:` で停止を握りつぶすループなど）場合の見限り
+describe('停止に応答しない実行の見限り', () => {
+  async function setupMulti() {
+    vi.resetModules()
+    verifiedImport.mockReset()
+    const instances: Array<{
+      fake: ReturnType<typeof createFakePyodide>
+      runs: Deferred[]
+      stdout: (text: string) => void
+    }> = []
+    const loadPyodide = vi.fn(async (opts: { stdout: (text: string) => void }) => {
+      const fake = createFakePyodide(true)
+      const runs: Deferred[] = []
+      fake.pyodide.runPythonAsync.mockImplementation(((code: string) => {
+        if (code.includes('can_run_sync')) return Promise.resolve(true)
+        const d = deferred()
+        runs.push(d)
+        return d.promise
+      }) as never)
+      instances.push({ fake, runs, stdout: opts.stdout })
+      return fake.pyodide
+    })
+    verifiedImport.mockResolvedValue({ loadPyodide })
+    const mod = await import('./pygameRunner')
+    return { mod, loadPyodide, instances }
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+    watchdog.wasStalled.mockReturnValue(false)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('前の実行が制限時間を過ぎても終わらなければ、Python 環境を作り直して次の実行を始める', async () => {
+    const { mod, loadPyodide, instances } = await setupMulti()
+    const first = await mod.startPygame('first', canvas, createIO(), emptyProject)
+    first.cancel() // 停止を要求したが、ループが握りつぶして終わらない
+
+    const io = createIO()
+    const secondPromise = mod.startPygame('second', canvas, io, emptyProject)
+    await vi.advanceTimersByTimeAsync(mod.STOP_TIMEOUT_MS)
+    await secondPromise
+
+    expect(loadPyodide).toHaveBeenCalledTimes(2)
+    expect(instances[0].runs).toHaveLength(1)
+    expect(instances[1].runs).toHaveLength(1)
+    expect(io.onLoading).toHaveBeenCalledWith(expect.stringContaining('作り直し'))
+  })
+
+  it('制限時間内に終われば作り直さない', async () => {
+    const { mod, loadPyodide, instances } = await setupMulti()
+    const first = await mod.startPygame('first', canvas, createIO(), emptyProject)
+    first.cancel()
+
+    const secondPromise = mod.startPygame('second', canvas, createIO(), emptyProject)
+    await vi.advanceTimersByTimeAsync(mod.STOP_TIMEOUT_MS - 1000)
+    instances[0].runs[0].resolve()
+    await secondPromise
+
+    expect(loadPyodide).toHaveBeenCalledTimes(1)
+    expect(instances[0].runs).toHaveLength(2)
+  })
+
+  it('見限った実行の出力・通知は、新しい実行へ流れ込まない', async () => {
+    const { mod, instances } = await setupMulti()
+    const first = await mod.startPygame('first', canvas, createIO(), emptyProject)
+    first.cancel()
+    const io = createIO()
+    const secondPromise = mod.startPygame('second', canvas, io, emptyProject)
+    await vi.advanceTimersByTimeAsync(mod.STOP_TIMEOUT_MS)
+    await secondPromise
+
+    instances[0].stdout('from the zombie')
+    ;(instances[0].fake.jsModules['narapy_host'].resize as (w: number, h: number) => void)(1, 1)
+    expect(io.onStdout).not.toHaveBeenCalled()
+    expect(io.onResize).not.toHaveBeenCalled()
+
+    instances[1].stdout('from the new run')
+    expect(io.onStdout).toHaveBeenCalledWith('from the new run')
+  })
+
+  it('見限った実行が順番待ちの数を残さない（次の実行で「停止を待っています」を誤表示しない）', async () => {
+    const { mod, instances } = await setupMulti()
+    const first = await mod.startPygame('first', canvas, createIO(), emptyProject)
+    first.cancel()
+    const secondPromise = mod.startPygame('second', canvas, createIO(), emptyProject)
+    await vi.advanceTimersByTimeAsync(mod.STOP_TIMEOUT_MS)
+    const second = await secondPromise
+    instances[1].runs[0].resolve()
+    await second.done
+
+    const io = createIO()
+    await mod.startPygame('third', canvas, io, emptyProject)
+    expect(io.onLoading).not.toHaveBeenCalledWith(expect.stringContaining('停止を待っています'))
   })
 })

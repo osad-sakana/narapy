@@ -52,11 +52,3 @@ export function syncFiles(
   }
   return written
 }
-
-// 直下の .py の拡張子抜きモジュール名。sys.path に作業ディレクトリが含まれるため
-// `import helper` で参照でき、再実行時に古いモジュールが sys.modules に残らないよう掃除する対象。
-export function topLevelPyModuleNames(files: readonly RunFile[]): string[] {
-  return files
-    .filter((f) => f.kind === 'text' && f.path.endsWith('.py') && !f.path.includes('/'))
-    .map((f) => f.path.slice(0, -3))
-}

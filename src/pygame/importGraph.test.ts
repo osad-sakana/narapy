@@ -27,6 +27,20 @@ describe('importedModules', () => {
     expect(names('from pkg import (a as x, b)')).toEqual(expect.arrayContaining(['pkg', 'pkg.a', 'pkg.b']))
   })
 
+  it('`;` で区切られた複数の文の import も拾う', () => {
+    expect(names('import os; import game')).toEqual(expect.arrayContaining(['os', 'game']))
+    expect(names('x = 1; from pkg import mod')).toEqual(expect.arrayContaining(['pkg', 'pkg.mod']))
+  })
+
+  it('括弧つきの複数行 from import の名前をすべて拾う', () => {
+    expect(names('from pkg import (\n    mod,\n    other as o,\n)')).toEqual(
+      expect.arrayContaining(['pkg', 'pkg.mod', 'pkg.other']),
+    )
+    expect(importedModules('from . import (\n  a,\n  b,\n)')).toEqual(
+      expect.arrayContaining([{ level: 1, name: 'a' }, { level: 1, name: 'b' }]),
+    )
+  })
+
   it('コメント・文字列中の import は拾わない', () => {
     expect(importedModules('# import secret\nprint("import hidden")')).toEqual([])
   })
@@ -42,6 +56,9 @@ describe('importedModules', () => {
       `from${' '.repeat(n)}x`,
       `import${' '.repeat(n)}x`,
       `import a${' '.repeat(n)}b`,
+      // 閉じ括弧の無い from import が大量にあっても、行ごとにファイル末尾まで走査しない
+      'from a import (\n'.repeat(20_000),
+      `from a import (${' '.repeat(n)}`,
     ]
     for (const line of lines) {
       const start = performance.now()

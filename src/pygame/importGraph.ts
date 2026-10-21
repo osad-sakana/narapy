@@ -4,7 +4,10 @@ import type { RunFile } from '../types'
 // 共有リンクで開いた任意の .py にも毎回かかるため、隣り合う量指定子が同じ文字を取り合う形
 // （`[ \\t]+` と `[^#\\n]*` など）を避け、長い 1 行でも線形時間で終わるようにしている。
 const IMPORT_STMT = /^[ \t]*import[ \t]([^#\n]+)/gm
-const FROM_IMPORT_STMT = /^[ \t]*from[ \t]+(\.*\w[\w.]*|\.+)[ \t]+import[ \t]([^#\n]+)/gm
+// `from pkg import (` の括弧の中身は、正規表現ではなく下の関数で上限つきに切り出す
+// （閉じ括弧の無い行が大量にあっても、正規表現のバックトラックで固まらないように）
+const FROM_IMPORT_STMT = /^[ \t]*from[ \t]+(\.*\w[\w.]*|\.+)[ \t]+import[ \t]*(\(?)([^#\n]*)/gm
+const MAX_PAREN_LIST_CHARS = 2000
 
 export interface ImportRef {
   // 相対 import のドットの数（絶対 import は 0）
@@ -21,9 +24,21 @@ function splitNames(list: string): string[] {
     .filter((name) => /^[\w.]+$/.test(name))
 }
 
+// from import の名前の並び。括弧つき（複数行）なら、閉じ括弧までを上限つきで取り込む
+function importedNameList(code: string, match: RegExpMatchArray): string {
+  const [whole, , paren, firstLine] = match
+  if (!paren) return firstLine
+  const rest = code.slice(match.index! + whole.length, match.index! + whole.length + MAX_PAREN_LIST_CHARS)
+  const close = rest.indexOf(')')
+  return close < 0 ? firstLine : firstLine + rest.slice(0, close)
+}
+
 // コードが import しうるモジュール。`from pkg import x` の x はサブモジュールの可能性があるので
 // `pkg.x` も候補に含める。
-export function importedModules(code: string): ImportRef[] {
+export function importedModules(source: string): ImportRef[] {
+  // `import os; import game` のように 1 行に複数の文がある場合も拾うため、`;` を改行として扱う
+  // （文字列中の `;` で行が増えても、候補が増えるだけで害はない）
+  const code = source.replace(/;/g, '\n')
   const refs: ImportRef[] = []
   for (const match of code.matchAll(IMPORT_STMT)) {
     for (const name of splitNames(match[1])) refs.push({ level: 0, name })
@@ -32,7 +47,8 @@ export function importedModules(code: string): ImportRef[] {
     const level = match[1].length - match[1].replace(/^\.+/, '').length
     const module = match[1].slice(level)
     if (module) refs.push({ level, name: module })
-    for (const name of splitNames(match[2])) {
+    const list = importedNameList(code, match).replace(/#[^\n]*/g, '')
+    for (const name of splitNames(list)) {
       refs.push({ level, name: module ? `${module}.${name}` : name })
     }
   }

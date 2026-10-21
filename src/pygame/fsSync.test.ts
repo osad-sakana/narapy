@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RunFile } from '../types'
-import { syncFiles, topLevelPyModuleNames, type FsLike } from './fsSync'
+import { syncFiles, type FsLike } from './fsSync'
 
 const WORK = '/home/pyodide'
 
@@ -79,18 +79,5 @@ describe('syncFiles', () => {
     const previous: ReadonlySet<string> = Object.freeze(new Set([`${WORK}/x.png`])) as ReadonlySet<string>
     expect(() => syncFiles(fs, WORK, previous, [], [])).not.toThrow()
     expect(previous.size).toBe(1)
-  })
-})
-
-describe('topLevelPyModuleNames', () => {
-  it('直下の .py の拡張子抜き名だけを返す', () => {
-    const files: RunFile[] = [
-      text('main.py'),
-      text('helper.py'),
-      text('pkg/inner.py'),
-      text('notes.txt'),
-      binary('sprite.png', [1]),
-    ]
-    expect(topLevelPyModuleNames(files)).toEqual(['main', 'helper'])
   })
 })

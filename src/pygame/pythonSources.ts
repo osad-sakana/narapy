@@ -21,6 +21,10 @@ def __narapy_install_sync_patches__():
     # SIGINT（interrupt buffer）は yield 中だと Pyodide のイベントループ内部に当たって壊れるため使わない
     def check_stop():
         if __narapy_pygame_stop__:
+            # ゲームループの \`except:\` に握りつぶされても、ブラウザを固めて空回りしないよう
+            # 投げる前に制御を返す（短く待つので、握りつぶされ続けても CPU をほとんど使わない）
+            if can_run_sync():
+                run_sync(asyncio.sleep(0.05))
             raise KeyboardInterrupt()
 
     # run_sync は 1 回ごとに数 ms かかるため、フレーム内で何度も呼ばれても 5ms に 1 回へ間引く。
@@ -118,16 +122,19 @@ export const BOOTSTRAP_CODE = `${SYNC_PATCHES_CODE}
 __narapy_pygame_task__ = None
 __narapy_pygame_stop__ = False
 
-# 作業ディレクトリへ移動し、前回実行の直下モジュール（import helper 等）を sys.modules から外して
-# 編集後の内容が再 import されるようにする
-def __narapy_pygame_prepare__(workdir, names):
+# 作業ディレクトリへ移動し、作業ディレクトリ配下から読み込まれたモジュール（import helper や
+# パッケージ内のファイル）を sys.modules から外して、編集・削除後の内容が反映されるようにする
+def __narapy_pygame_prepare__(workdir):
     import os, sys, importlib
     global __narapy_pygame_task__, __narapy_pygame_stop__
     __narapy_pygame_task__ = None
     __narapy_pygame_stop__ = False
     os.chdir(workdir)
-    for name in names:
-        sys.modules.pop(name, None)
+    prefix = workdir + '/'
+    for name, module in list(sys.modules.items()):
+        path = getattr(module, '__dict__', {}).get('__file__')
+        if isinstance(path, str) and path.startswith(prefix):
+            sys.modules.pop(name, None)
     importlib.invalidate_caches()
 
 # await で止まっている非同期ループ向けの停止。同期ループは停止フラグ（STOP_FLAG）で止まる
@@ -164,6 +171,10 @@ async def __narapy_pygame_main__(src):
         res = eval(compile(src, '<exec>', 'exec', ast.PyCF_ALLOW_TOP_LEVEL_AWAIT), ns)
         if res is not None:
             await res
+    except SystemExit as exit_info:
+        # pygame.quit(); sys.exit() はチュートリアルで定番の終わり方なので、正常終了として扱う
+        if exit_info.code not in (None, 0):
+            raise
     finally:
         pg = sys.modules.get('pygame')
         if pg is not None:

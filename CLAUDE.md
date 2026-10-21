@@ -23,6 +23,7 @@ narapy/
 │   ├── editor/             # Monaco エディタ・コード補完・フォントサイズ
 │   ├── completion.worker.ts # Pyodide を使ったコード補完 Web Worker
 │   ├── runner/             # 実行・Turtle/matplotlib 描画・エラー翻訳
+│   ├── pygame/             # pygame-ce 実行（メインスレッドの専用Pyodide・モーダル・ウォッチドッグ。詳細は下記）
 │   ├── pyodide/            # Pyodide 連携（Turtle互換モジュール、採点エンジン）
 │   ├── pyodide.worker.ts   # Pyodide を動的 import で初期化する Web Worker
 │   ├── lib/                # Pyodide ローダーなど共通ユーティリティ
@@ -135,6 +136,53 @@ JSON に記録し、メインスレッド側でスクラブ再生する record-t
   の対象外で、従来どおり実行ログへライブ配信される。
 - MVP では関数呼び出しスタックの可視化・実行中の turtle 段階描画は対象外
   （turtle/matplotlib の描画結果は通常実行と同様、完了後にモーダルで表示される）。
+
+### pygame-ce の実行（src/pygame/、issue #73 / #74）
+
+`import pygame` を含むコードの**通常実行だけ**は Worker ではなく、メインスレッドの専用 Pyodide
+（`pygameRunner.ts`）で全画面モーダル（`pygameModal.ts`）内の canvas に描画する。
+通常実行の Worker とは別インスタンスで、pygame-ce は Pyodide v0.27.0 同梱の 2.4.1。
+
+- **Worker では動かさない**。SDL は canvas と DOM を要求し、Worker で `set_mode` すると異常終了して
+  実行ボタンも復帰しなくなる。そのためステップ実行・採点は `detect.ts` の `routeRun()` で
+  pygame 使用コードを実行前に弾き、理由をログへ出す。新しい実行モードを足すときは必ず `routeRun` を通すこと。
+- **同期ループ（`await` なしの `while True:`）は JSPI の `run_sync` で動かす**。`pythonSources.ts` が
+  `pygame.display.flip/update`・`event.get/pump/poll/wait`・`Clock.tick`・`time.sleep`・`pygame.time.wait/delay` を
+  パッチし、呼ばれるたびにブラウザへ制御を返す（5ms に 1 回へ間引き、`tick` は必ず返す）。
+  - ゲームは必ず `runPythonAsync` 経由で開始する。`asyncio.ensure_future` した Task 内では
+    `run_sync` が使える保証がない。`can_run_sync()` は呼び出しのたびに確認する（非対応なら元の関数と同じ挙動）。
+  - JSPI 非対応ブラウザ（Firefox・Safari 等）は `session.syncLoop === false` となり、
+    `await asyncio.sleep(0)` でループを回す従来の書き方が必要。固まったときの案内もモード別に出し分ける。
+  - `Clock` は C 型で属性を差し替えられないため、`tick` だけ制御を返す委譲クラスで置き換えている。
+- **停止は停止フラグ（`__narapy_pygame_stop__`）で行う**。JS が立て、パッチ済み関数が見て
+  `KeyboardInterrupt` を投げる。await で止まっている非同期ループには `Task.cancel()` を併用する。
+  **停止操作で interrupt buffer（SIGINT）を使わないこと**: yield 中の SIGINT は Pyodide の
+  イベントループ内部（`webloop`）や `cancel()` 自身の `runPython` に当たって例外になり、
+  モーダルが閉じなくなる。`cancel()` は失敗してもモーダルを閉じられるよう例外を投げない。
+- **実行は直列化する**（`pygameRunner.ts` の `runQueue`）。モーダルを閉じても停止は協調的・非同期なので、
+  古い実行が生きている間に次の実行が FS・canvas・停止フラグへ触ると 2 つのゲームが混ざる。
+  - 起動前にモーダルが閉じられた実行は起動しない（`shouldAbort`）。起動してから `cancel` しても、
+    `await` しかしないコードは停止フラグを見ないため止まらず、順番待ちを塞ぐ。
+  - 停止後 `STOP_TIMEOUT_MS`（5 秒）たっても前の実行が終わらない場合（`try: ... except: pass` が停止を
+    握りつぶす等）は、その Pyodide を見限って作り直す。古いインスタンスの出力・通知は `instanceId`（世代）の
+    不一致で遮断する。待ち続けると以降の実行がすべて止まる。
+  - 停止フラグ検知時は、例外を投げる前に `run_sync` で制御を返す。`except:` に握りつぶされてもタブが固まらない。
+- **ウォッチドッグ**（`watchdog.ts` / `watchdog.worker.ts` / `stallMonitor.ts`）が、yield しないループ
+  （`while True: pass` 等）でメインスレッドが固まったときの唯一の復帰手段。メインスレッドの心拍を
+  別 Worker が SharedArrayBuffer 越しに監視し、5 秒止まったら interrupt buffer に SIGINT を書く
+  （ブロック中のコードを止めるのが目的なので、ここでだけ interrupt buffer を使う）。
+  - ウォッチドッグ Worker は**実行を始める前に起動完了（`ready`）を待つ**。メインスレッドが固まった後では
+    Worker の起動が間に合わず、監視が一度も働かない。
+  - タブ非表示中は計測を止めず**閾値を 90 秒に延ばす**。止めると、非表示中に固まったとき
+    「表示に戻った」通知を処理できず永久に復帰できなくなる（90 秒はバックグラウンドタイマーの
+    1 分に 1 回の間引きより長い）。
+- ユーザーコードは通常実行と同じファイル名 `<exec>` で compile する。`errorTranslator` が
+  `File "<exec>", line N` から行番号を抽出するため、別名だとラッパー側の行番号を拾ってしまう。
+- エクスプローラー上のファイル（画像・フォント・`.py`）は `fsSync.ts` が `/home/pyodide` へ書き込む。
+  メインスレッドの Pyodide は実行をまたいで FS が残るため、前回書いて今回無くなったファイルを削除し、
+  直下の `.py` は `sys.modules` から外して編集後の内容が再 import されるようにしている。
+- SDL は `document.title` を書き換えるので、モーダル表示中は `MutationObserver` で元のタイトルへ戻し、
+  `set_caption` の内容はモーダルのタイトルに表示する。`Escape` はゲームのキー入力に使えるよう閉じる操作にしない。
 
 ### ビルドターゲット（`esnext`）
 

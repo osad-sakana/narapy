@@ -5,6 +5,7 @@ export interface PyFS {
   writeFile: (path: string, data: string | Uint8Array) => void
   mkdir: (path: string) => void
   analyzePath: (path: string) => { exists: boolean }
+  unlink: (path: string) => void
 }
 
 export interface PyodideInterface {

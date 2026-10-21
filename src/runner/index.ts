@@ -9,6 +9,8 @@ import type { InputPromptHandle } from './inputPrompt'
 import { handleInputRequest, type InputRequestDeps } from './inputRequest'
 import { RUN_STYLE, STOP_STYLE } from './buttonStyles'
 import { setRunStatus, type RunStatus } from './runStatus'
+import { routeRun } from '../pygame/detect'
+import { showPygameModal } from '../pygame/pygameModal'
 
 // 60 秒間応答がなければ Worker を強制終了する
 const EXECUTION_TIMEOUT_MS = 60_000
@@ -243,8 +245,31 @@ export function initRunner(
 
   attachWorkerHandlers()
 
+  // pygame はメインスレッドの専用 Pyodide でモーダル内に実行する（issue #73）。
+  // 開いている間はエディタを編集不可にし、二重起動も防ぐ。
+  let pygameOpen = false
+  function openPygame(code: string, project: { files: RunFile[]; directories: string[] }): void {
+    if (pygameOpen) return
+    onRunStart?.()
+    clearLog()
+    appendLog('--- 実行開始（Pygame） ---', 'info')
+    showPygameModal(code, project, {
+      onOpen: () => {
+        pygameOpen = true
+        editor.updateOptions({ readOnly: true })
+        runBtn.disabled = true
+      },
+      onClose: () => {
+        pygameOpen = false
+        editor.updateOptions({ readOnly: false })
+        runBtn.disabled = false
+        editor.focus()
+      },
+    })
+  }
+
   function startRun(mode: 'normal' | 'trace' | 'grade' = 'normal', gradeCode?: string, testCode?: string, entryPath?: string): void {
-    if (running) return
+    if (running || pygameOpen) return
 
     // grade モードはエディタの表示中ファイルではなく、呼び出し側が明示的に渡した
     // 採点対象ファイルの内容を使う（issue #65 レビュー指摘対応）
@@ -260,6 +285,19 @@ export function initRunner(
       return
     }
 
+    const project = getRunFiles()
+    const route = routeRun(mode, code, testCode, project.files)
+    if (route.kind === 'pygame') {
+      openPygame(code, project)
+      return
+    }
+    if (route.kind === 'unsupported') {
+      // 押しても無言で何も起きないと故障に見えるため、理由をログへ残す
+      clearLog()
+      appendLog(route.message, 'warn')
+      return
+    }
+
     onRunStart?.()
     // stderr 出力で running が false になった状態で入力待ちが残っている場合は、
     // 古い実行を Worker ごと破棄する（clearLog 経由の KeyboardInterrupt の error メッセージが
@@ -269,7 +307,7 @@ export function initRunner(
     setRunning(true)
     clearLog()
     appendLog(mode === 'grade' ? '--- 採点開始 ---' : '--- 実行開始 ---', 'info')
-    const { files, directories } = getRunFiles()
+    const { files, directories } = project
     worker.postMessage({ type: 'run', code, files, directories, mode, testCode, entryPath } satisfies RunPayload)
   }
 

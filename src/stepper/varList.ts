@@ -1,4 +1,5 @@
 import type { VarWithChange } from '../trace/varDiff'
+import { typeLabel } from '../trace/typeLabel'
 
 const CHANGE_CLASS: Record<VarWithChange['change'], string> = {
   added: 'text-success',
@@ -16,7 +17,7 @@ function buildRow(v: VarWithChange): HTMLElement {
 
   const type = document.createElement('span')
   type.className = 'text-muted shrink-0'
-  type.textContent = v.type
+  type.textContent = typeLabel(v.type)
 
   const value = document.createElement('span')
   value.className = 'text-ink break-all min-w-0'

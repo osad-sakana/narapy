@@ -40,7 +40,7 @@ initTheme()
 
 // initLayout() は createEditor() より先に呼ぶこと。
 // Monaco は生成時にコンテナを実測するため、順序を入れ替えると初期サイズが崩れる
-initLayout()
+const layout = initLayout()
 
 await initStore()
 
@@ -207,6 +207,7 @@ const runner = initRunner(
   (json) => stepperController.onTraceResult(json),
   () => stepperController.invalidate(),
   (json) => exerciseController.onGradeResult(json),
+  layout.ensureLogPanelVisible,
 )
 
 gradeBtn.addEventListener('click', () => {

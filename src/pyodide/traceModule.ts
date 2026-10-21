@@ -12,8 +12,8 @@
 //
 // この文字列は _narapy_trace という独立モジュールとして sys.modules に登録され
 // (traceRun.ts参照)、__main__ の名前空間を汚さない。ユーザーコード自体は
-// __main__ の globals() で exec するため、input() 用に差し込んだ customInput 等の
-// 既存のグローバル状態はそのまま見える。
+// __main__ の globals() で exec するため、ユーザーが定義した
+// グローバル状態はそのまま見える（input() は builtins 側で差し替え済み）。
 export const TRACE_MODULE_SRC = String.raw`
 import sys as _sys
 import io as _io
@@ -35,6 +35,8 @@ _MAX_STDOUT_CHUNK = 20000
 # Worker のメモリを食い潰してタブがクラッシュする（MAX_STEPSが防ごうとしていたのと
 # 同じ種類の問題が別経路で再発する）。バッファ自体に上限を設けて防ぐ。
 _MAX_STDOUT_TOTAL = 200000
+# input() 直前にログへ見せる未表示出力の上限（文字数）
+_MAX_PREVIEW = 2000
 
 
 class _CappedStdout(_io.StringIO):
@@ -44,6 +46,7 @@ class _CappedStdout(_io.StringIO):
     def __init__(self):
         super().__init__()
         self.dropped = 0
+        self._preview_pos = 0
 
     def write(self, s):
         room = _MAX_STDOUT_TOTAL - self.tell()
@@ -51,6 +54,20 @@ class _CappedStdout(_io.StringIO):
             super().write(s[:room])
         self.dropped += max(0, len(s) - max(0, room))
         return len(s)
+
+    # input() の直前に、まだ実行ログへ見せていない出力を取り出す（_narapy_io 参照）。
+    # ステップの stdout 差分（Recorder側の位置）には影響しない独立した位置で管理する。
+    def take_input_preview(self):
+        text = self.getvalue()
+        chunk = text[self._preview_pos:]
+        self._preview_pos = len(text)
+        if len(chunk) > _MAX_PREVIEW:
+            return "…(省略)\n" + chunk[-_MAX_PREVIEW:]
+        return chunk
+
+    # input() がエコーした行は呼び出し側（JS）が実行ログへ直接出すので、次回の取り出しから除く
+    def mark_input_echoed(self):
+        self._preview_pos = len(self.getvalue())
 
 
 class _NarapyRepr(_reprlib.Repr):

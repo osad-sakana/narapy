@@ -15,7 +15,12 @@ const BTN_INACTIVE = `${BTN_BASE} text-muted border border-transparent hover:tex
 // パネルトグルの全スタイルをまとめて公開する。
 export const HEADER_BTN_STYLES = [BTN_INACTIVE, BTN_ACTIVE]
 
-export function initLayout(): void {
+export interface LayoutHandle {
+  // 折りたたまれた実行ログを開く（input() の入力欄を見せるため）
+  ensureLogPanelVisible: () => void
+}
+
+export function initLayout(): LayoutHandle {
   const state = load()
 
   const rightPanel   = document.getElementById('rightPanel')   as HTMLElement
@@ -95,4 +100,14 @@ export function initLayout(): void {
   // 初期状態を適用
   syncVSplit()
   updateAll()
+
+  return {
+    ensureLogPanelVisible: () => {
+      if (!logCollapsed) return
+      logCollapsed = false
+      syncVSplit()
+      save({ logCollapsed })
+      updateAll()
+    },
+  }
 }

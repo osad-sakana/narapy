@@ -7,11 +7,31 @@ import {
   deleteFile,
   deleteDirectory,
   upsertFile,
+  moveEntry,
 } from './store'
 import type { TreeDirNode, TreeFileNode, TreeNode } from './types'
 import { buildTree } from './tree'
 import { detectFileKind } from './fileKind'
 import { validatePath } from './paths'
+import { fileBadge } from './fileBadge'
+import {
+  buildIcon,
+  ICON_CHEVRON_DOWN,
+  ICON_CHEVRON_RIGHT,
+  ICON_FILE,
+  ICON_FOLDER,
+  ICON_FOLDER_OPEN,
+  ICON_FOLDER_PLUS,
+  ICON_IMG,
+  ICON_MORE,
+  ICON_PLUS,
+  ICON_TRASH,
+  ICON_UPLOAD,
+} from './icons'
+import { closeMenu, isMenuOpenFor, openMenu, type MenuItem } from './menu'
+import { createResizeHandle } from './resize'
+import { planMove, type MoveSource } from './move'
+import { blockInternalDrop, makeDraggable, makeDropTarget } from './moveDnd'
 import {
   collectFilesFromDataTransfer,
   formatBytes,
@@ -30,23 +50,6 @@ function validatePyName(raw: string): string | null {
   if (!PY_NAME_RE.test(name)) return '英数字・_・. で始まり、.py で終わる名前にしてください'
   return null
 }
-
-function buildIcon(path: string): string {
-  return `<svg class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-    <path stroke-linecap="round" stroke-linejoin="round" d="${path}"/>
-  </svg>`
-}
-
-const ICON_PLUS         = 'M12 4.5v15m7.5-7.5h-15'
-const ICON_CLOSE        = 'M6 18 18 6M6 6l12 12'
-const ICON_FILE         = 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9z'
-const ICON_FOLDER_PLUS  = 'M12 10.5v6m3-3H9m4.06-7.19-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44z'
-const ICON_UPLOAD       = 'M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5'
-const ICON_DIR_UP       = 'M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776'
-const ICON_CHEVRON_DOWN = 'm19.5 8.25-7.5 7.5-7.5-7.5'
-const ICON_CHEVRON_RIGHT= 'm8.25 4.5 7.5 7.5-7.5 7.5'
-const ICON_DOC          = 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6'
-const ICON_IMG          = 'm2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z'
 
 export type OnFileSelect = (path: string) => void
 export type OnNotify = (message: string) => void
@@ -77,7 +80,10 @@ export function createExplorer(
   const expanded = new Set<string>()
   let dragDepth = 0
 
+  const resizeHandle = createResizeHandle(container)
+
   function render(): void {
+    closeMenu()
     const files = getFiles()
     const directories = getDirectories()
     const active = getActiveFile()
@@ -85,75 +91,77 @@ export function createExplorer(
     autoExpand(tree, expanded, active)
 
     container.innerHTML = ''
-    container.appendChild(buildHeader())
-    container.appendChild(buildToolbar())
+    const header = buildHeader()
+    container.appendChild(header)
 
     const list = document.createElement('div')
     list.className = 'flex-1 overflow-y-auto py-1 min-h-0 relative'
     list.appendChild(renderTree(tree, active, 0))
     container.appendChild(list)
+    container.appendChild(resizeHandle)
+
+    // ルートへ移動する先（フォルダに入れた項目を取り出す）。ツリーが長くても届くようヘッダーも対象にする
+    makeDropTarget(list, rootDrop)
+    makeDropTarget(header, rootDrop)
 
     attachDropHandlers(container, list)
   }
 
+  function createNewFile(): void {
+    const raw = window.prompt('ファイル名 (.py 必須):')
+    if (raw === null) return
+    const err = validatePyName(raw)
+    if (err) { window.alert(err); return }
+    const name = raw.trim()
+    if (!createTextFile(name)) { window.alert(`"${name}" は既に存在します`); return }
+    onFileSelect(name)
+  }
+
+  function createNewDirectory(): void {
+    const raw = window.prompt('フォルダ名 (例: data または data/csv):')
+    if (raw === null) return
+    const err = validatePath(raw)
+    if (err) { window.alert(err); return }
+    const path = raw.trim().replace(/^\/+|\/+$/g, '')
+    if (!createDirectory(path)) {
+      window.alert(`"${path}" は既に存在します`)
+      return
+    }
+    expanded.add(path)
+    render()
+  }
+
+  const NEW_MENU_ITEMS: MenuItem[] = [
+    { label: '新規ファイル (.py)', iconPath: ICON_FILE, onSelect: createNewFile },
+    { label: '新規フォルダ', iconPath: ICON_FOLDER_PLUS, onSelect: createNewDirectory },
+    { label: 'ファイルをアップロード', iconPath: ICON_UPLOAD, onSelect: () => openFilePicker(false) },
+    { label: 'フォルダをアップロード', iconPath: ICON_FOLDER_OPEN, onSelect: () => openFilePicker(true) },
+  ]
+
+  // 追加操作（新規作成・アップロード）を1つのメニューにまとめたヘッダー
   function buildHeader(): HTMLElement {
     const header = document.createElement('div')
-    header.className = 'flex items-center justify-between px-3 py-2.5 bg-panel border-b border-line shrink-0'
+    header.className = 'flex items-center justify-between gap-1 px-3 py-2 bg-panel border-b border-line shrink-0'
     header.innerHTML = `
-      <div class="flex items-center gap-1.5">
+      <div class="flex items-center gap-1.5 min-w-0">
         ${buildIcon(ICON_FILE)}
-        <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em] select-none">ファイル</span>
+        <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em] select-none truncate">ファイル</span>
       </div>
       <button
         id="explorerNewBtn"
-        title="新規 .py ファイル"
-        class="text-muted hover:text-ink transition-colors cursor-pointer"
-      >${buildIcon(ICON_PLUS)}</button>
+        type="button"
+        title="ファイル・フォルダを追加"
+        aria-haspopup="menu"
+        class="shrink-0 flex items-center gap-1 px-1.5 py-1 rounded-md border border-line text-[11px] font-medium text-ink hover:bg-hover transition-colors cursor-pointer whitespace-nowrap"
+      >${buildIcon(ICON_PLUS)}<span>新規</span>${buildIcon(ICON_CHEVRON_DOWN)}</button>
     `
-    header.querySelector('#explorerNewBtn')!.addEventListener('click', () => {
-      const raw = window.prompt('ファイル名 (.py 必須):')
-      if (raw === null) return
-      const err = validatePyName(raw)
-      if (err) { window.alert(err); return }
-      const name = raw.trim()
-      if (!createTextFile(name)) { window.alert(`"${name}" は既に存在します`); return }
-      onFileSelect(name)
+    const newBtn = header.querySelector('#explorerNewBtn') as HTMLButtonElement
+    newBtn.addEventListener('click', () => {
+      if (isMenuOpenFor(newBtn)) { closeMenu(); return }
+      const rect = newBtn.getBoundingClientRect()
+      openMenu(NEW_MENU_ITEMS, { x: rect.left, y: rect.bottom + 4 }, newBtn)
     })
     return header
-  }
-
-  function buildToolbar(): HTMLElement {
-    const bar = document.createElement('div')
-    bar.className = 'flex items-center justify-between gap-1 px-2 py-1.5 border-b border-line shrink-0'
-    bar.innerHTML = `
-      <button id="explorerNewDirBtn"   title="新規フォルダ"      class="flex-1 flex items-center justify-center text-muted hover:text-ink transition-colors cursor-pointer py-1 rounded hover:bg-hover">${buildIcon(ICON_FOLDER_PLUS)}</button>
-      <button id="explorerUploadBtn"   title="ファイルをアップロード" class="flex-1 flex items-center justify-center text-muted hover:text-ink transition-colors cursor-pointer py-1 rounded hover:bg-hover">${buildIcon(ICON_UPLOAD)}</button>
-      <button id="explorerUploadDirBtn" title="フォルダをアップロード" class="flex-1 flex items-center justify-center text-muted hover:text-ink transition-colors cursor-pointer py-1 rounded hover:bg-hover">${buildIcon(ICON_DIR_UP)}</button>
-    `
-
-    bar.querySelector('#explorerNewDirBtn')!.addEventListener('click', () => {
-      const raw = window.prompt('フォルダ名 (例: data または data/csv):')
-      if (raw === null) return
-      const err = validatePath(raw)
-      if (err) { window.alert(err); return }
-      const path = raw.trim().replace(/^\/+|\/+$/g, '')
-      if (!createDirectory(path)) {
-        window.alert(`"${path}" は既に存在します`)
-        return
-      }
-      expanded.add(path)
-      render()
-    })
-
-    bar.querySelector('#explorerUploadBtn')!.addEventListener('click', () => {
-      openFilePicker(false)
-    })
-
-    bar.querySelector('#explorerUploadDirBtn')!.addEventListener('click', () => {
-      openFilePicker(true)
-    })
-
-    return bar
   }
 
   function openFilePicker(directory: boolean): void {
@@ -257,6 +265,34 @@ export function createExplorer(
     })
   }
 
+  function canMoveTo(source: MoveSource, destDir: string): boolean {
+    return planMove(
+      { files: getFiles().map(f => f.path), directories: getDirectories().map(d => d.path) },
+      source,
+      destDir,
+    ).ok
+  }
+
+  function moveTo(source: MoveSource, destDir: string): void {
+    const activeBefore = getActiveFile()
+    const result = moveEntry(source, destDir)
+    if (!result.ok) {
+      if (result.reason === 'conflict') window.alert('移動先に同じ名前の項目があります')
+      return
+    }
+    // 旧パスのファイルは削除と同じ扱い（エディタのモデル破棄・講師モードの基準破棄）にする
+    for (const move of result.fileMoves) onFileDeleted(move.from)
+    for (const move of result.dirMoves) {
+      if (expanded.delete(move.from)) expanded.add(move.to)
+    }
+    if (destDir) expanded.add(destDir)
+    const activeAfter = getActiveFile()
+    if (activeAfter !== activeBefore) onFileSelect(activeAfter)
+    else render()
+  }
+
+  const rootDrop = { destDir: '', canDrop: canMoveTo, onDrop: moveTo }
+
   function renderTree(nodes: TreeNode[], active: string, depth: number): HTMLElement {
     const ul = document.createElement('ul')
     ul.className = 'flex flex-col'
@@ -268,6 +304,69 @@ export function createExplorer(
     return ul
   }
 
+  function removeDirectory(node: TreeDirNode): void {
+    if (!window.confirm(`空のフォルダ "${node.path}/" を削除しますか？`)) return
+    if (!deleteDirectory(node.path)) {
+      window.alert('フォルダ内にファイルがあるため削除できません')
+      return
+    }
+    expanded.delete(node.path)
+    render()
+  }
+
+  function removeFile(node: TreeFileNode, active: string): void {
+    if (!window.confirm(`"${node.path}" を削除しますか？`)) return
+    const wasActive = node.path === active
+    if (!deleteFile(node.path)) {
+      window.alert('最後のテキストファイルは削除できません')
+      return
+    }
+    onFileDeleted(node.path)
+    if (wasActive) {
+      onFileSelect(getActiveFile())
+    } else {
+      render()
+    }
+  }
+
+  // 行末の「…」ボタンと右クリックで同じメニューを開く。常時表示にして発見しやすくする
+  function attachRowMenu(row: HTMLElement, label: string, items: MenuItem[]): void {
+    const moreBtn = document.createElement('button')
+    moreBtn.type = 'button'
+    moreBtn.className = 'shrink-0 mr-1 p-1 rounded text-muted opacity-60 group-hover:opacity-100 focus:opacity-100 hover:text-ink hover:bg-hover transition-all cursor-pointer'
+    moreBtn.title = `${label} のメニュー`
+    moreBtn.setAttribute('aria-label', `${label} のメニュー`)
+    moreBtn.setAttribute('aria-haspopup', 'menu')
+    moreBtn.innerHTML = buildIcon(ICON_MORE)
+    moreBtn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      if (isMenuOpenFor(moreBtn)) { closeMenu(); return }
+      const rect = moreBtn.getBoundingClientRect()
+      openMenu(items, { x: rect.left, y: rect.bottom + 2 }, moreBtn)
+    })
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault()
+      openMenu(items, { x: e.clientX, y: e.clientY })
+    })
+    row.appendChild(moreBtn)
+  }
+
+  // 階層の深さを示すガイド線（深さの数だけ縦線を並べる）
+  function indentGuides(depth: number): HTMLElement[] {
+    return Array.from({ length: depth }, () => {
+      const guide = document.createElement('span')
+      guide.className = 'inline-block w-3 self-stretch shrink-0 border-l border-line'
+      return guide
+    })
+  }
+
+  function nameSpan(text: string, extraClass = ''): HTMLElement {
+    const span = document.createElement('span')
+    span.className = `truncate ${extraClass}`.trim()
+    span.textContent = text
+    return span
+  }
+
   function renderDir(node: TreeDirNode, active: string, depth: number): HTMLElement {
     const isOpen = expanded.has(node.path)
     const li = document.createElement('li')
@@ -277,33 +376,25 @@ export function createExplorer(
     row.className = 'group relative flex items-center'
 
     const btn = document.createElement('button')
-    btn.className = 'flex-1 min-w-0 flex items-center gap-1 text-left px-2 py-1 text-xs font-mono text-muted hover:bg-hover hover:text-ink transition-colors cursor-pointer'
-    btn.style.paddingLeft = `${depth * 12 + 8}px`
-    btn.innerHTML = `${buildIcon(isOpen ? ICON_CHEVRON_DOWN : ICON_CHEVRON_RIGHT)}<span class="truncate">${escapeHtml(node.name)}/</span>`
+    btn.type = 'button'
+    btn.className = 'flex-1 min-w-0 flex items-center gap-1.5 text-left pl-2 pr-1 py-1 text-xs font-mono font-medium text-ink border-l-2 border-transparent hover:bg-hover transition-colors cursor-pointer'
     btn.title = node.path
+    btn.setAttribute('aria-expanded', String(isOpen))
+    btn.append(...indentGuides(depth))
+    btn.insertAdjacentHTML('beforeend', `<span class="text-muted">${buildIcon(isOpen ? ICON_CHEVRON_DOWN : ICON_CHEVRON_RIGHT)}</span><span class="text-warn">${buildIcon(isOpen ? ICON_FOLDER_OPEN : ICON_FOLDER)}</span>`)
+    btn.appendChild(nameSpan(node.name))
     btn.addEventListener('click', () => {
       if (isOpen) expanded.delete(node.path)
       else expanded.add(node.path)
       render()
     })
 
-    const delBtn = document.createElement('button')
-    delBtn.className = 'shrink-0 mr-1.5 opacity-0 group-hover:opacity-100 text-muted hover:text-danger transition-all cursor-pointer p-0.5 rounded'
-    delBtn.title = `${node.path}/ を削除`
-    delBtn.innerHTML = buildIcon(ICON_CLOSE)
-    delBtn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      if (!window.confirm(`空のフォルダ "${node.path}/" を削除しますか？`)) return
-      if (!deleteDirectory(node.path)) {
-        window.alert('フォルダ内にファイルがあるため削除できません')
-        return
-      }
-      expanded.delete(node.path)
-      render()
-    })
-
     row.appendChild(btn)
-    row.appendChild(delBtn)
+    makeDraggable(row, { type: 'dir', path: node.path })
+    makeDropTarget(row, { destDir: node.path, canDrop: canMoveTo, onDrop: moveTo })
+    attachRowMenu(row, `${node.path}/`, [
+      { label: 'フォルダを削除', iconPath: ICON_TRASH, danger: true, onSelect: () => removeDirectory(node) },
+    ])
     li.appendChild(row)
 
     if (isOpen && node.children.length > 0) {
@@ -312,23 +403,40 @@ export function createExplorer(
     return li
   }
 
+  // ファイル名の前に出す種類表示。画像はアイコン、それ以外は拡張子のバッジ
+  function fileMarker(node: TreeFileNode): HTMLElement {
+    const marker = document.createElement('span')
+    const badge = fileBadge(node.path)
+    if (!badge) {
+      marker.className = 'w-6 flex justify-center shrink-0'
+      marker.innerHTML = buildIcon(ICON_IMG)
+      return marker
+    }
+    marker.className = `w-6 shrink-0 text-center text-[9px] leading-none font-bold font-mono ${badge.colorClass}`
+    marker.textContent = badge.label
+    return marker
+  }
+
   function renderFile(node: TreeFileNode, active: string, depth: number): HTMLElement {
     const isActive = node.path === active
     const li = document.createElement('li')
     li.className = 'group relative flex items-center'
 
     const btn = document.createElement('button')
+    btn.type = 'button'
     btn.className = [
-      'flex-1 min-w-0 flex items-center gap-1 text-left px-2 py-1 text-xs font-mono truncate transition-colors cursor-pointer',
+      'flex-1 min-w-0 flex items-center gap-1.5 text-left pl-2 pr-1 py-1 text-xs font-mono border-l-2 transition-colors cursor-pointer',
       isActive
-        ? 'bg-accent/15 text-accent'
+        ? 'bg-accent/15 text-accent font-bold border-accent'
         : node.kind === 'binary'
-          ? 'text-muted/70 hover:bg-hover hover:text-muted'
-          : 'text-muted hover:bg-hover hover:text-ink',
+          ? 'text-muted border-transparent hover:bg-hover'
+          : 'text-ink border-transparent hover:bg-hover',
     ].join(' ')
-    btn.style.paddingLeft = `${depth * 12 + 8}px`
-    btn.innerHTML = `${buildIcon(node.kind === 'binary' ? ICON_IMG : ICON_DOC)}<span class="truncate">${escapeHtml(node.name)}</span>`
     btn.title = node.path
+    if (isActive) btn.setAttribute('aria-current', 'true')
+    btn.append(...indentGuides(depth))
+    btn.appendChild(fileMarker(node))
+    btn.appendChild(nameSpan(node.name))
 
     btn.addEventListener('click', () => {
       if (node.kind === 'binary') {
@@ -339,29 +447,12 @@ export function createExplorer(
       onFileSelect(node.path)
     })
 
-    const delBtn = document.createElement('button')
-    delBtn.className = 'shrink-0 mr-1.5 opacity-0 group-hover:opacity-100 text-muted hover:text-danger transition-all cursor-pointer p-0.5 rounded'
-    delBtn.title = `${node.path} を削除`
-    delBtn.innerHTML = buildIcon(ICON_CLOSE)
-    delBtn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      if (!window.confirm(`"${node.path}" を削除しますか？`)) return
-      const wasActive = node.path === active
-      if (!deleteFile(node.path)) {
-        window.alert('最後のテキストファイルは削除できません')
-        return
-      }
-      onFileDeleted(node.path)
-      if (wasActive) {
-        const next = getActiveFile()
-        onFileSelect(next)
-      } else {
-        render()
-      }
-    })
-
     li.appendChild(btn)
-    li.appendChild(delBtn)
+    makeDraggable(li, { type: 'file', path: node.path })
+    blockInternalDrop(li)
+    attachRowMenu(li, node.path, [
+      { label: '削除', iconPath: ICON_TRASH, danger: true, onSelect: () => removeFile(node, active) },
+    ])
     return li
   }
 
@@ -381,13 +472,3 @@ function autoExpand(nodes: TreeNode[], expanded: Set<string>, activePath: string
   // touch nodes to silence unused warning (reserved for future per-node defaults)
   void nodes
 }
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-

@@ -11,6 +11,7 @@ import { RUN_STYLE, STOP_STYLE } from './buttonStyles'
 import { setRunStatus, type RunStatus } from './runStatus'
 import { routeRun } from '../pygame/detect'
 import { showPygameModal } from '../pygame/pygameModal'
+import { confirmPygameRun } from '../pygame/sharedLinkGuard'
 
 // 60 秒間応答がなければ Worker を強制終了する
 const EXECUTION_TIMEOUT_MS = 60_000
@@ -248,8 +249,18 @@ export function initRunner(
   // pygame はメインスレッドの専用 Pyodide でモーダル内に実行する（issue #73）。
   // 開いている間はエディタを編集不可にし、二重起動も防ぐ。
   let pygameOpen = false
-  function openPygame(code: string, project: { files: RunFile[]; directories: string[] }): void {
-    if (pygameOpen) return
+  let pygameConfirming = false
+  async function openPygame(code: string, project: { files: RunFile[]; directories: string[] }): Promise<void> {
+    if (pygameOpen || pygameConfirming) return
+    // 共有リンク由来のコードは、ページ本体で動く pygame を初めて実行する前に確認する
+    pygameConfirming = true
+    let approved = false
+    try {
+      approved = await confirmPygameRun()
+    } finally {
+      pygameConfirming = false
+    }
+    if (!approved || pygameOpen) return
     onRunStart?.()
     clearLog()
     appendLog('--- 実行開始（Pygame） ---', 'info')
@@ -269,7 +280,7 @@ export function initRunner(
   }
 
   function startRun(mode: 'normal' | 'trace' | 'grade' = 'normal', gradeCode?: string, testCode?: string, entryPath?: string): void {
-    if (running || pygameOpen) return
+    if (running || pygameOpen || pygameConfirming) return
 
     // grade モードはエディタの表示中ファイルではなく、呼び出し側が明示的に渡した
     // 採点対象ファイルの内容を使う（issue #65 レビュー指摘対応）
@@ -288,7 +299,7 @@ export function initRunner(
     const project = getRunFiles()
     const route = routeRun(mode, code, testCode, project.files)
     if (route.kind === 'pygame') {
-      openPygame(code, project)
+      void openPygame(code, project)
       return
     }
     if (route.kind === 'unsupported') {

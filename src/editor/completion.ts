@@ -1,6 +1,7 @@
 import * as monaco from 'monaco-editor'
 import { describeCompletion } from './completionLabel'
 import { describeOrigin } from './completionOrigin'
+import { lookupJaDoc } from './jaDocs'
 import type { CompletionWorkerOut, RawCompletion } from './completionMeta'
 import { createFormatRequester } from '../format/requester'
 import type { FormatResult } from '../format/result'
@@ -201,6 +202,8 @@ function getOrCreateWorker(): Worker {
         insertText: item.name,
         filterText: item.name,
         sortText: sortKey(item.name),
+        // 候補にフォーカスしたときの詳細欄。日本語辞書にあるものだけ出す
+        documentation: lookupJaDoc(item.fullName)?.summary,
         range: entry.range,
       }))
       const jediNames = new Set(msg.items.map((i) => i.name))

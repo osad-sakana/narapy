@@ -1,4 +1,4 @@
-import jedi as _jedi, json as _json, re as _re, time as _time
+import importlib as _importlib, jedi as _jedi, json as _json, re as _re, time as _time
 
 # parent() / goto() は jedi の推論を伴い重いので、時間予算を超えたら以降は軽い情報だけにする
 # （呼び出し前にしか確認しないため、上限ではなく目安）
@@ -121,3 +121,12 @@ def _signature(source, line, col):
         })
     except Exception:
         return 'null'
+
+
+def _refresh_modules():
+    # 後から読み込んだパッケージを jedi の探索に反映する
+    try:
+        _importlib.invalidate_caches()
+        _jedi.cache.clear_time_caches(True)
+    except Exception:
+        pass

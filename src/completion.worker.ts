@@ -5,6 +5,7 @@ import completionHelperSource from './completion_helper.py?raw'
 import { parseCompletionItems, type CompletionWorkerOut } from './editor/completionMeta'
 import { memoizeRetryable } from './lib/memoizeRetryable'
 import { AUTOPEP8_REQUIREMENTS, FORMAT_PY } from './format/formatModule'
+import { extractImportedModules } from './editor/importScan'
 
 type RequestType = 'complete' | 'hover' | 'signature'
 type QueryMessage = { type: RequestType; id: number; code: string; line: number; col: number }
@@ -32,6 +33,7 @@ interface PyodideInterface {
   runPython: (code: string) => unknown
   runPythonAsync: (code: string) => Promise<unknown>
   loadPackage: (names: string | string[], options?: LoadPackageOptions) => Promise<void>
+  loadPackagesFromImports: (code: string, options?: LoadPackageOptions) => Promise<void>
   globals: { set: (key: string, value: unknown) => void }
 }
 
@@ -100,6 +102,20 @@ const getInit = memoizeRetryable(init)
 
 getInit().catch(() => undefined)
 
+// import されたモジュールの名前を一度だけ読み込む（失敗したら次の機会に再試行できるよう記録を消す）
+const requestedModules = new Set<string>()
+
+// import されたパッケージ（numpy・pygame など）を背景で読み込み、jedi が中身を見られるようにする。
+// 補完の応答は待たせず、読み込み後の次の要求から反映される。名前は importScan で識別子に限っている
+function loadImportedPackages(py: PyodideInterface, code: string, typingLine: number): void {
+  const fresh = extractImportedModules(code, typingLine).filter((name) => !requestedModules.has(name))
+  if (fresh.length === 0) return
+  fresh.forEach((name) => requestedModules.add(name))
+  py.loadPackagesFromImports(fresh.map((name) => `import ${name}`).join('\n'), { messageCallback: () => undefined })
+    .then(() => py.runPython('_refresh_modules()'))
+    .catch(() => fresh.forEach((name) => requestedModules.delete(name)))
+}
+
 function isValidId(id: unknown): id is number {
   return typeof id === 'number' && Number.isInteger(id)
 }
@@ -159,6 +175,7 @@ self.onmessage = async (event: MessageEvent<InMessage>) => {
       postFailure(msg.type, id)
       return
     }
+    loadImportedPackages(pyodide, code, line)
     // line/col もglobals経由で渡してテンプレート文字列への直接埋込みを廃止
     pyodide.globals.set('_src', code)
     pyodide.globals.set('_line', line)

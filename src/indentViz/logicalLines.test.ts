@@ -79,6 +79,11 @@ describe('splitLogicalLines', () => {
 
   it('未閉括弧の直後の match も打ち切りに使う', () => {
     expect(splitLogicalLines('foo(\nmatch x:\n    case 1:').map(l => l.text)).toEqual(['foo(', 'match x:', 'case 1:'])
+    expect(splitLogicalLines('foo(\nmatch(x):\n    case[a]:').map(l => l.text)).toEqual(['foo(', 'match(x):', 'case[a]:'])
+  })
+
+  it('非ASCII識別子で始まる行は見出しとみなさない', () => {
+    expect(splitLogicalLines('d = {\nif変数:\n 1,\n}')).toHaveLength(1)
   })
 
   it('括弧内のより深いインデントの行は打ち切りに使わない', () => {

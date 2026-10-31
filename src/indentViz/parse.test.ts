@@ -122,8 +122,6 @@ describe('parseIndentTree', () => {
   })
 
   it('デコレータ付きの def / class はデコレータの行から数える', () => {
-    const [fn] = parseIndentTree('x = 1\n@a\n@b\ndef f():\n    pass')
-    expect(fn.line).toBe(1)
     const tree = parseIndentTree('x = 1\n@a\n@b\ndef f():\n    pass')
     expect(tree.map(n => n.line)).toEqual([1, 2])
   })

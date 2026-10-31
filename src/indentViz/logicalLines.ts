@@ -125,8 +125,8 @@ function flushPending(acc: Accumulator, result: LogicalLine[]): void {
 // 入力途中で閉じ括弧が無いとき、以降すべてが1文に飲まれて構造が見えなくなるのを防ぐ。
 // 括弧の中でも、文の開始位置以下のインデントで始まる「…:」終わりのブロック見出しが来たら
 // そこで前の文を打ち切る（正しいコードの括弧内にこの形の行は現れない）
-// match / case はソフトキーワード（辞書キー等にも使える）なので、後ろに式が続く形だけを見出しとみなす
-const BLOCK_HEADER = /^(?:async\s+)?(?:(?:if|elif|else|for|while|def|class|try|except|finally|with)\b|(?:match|case)\s+\S).*:\s*(?:#.*)?$/
+// match / case はソフトキーワード（辞書キー等にも使える）なので、後ろに式が続く形（match x: / match(x):）だけを見出しとみなす
+const BLOCK_HEADER = /^(?:async\s+)?(?:(?:if|elif|else|for|while|def|class|try|except|finally|with)(?![\p{L}\p{N}_])|(?:match|case)\s*[^\s:=,)\]}]).*:\s*(?:#.*)?$/u
 
 function abandonsUnclosedBracket(acc: Accumulator, raw: string): boolean {
   const { pending, state } = acc

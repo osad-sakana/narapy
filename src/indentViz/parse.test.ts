@@ -1,119 +1,127 @@
 import { describe, expect, it } from 'vitest'
-import { parseIndentTree, parseImportNames, type VizNode } from './parse'
+import { parseImportNames, parseIndentTree, type VizNode } from './parse'
 
-function kinds(nodes: readonly VizNode[]): string[] {
-  return nodes.map(n => (n.type === 'group' ? `group(${n.statements.map(s => s.kind).join(',')})` : `block:${n.kind}`))
+function types(nodes: readonly VizNode[]): string[] {
+  return nodes.map(n => n.type)
 }
 
 describe('parseIndentTree', () => {
   it('インデントで入れ子にする', () => {
-    const tree = parseIndentTree('for i in range(3):\n    if i:\n        print(i)')
-    expect(tree).toHaveLength(1)
-    const loop = tree[0]
-    if (loop.type !== 'block') throw new Error('block expected')
-    expect(loop.kind).toBe('flow')
-    expect(loop.header).toBe('for i in range(3):')
-    const inner = loop.children[0]
-    if (inner.type !== 'block') throw new Error('block expected')
-    expect(inner.header).toBe('if i:')
-    expect(inner.children).toHaveLength(1)
+    const [loop] = parseIndentTree('for i in range(3):\n    if i:\n        print(i)')
+    expect(loop.type).toBe('for')
+    expect(loop.text).toBe('for i in range(3):')
+    expect(types(loop.children)).toEqual(['if'])
+    expect(types(loop.children[0].children)).toEqual(['other'])
   })
 
-  it('連続する単純文は1つのグループにまとまり、空行で分かれる', () => {
+  it('単純文は1文ごとに1ノードになる', () => {
     const tree = parseIndentTree('a = 1\nb = 2\n\nc = 3')
-    expect(tree).toHaveLength(2)
-    expect(tree[0].type === 'group' && tree[0].statements).toHaveLength(2)
-    expect(tree[1].type === 'group' && tree[1].statements).toHaveLength(1)
+    expect(types(tree)).toEqual(['assignment', 'assignment', 'assignment'])
   })
 
-  it('ブロックの前後で単純文のグループが分かれる', () => {
-    const tree = parseIndentTree('a = 1\nif a:\n    pass\nb = 2')
-    expect(kinds(tree)).toEqual(['group(flow)', 'block:flow', 'group(flow)'])
+  it('文の種類を分類する', () => {
+    const src = ['import os', 'from a import b', 'x = 1', 'print(x)', 'pass', 'return 1'].join('\n')
+    expect(types(parseIndentTree(src))).toEqual(['import', 'import', 'assignment', 'other', 'other', 'other'])
   })
 
-  it('種類ごとの色分類', () => {
-    const src = [
-      'import os', 'x = 1', 'print(x)', 'pass', 'raise ValueError', 'assert x',
-      'return 1', 'break', 'continue',
-    ].join('\n')
-    const [group] = parseIndentTree(src)
-    if (group.type !== 'group') throw new Error('group expected')
-    expect(group.statements.map(s => s.kind)).toEqual([
-      'import', 'flow', 'plain', 'purple', 'purple', 'purple', 'def', 'flow', 'flow',
-    ])
-  })
-
-  it('def / class / try / with / match の色分類', () => {
+  it('複合文を分類する', () => {
     const src = [
       'def f():', '    pass',
-      'class C:', '    def m(self):', '        pass',
+      'class C:', '    pass',
       'try:', '    pass', 'except E:', '    pass', 'finally:', '    pass',
       'with open(p) as f:', '    pass',
       'match v:', '    case 1:', '        pass',
     ].join('\n')
-    expect(kinds(parseIndentTree(src))).toEqual([
-      'block:def', 'block:class', 'block:try', 'block:try', 'block:try', 'block:with', 'block:class',
+    const tree = parseIndentTree(src)
+    expect(types(tree)).toEqual(['def', 'class', 'try', 'except', 'finally', 'with', 'match'])
+    expect(types(tree[6].children)).toEqual(['case'])
+  })
+
+  it('class の内側の def は method になる', () => {
+    const [cls] = parseIndentTree('class C:\n    def m(self):\n        pass\n    x = 1')
+    expect(types(cls.children)).toEqual(['method', 'assignment'])
+  })
+
+  it('class の外の def は method にならない', () => {
+    expect(types(parseIndentTree('def f():\n    def g():\n        pass'))).toEqual(['def'])
+    expect(types(parseIndentTree('def f():\n    def g():\n        pass')[0].children)).toEqual(['def'])
+  })
+
+  it('elif / else は兄弟ノードになる', () => {
+    const tree = parseIndentTree('if a:\n    pass\nelif b:\n    pass\nelse:\n    pass')
+    expect(types(tree)).toEqual(['if', 'elif', 'else'])
+  })
+
+  it('デコレータは直後の def / class に付く', () => {
+    const [fn] = parseIndentTree('@a\n@b(1)\ndef f():\n    pass')
+    expect(fn.decorators).toEqual(['@a', '@b(1)'])
+    expect(fn.text).toBe('def f():')
+  })
+
+  it('def / class 以外の前のデコレータは消さずに単純文として出し、次の文に持ち越さない', () => {
+    const tree = parseIndentTree('@a\nx = 1\ndef f():\n    pass')
+    expect(tree.map(n => [n.type, n.text, n.decorators.length])).toEqual([
+      ['other', '@a', 0], ['assignment', 'x = 1', 0], ['def', 'def f():', 0],
     ])
   })
 
-  it('class 直下の def は method になる', () => {
-    const [cls] = parseIndentTree('class C:\n    def m(self):\n        pass\n    x = 1')
-    if (cls.type !== 'block') throw new Error('block expected')
-    expect(kinds(cls.children)).toEqual(['block:method', 'group(flow)'])
+  it('スコープ末尾に残ったデコレータも消さない', () => {
+    const [fn] = parseIndentTree('def f():\n    pass\n    @a')
+    expect(fn.children.map(n => n.text)).toEqual(['pass', '@a'])
   })
 
-  it('メソッド内の入れ子の def は method にならない', () => {
-    const [cls] = parseIndentTree('class C:\n    def m(self):\n        def inner():\n            pass')
-    if (cls.type !== 'block') throw new Error('block expected')
-    const m = cls.children[0]
-    if (m.type !== 'block') throw new Error('block expected')
-    expect(kinds(m.children)).toEqual(['block:def'])
+  it('空白が極端に長い行でも一瞬で終わる', () => {
+    const started = Date.now()
+    parseIndentTree('a' + ' '.repeat(50000) + 'b')
+    expect(Date.now() - started).toBeLessThan(500)
   })
 
-  it('elif / else は別ブロックとして兄弟になる', () => {
-    const tree = parseIndentTree('if a:\n    pass\nelif b:\n    pass\nelse:\n    pass')
-    expect(tree.map(n => n.type === 'block' && n.header)).toEqual(['if a:', 'elif b:', 'else:'])
+  it('行数の多い連続文・巨大リテラルでも現実的な時間で終わる', () => {
+    const started = Date.now()
+    parseIndentTree('x = [\n' + '    1,\n'.repeat(20000) + ']')
+    parseIndentTree('a = 1\n'.repeat(20000))
+    expect(Date.now() - started).toBeLessThan(2000)
   })
 
-  it('デコレータは直後の def と同じブロックにまとまる', () => {
-    const tree = parseIndentTree('@a\n@b(1)\ndef f():\n    pass')
-    expect(tree).toHaveLength(1)
-    const block = tree[0]
-    if (block.type !== 'block') throw new Error('block expected')
-    expect(block.decorators).toEqual(['@a', '@b(1)'])
-    expect(block.header).toBe('def f():')
+  it('閉じていない括弧があっても、後続のブロックは構造として見える', () => {
+    const tree = parseIndentTree('print(\nif x:\n    y = 1\nz = 2')
+    expect(tree.map(n => n.type)).toEqual(['other', 'if', 'assignment'])
+    expect(tree[1].children.map(n => n.text)).toEqual(['y = 1'])
   })
 
   it('async def / async for / async with を認識する', () => {
-    expect(kinds(parseIndentTree('async def f():\n    pass'))).toEqual(['block:def'])
-    expect(kinds(parseIndentTree('async for x in y:\n    pass'))).toEqual(['block:flow'])
-    expect(kinds(parseIndentTree('async with a as b:\n    pass'))).toEqual(['block:with'])
+    expect(types(parseIndentTree('async def f():\n    pass'))).toEqual(['def'])
+    expect(types(parseIndentTree('async for x in y:\n    pass'))).toEqual(['for'])
+    expect(types(parseIndentTree('async with a as b:\n    pass'))).toEqual(['with'])
   })
 
-  it('1行に書かれた if も block として扱う', () => {
-    expect(kinds(parseIndentTree('if x: y = 1'))).toEqual(['block:flow'])
+  it('1行に書かれた if も if として扱う', () => {
+    expect(types(parseIndentTree('if x: y = 1'))).toEqual(['if'])
   })
 
   it('match / case はコロン終端のときだけ構文として扱う', () => {
-    expect(kinds(parseIndentTree('match = 1\nmatch(x)'))).toEqual(['group(flow,plain)'])
+    expect(types(parseIndentTree('match = 1\nmatch(x)'))).toEqual(['assignment', 'other'])
   })
 
-  it('キーワード引数の = は代入にしない', () => {
-    const [g] = parseIndentTree('foo(a=1)\nx += 1\nd["k"] = 2\ny: int = 3\na == b')
-    if (g.type !== 'group') throw new Error('group expected')
-    expect(g.statements.map(s => s.kind)).toEqual(['plain', 'flow', 'flow', 'flow', 'plain'])
+  it('キーワード引数・比較の = は代入にしない', () => {
+    const src = 'foo(a=1)\nx += 1\nd["k"] = 2\ny: int = 3\na == b'
+    expect(types(parseIndentTree(src))).toEqual(['other', 'assignment', 'assignment', 'assignment', 'other'])
   })
 
-  it('複数行の文は1文として扱い、先頭行番号を持つ', () => {
-    const [g] = parseIndentTree('x = [\n    1,\n    2,\n]\ny = 1')
-    if (g.type !== 'group') throw new Error('group expected')
-    expect(g.statements).toHaveLength(2)
-    expect(g.statements[0].line).toBe(1)
-    expect(g.statements[1].line).toBe(5)
+  it('複数行の文は1ノードで、先頭行番号と改行を保つ', () => {
+    const tree = parseIndentTree('x = [\n    1,\n    2,\n]\ny = 1')
+    expect(tree).toHaveLength(2)
+    expect(tree[0].line).toBe(1)
+    expect(tree[0].text).toBe('x = [\n  1,\n  2,\n]')
+    expect(tree[1].line).toBe(5)
   })
 
   it('インデントが不規則でも落ちない', () => {
     expect(() => parseIndentTree('  a = 1\nb = 2\n      c = 3\n  d = 4')).not.toThrow()
+  })
+
+  it('単純文の後ろに深いインデントが続いても全行を消費して終わる', () => {
+    expect(types(parseIndentTree('a = 1\n    b = 2\nc = 3'))).toEqual(['assignment', 'assignment', 'assignment'])
   })
 
   it('空入力は空配列', () => {
@@ -130,8 +138,8 @@ describe('parseImportNames', () => {
     expect(parseImportNames('import numpy as np')).toEqual(['np'])
     expect(parseImportNames('from a import b as c, d')).toEqual(['c', 'd'])
   })
-  it('括弧付き from import', () => {
-    expect(parseImportNames('from a import ( b, c as d, )')).toEqual(['b', 'd'])
+  it('括弧付き・複数行の from import', () => {
+    expect(parseIndentTreeNames('from a import (\n    b,\n    c as d,\n)')).toEqual(['b', 'd'])
   })
   it('ドット付きモジュールと *', () => {
     expect(parseImportNames('import os.path')).toEqual(['os.path'])
@@ -141,3 +149,8 @@ describe('parseImportNames', () => {
     expect(parseImportNames('x = 1')).toEqual([])
   })
 })
+
+function parseIndentTreeNames(src: string): string[] {
+  const [node] = parseIndentTree(src)
+  return parseImportNames(node.text)
+}

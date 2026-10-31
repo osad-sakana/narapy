@@ -34,7 +34,7 @@ describe('splitLogicalLines', () => {
   it('括弧をまたぐ複数行を1つの論理行にまとめる', () => {
     const lines = splitLogicalLines('foo(\n    1,\n    2,\n)\nbar = 1')
     expect(lines).toHaveLength(2)
-    expect(lines[0]).toMatchObject({ text: 'foo( 1, 2, )', line: 1, indent: 0 })
+    expect(lines[0]).toMatchObject({ text: 'foo(\n  1,\n  2,\n)', line: 1, indent: 0 })
     expect(lines[1].line).toBe(5)
   })
 
@@ -47,7 +47,7 @@ describe('splitLogicalLines', () => {
   it('バックスラッシュ継続を1つの論理行にまとめる', () => {
     const lines = splitLogicalLines('a = 1 + \\\n    2\nb = 3')
     expect(lines).toHaveLength(2)
-    expect(lines[0].text).toBe('a = 1 + 2')
+    expect(lines[0].text).toBe('a = 1 +\n  2')
   })
 
   it('三連引用符をまたぐ文字列を1つの論理行にまとめる', () => {
@@ -69,7 +69,26 @@ describe('splitLogicalLines', () => {
     expect(splitLogicalLines('a = 1\r\nb = 2').map(l => l.text)).toEqual(['a = 1', 'b = 2'])
   })
 
-  it('閉じ括弧のない入力でも終了する', () => {
-    expect(() => splitLogicalLines('foo(\n1')).not.toThrow()
+  it('閉じ括弧のない入力でも終了し、残りを落とさない', () => {
+    expect(splitLogicalLines('foo(\n1').map(l => l.text)).toEqual(['foo(\n1'])
+  })
+
+  it('閉じていない括弧は、文の開始以下のインデントのブロック見出しで打ち切る', () => {
+    const lines = splitLogicalLines('print(\nif x:\n    y = 1\nz = 2')
+    expect(lines.map(l => l.text)).toEqual(['print(', 'if x:', 'y = 1', 'z = 2'])
+  })
+
+  it('括弧内のより深いインデントの行は打ち切りに使わない', () => {
+    const lines = splitLogicalLines('foo(\n    if_x,\n    else_y:\n)')
+    expect(lines).toHaveLength(1)
+  })
+
+  it('三連引用符を連結した式文は消さない', () => {
+    expect(splitLogicalLines('"""a""" + """b"""')).toHaveLength(1)
+  })
+
+  it('三連引用符内のバックスラッシュエスケープを扱う', () => {
+    const lines = splitLogicalLines('s = """a\\"""\nstill string"""\nz = 1')
+    expect(lines.map(l => l.text)).toHaveLength(2)
   })
 })

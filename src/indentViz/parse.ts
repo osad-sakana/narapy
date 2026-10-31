@@ -1,75 +1,54 @@
 import { splitLogicalLines, type LogicalLine } from './logicalLines'
 
-/** 色の分類。具体色は render 側で決める */
-export type VizKind = 'flow' | 'def' | 'method' | 'class' | 'try' | 'with' | 'import' | 'purple' | 'plain'
+export type StatementType =
+  | 'if' | 'elif' | 'else' | 'for' | 'while'
+  | 'def' | 'method' | 'class'
+  | 'try' | 'except' | 'finally'
+  | 'with' | 'match' | 'case'
+  | 'assignment' | 'import' | 'other'
 
-export interface VizStatement {
-  readonly text: string
-  readonly kind: VizKind
-  /** import 文で取り込まれる名前（as があれば別名） */
-  readonly badges: readonly string[]
-  readonly line: number
-}
-
-export interface VizGroup {
-  readonly type: 'group'
-  readonly statements: readonly VizStatement[]
-}
-
-export interface VizBlock {
-  readonly type: 'block'
-  readonly kind: VizKind
+export interface VizNode {
+  readonly type: StatementType
+  /** def / class に付いたデコレータ（@ 付きの行） */
   readonly decorators: readonly string[]
-  readonly header: string
-  readonly children: readonly VizNode[]
+  /** 文の本体。複数行の文は改行で結合されている */
+  readonly text: string
+  /** 先頭行の行番号（1始まり） */
   readonly line: number
+  readonly children: readonly VizNode[]
 }
-
-export type VizNode = VizGroup | VizBlock
 
 const HARD_COMPOUND = /^(?:async\s+)?(def|class|if|elif|else|for|while|try|except|finally|with)\b/
 const SOFT_COMPOUND = /^(match|case)\b/
-
-const COMPOUND_KINDS: Readonly<Record<string, VizKind>> = {
-  def: 'def', class: 'class', match: 'class', case: 'class',
-  if: 'flow', elif: 'flow', else: 'flow', for: 'flow', while: 'flow',
-  try: 'try', except: 'try', finally: 'try', with: 'with',
-}
-
-const SIMPLE_KEYWORD_KINDS: Readonly<Record<string, VizKind>> = {
-  import: 'import', from: 'import',
-  return: 'def', yield: 'def',
-  break: 'flow', continue: 'flow',
-  pass: 'purple', raise: 'purple', assert: 'purple',
-}
+const IMPORT = /^(?:import\s|from\s+\S+\s+import\b)/
 
 // 左辺に括弧を許さないことで foo(a=1) のキーワード引数を代入から除く
-const ASSIGNMENT = /^[\w.[\],\s*'"-]+?\s*(?:\/\/|\*\*|>>|<<|[-+*/%@&|^])?=(?!=)/
+const ASSIGNMENT = /^[\w.[\],\s*'"-]+(?:\/\/|\*\*|>>|<<|[-+*/%@&|^])?=(?!=)/
 const ANNOTATION = /^[A-Za-z_][\w.]*\s*:\s*[^=\s]/
 
-function firstWord(text: string): string {
-  return /^[A-Za-z_]\w*/.exec(text)?.[0] ?? ''
+function firstLine(text: string): string {
+  return text.split('\n', 1)[0]
 }
 
-function compoundKind(text: string): { kind: VizKind } | null {
+function compoundType(text: string): StatementType | null {
   const hard = HARD_COMPOUND.exec(text)
-  if (hard) return { kind: COMPOUND_KINDS[hard[1]] }
+  if (hard) return hard[1] as StatementType
   const soft = SOFT_COMPOUND.exec(text)
-  if (soft && text.endsWith(':')) return { kind: COMPOUND_KINDS[soft[1]] }
+  if (soft && text.endsWith(':')) return soft[1] as StatementType
   return null
 }
 
-function simpleKind(text: string): VizKind {
-  const word = firstWord(text)
-  const byKeyword = SIMPLE_KEYWORD_KINDS[word]
-  if (byKeyword) return byKeyword
-  if (ASSIGNMENT.test(text) || (word !== 'lambda' && ANNOTATION.test(text))) return 'flow'
-  return 'plain'
+function simpleType(text: string): StatementType {
+  if (IMPORT.test(text)) return 'import'
+  const head = firstLine(text)
+  if (ASSIGNMENT.test(head) || (!head.startsWith('lambda') && ANNOTATION.test(head))) return 'assignment'
+  return 'other'
 }
 
-/** import 文で使えるようになる名前を返す。import 以外の文は空配列 */
+/** import 文で使えるようになる名前を返す（as があれば別名）。import 以外の文は空配列 */
 export function parseImportNames(text: string): string[] {
-  const body = /^import\s+(.*)$/.exec(text)?.[1] ?? /^from\s+\S+\s+import\s+(.*)$/.exec(text)?.[1]
+  const flat = text.replace(/\s+/g, ' ').trim()
+  const body = /^import\s+(.*)$/.exec(flat)?.[1] ?? /^from\s+\S+\s+import\s+(.*)$/.exec(flat)?.[1]
   if (body === undefined) return []
   return body
     .replace(/[()]/g, ' ')
@@ -78,70 +57,47 @@ export function parseImportNames(text: string): string[] {
     .filter(name => name !== '')
 }
 
-function toStatement(line: LogicalLine): VizStatement {
-  const kind = simpleKind(line.text)
-  return { text: line.text, kind, badges: kind === 'import' ? parseImportNames(line.text) : [], line: line.line }
-}
-
-/** 単純文を、空行・ブロックで区切れるまで1グループにまとめる */
-function groupStatements(items: readonly (VizNode | { statement: VizStatement; blankBefore: boolean })[]): VizNode[] {
-  const nodes: VizNode[] = []
-  let current: VizStatement[] = []
-  const flush = (): void => {
-    if (current.length > 0) nodes.push({ type: 'group', statements: current })
-    current = []
-  }
-  for (const item of items) {
-    if ('type' in item) {
-      flush()
-      nodes.push(item)
-      continue
-    }
-    if (item.blankBefore) flush()
-    current = [...current, item.statement]
-  }
-  flush()
-  return nodes
-}
-
 interface ParseContext {
   readonly lines: readonly LogicalLine[]
   /** 次に読む論理行の位置。parseScope が進める */
   pos: number
 }
 
-function parseScope(ctx: ParseContext, parentIndent: number, parentKind: VizKind | null): VizNode[] {
-  const items: (VizNode | { statement: VizStatement; blankBefore: boolean })[] = []
-  let decorators: string[] = []
+// def / class 以外の前に置かれたデコレータ、またはスコープ末尾に残ったものは消さずに単純文として出す
+function strayDecorators(decorators: readonly LogicalLine[]): VizNode[] {
+  return decorators.map(d => ({ type: 'other', decorators: [], text: d.text, line: d.line, children: [] }))
+}
+
+function parseScope(ctx: ParseContext, parentIndent: number, insideClass: boolean): VizNode[] {
+  const nodes: VizNode[] = []
+  let decorators: LogicalLine[] = []
 
   while (ctx.pos < ctx.lines.length && ctx.lines[ctx.pos].indent > parentIndent) {
     const line = ctx.lines[ctx.pos++]
     if (line.text.startsWith('@')) {
-      decorators = [...decorators, line.text]
+      decorators.push(line)
       continue
     }
-    const compound = compoundKind(line.text)
-    if (!compound) {
-      items.push({ statement: toStatement(line), blankBefore: line.blankBefore })
-      decorators = []
-      continue
-    }
-    const kind = compound.kind === 'def' && parentKind === 'class' ? 'method' : compound.kind
-    items.push({
-      type: 'block',
-      kind,
-      decorators,
-      header: line.text,
-      children: parseScope(ctx, line.indent, kind),
+    const compound = compoundType(line.text)
+    const base = compound ?? simpleType(line.text)
+    const type = base === 'def' && insideClass ? 'method' : base
+    const keepsDecorators = base === 'def' || base === 'class'
+    if (!keepsDecorators) nodes.push(...strayDecorators(decorators))
+    const children = compound ? parseScope(ctx, line.indent, insideClass || compound === 'class') : []
+    nodes.push({
+      type,
+      decorators: keepsDecorators ? decorators.map(d => d.text) : [],
+      text: line.text,
       line: line.line,
+      children,
     })
     decorators = []
   }
-  return groupStatements(items)
+  nodes.push(...strayDecorators(decorators))
+  return nodes
 }
 
-/** ソースをインデントに沿ったブロックの木にする */
+/** ソースをインデントに沿った文の木にする。単純文も1文ごとに1ノード */
 export function parseIndentTree(source: string): VizNode[] {
-  const ctx: ParseContext = { lines: splitLogicalLines(source), pos: 0 }
-  return parseScope(ctx, -1, null)
+  return parseScope({ lines: splitLogicalLines(source), pos: 0 }, -1, false)
 }

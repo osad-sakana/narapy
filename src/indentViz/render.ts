@@ -1,92 +1,81 @@
-import type { VizBlock, VizGroup, VizKind, VizNode, VizStatement } from './parse'
+import { highlightDecorator, highlightStatement, type Segment, type SegmentClass } from './highlight'
+import type { VizNode } from './parse'
+import { TYPE_COLORS, TYPE_LABELS } from './style'
 
-// 意味（文の種類）で色分けする。テーマ間で共通の色を使い、背景は透過の薄い塗りにして
-// ライト／ダークどちらの面でも読めるようにする
-const KIND_COLORS: Readonly<Record<VizKind, string>> = {
-  flow: '#f1944f',
-  def: '#4c9be8',
-  method: '#6ed0f0',
-  class: '#e56fb0',
-  try: '#ed5350',
-  with: '#45b164',
-  import: '#45b164',
-  purple: '#b28fef',
-  plain: '#8c8d94',
+const SEGMENT_CLASSES: Readonly<Record<SegmentClass, string>> = {
+  plain: '',
+  keyword: 'font-bold',
+  var: 'font-bold',
+  arrow: 'font-bold',
+  badge: 'inline-block px-1.5 rounded text-[0.9em] font-bold',
+  loopvar: 'inline-block px-1.5 rounded text-[0.9em] font-semibold',
 }
 
-export const KIND_LEGEND: readonly { kind: VizKind; label: string }[] = [
-  { kind: 'flow', label: 'if / for / while・代入' },
-  { kind: 'def', label: 'def・return' },
-  { kind: 'method', label: 'メソッド' },
-  { kind: 'class', label: 'class・match' },
-  { kind: 'try', label: 'try / except' },
-  { kind: 'with', label: 'with・import' },
-  { kind: 'purple', label: 'pass / raise / assert' },
-]
-
-export function kindColor(kind: VizKind): string {
-  return KIND_COLORS[kind]
-}
-
-function tinted(el: HTMLElement, kind: VizKind, percent: number): void {
-  const color = KIND_COLORS[kind]
-  el.style.borderLeft = `4px solid ${color}`
-  el.style.backgroundColor = `color-mix(in srgb, ${color} ${percent}%, transparent)`
-}
-
-function renderStatement(statement: VizStatement): HTMLElement {
-  const row = document.createElement('div')
-  row.className = 'flex flex-wrap items-center gap-1.5 px-2 py-0.5 rounded-sm font-mono text-xs text-ink'
-  tinted(row, statement.kind, 14)
-
-  const code = document.createElement('span')
-  code.className = 'whitespace-pre-wrap break-all'
-  code.textContent = statement.text
-  row.appendChild(code)
-
-  for (const name of statement.badges) {
-    const badge = document.createElement('span')
-    badge.className = 'px-1.5 rounded-full text-[10px] font-bold'
-    badge.style.backgroundColor = KIND_COLORS.import
-    badge.style.color = '#0d1117'
-    badge.textContent = name
-    row.appendChild(badge)
-  }
-  return row
-}
-
-function renderGroup(group: VizGroup): HTMLElement {
-  const el = document.createElement('div')
-  el.className = 'flex flex-col gap-px'
-  for (const statement of group.statements) el.appendChild(renderStatement(statement))
-  return el
-}
-
-function renderBlock(block: VizBlock): HTMLElement {
-  const el = document.createElement('div')
-  el.className = 'rounded-sm overflow-hidden'
-  tinted(el, block.kind, 8)
-
-  const head = document.createElement('div')
-  head.className = 'px-2 py-0.5 font-mono text-xs font-bold text-ink whitespace-pre-wrap break-all'
-  head.style.backgroundColor = `color-mix(in srgb, ${KIND_COLORS[block.kind]} 22%, transparent)`
-  head.textContent = [...block.decorators, block.header].join('\n')
-  el.appendChild(head)
-
-  if (block.children.length > 0) {
-    const body = document.createElement('div')
-    body.className = 'flex flex-col gap-1 p-1 pl-3'
-    for (const child of block.children) body.appendChild(renderNode(child))
-    el.appendChild(body)
+function renderSegment(segment: Segment): Node {
+  if (segment.cls === 'plain') return document.createTextNode(segment.text)
+  const el = document.createElement('span')
+  el.className = SEGMENT_CLASSES[segment.cls]
+  el.textContent = segment.text
+  const color = TYPE_COLORS[segment.tone]
+  if (segment.cls === 'badge' || segment.cls === 'loopvar') {
+    el.style.backgroundColor = color
+    el.style.color = '#0d1117'
+  } else {
+    el.style.color = color
   }
   return el
+}
+
+function renderCode(lines: readonly (readonly Segment[])[]): HTMLElement {
+  const code = document.createElement('div')
+  code.className = 'flex-1 min-w-0 font-mono text-xs text-ink whitespace-pre-wrap break-words'
+  lines.forEach((segments, i) => {
+    if (i > 0) code.appendChild(document.createTextNode('\n'))
+    for (const segment of segments) code.appendChild(renderSegment(segment))
+  })
+  return code
+}
+
+function renderLabel(node: VizNode): HTMLElement | null {
+  const label = TYPE_LABELS[node.type]
+  if (!label) return null
+  const pill = document.createElement('span')
+  pill.className = 'shrink-0 px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap'
+  pill.style.backgroundColor = TYPE_COLORS[node.type]
+  pill.style.color = '#0d1117'
+  pill.textContent = label
+  return pill
 }
 
 export function renderNode(node: VizNode): HTMLElement {
-  return node.type === 'group' ? renderGroup(node) : renderBlock(node)
+  const color = TYPE_COLORS[node.type]
+  const block = document.createElement('div')
+  block.className = 'rounded-md'
+  block.dataset.line = String(node.line)
+  block.dataset.statement = node.type
+  block.style.borderLeft = `4px solid ${color}`
+  block.style.backgroundColor = `color-mix(in srgb, ${color} 9%, transparent)`
+
+  const header = document.createElement('div')
+  header.className = 'flex items-start gap-2 px-2 py-1'
+  const label = renderLabel(node)
+  if (label) header.appendChild(label)
+  header.appendChild(renderCode([
+    ...node.decorators.map(highlightDecorator).map(s => [...s]),
+    ...highlightStatement(node.text, node.type),
+  ]))
+  block.appendChild(header)
+
+  if (node.children.length > 0) {
+    const body = document.createElement('div')
+    body.className = 'flex flex-col gap-1 pb-1 pl-3 pr-1'
+    for (const child of node.children) body.appendChild(renderNode(child))
+    block.appendChild(body)
+  }
+  return block
 }
 
-/** ブロックの木を DOM にする。文字列はすべて textContent で入れる */
+/** 文の木を DOM にする。文字列はすべて textContent / テキストノードで入れる */
 export function renderTree(nodes: readonly VizNode[]): HTMLElement {
   const root = document.createElement('div')
   root.className = 'flex flex-col gap-1'

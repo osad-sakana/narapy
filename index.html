@@ -40,6 +40,12 @@
             id="panelToggleLog"
             class="text-xs px-2 lg:px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 bg-accent/15 text-accent border border-accent/40"
           >実行</button>
+          <button
+            id="panelToggleViz"
+            title="インデント構造パネルの表示を切り替える"
+            aria-pressed="true"
+            class="text-xs px-2 lg:px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 bg-accent/15 text-accent border border-accent/40"
+          >構造</button>
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
@@ -250,6 +256,24 @@
         <!-- ステップ実行パネル（src/stepper/ui.ts がトレース結果に応じて構築・表示する。
              split.js の対象外。#fileExplorer と同様に固定幅で常時レイアウトに参加する） -->
         <aside id="stepPanel" class="hidden w-80 shrink-0 border-l border-line bg-panel flex-col overflow-hidden"></aside>
+
+        <!-- インデント構造パネル（src/indentViz/panel.ts がエディタの内容を常時反映する。issue #84。
+             split.js の対象外。狭い画面では max-md:hidden でエディタを優先する） -->
+        <aside id="vizPanel" class="relative flex max-md:hidden w-80 shrink-0 border-l border-line bg-panel flex-col overflow-hidden">
+          <!-- 幅のリサイズハンドル（src/indentViz/resize.ts）。右端固定のパネルなので左へ動かすと広がる -->
+          <div
+            id="vizPanelResizeHandle"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="インデント構造パネルの幅を変更"
+            tabindex="0"
+            class="absolute inset-y-0 left-0 w-1.5 z-10 cursor-col-resize touch-none transition-colors hover:bg-accent/40 focus-visible:bg-accent/60 outline-none"
+          ></div>
+          <div class="px-4 py-2.5 border-b border-line shrink-0">
+            <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em] whitespace-nowrap">インデント構造</span>
+          </div>
+          <div id="vizPanelBody" class="flex-1 overflow-y-auto p-2"></div>
+        </aside>
       </section>
     </main>
 

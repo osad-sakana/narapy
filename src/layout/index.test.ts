@@ -43,6 +43,7 @@ describe('index.html とヘッダークラス定数の整合性', () => {
   it('パネルトグル2個の class が BTN_ACTIVE と完全一致する（初期状態は全パネル表示）', () => {
     expect(extractClass('panelTogglePython')).toBe(BTN_ACTIVE)
     expect(extractClass('panelToggleLog')).toBe(BTN_ACTIVE)
+    expect(extractClass('panelToggleViz')).toBe(BTN_ACTIVE)
   })
 
   it('#editorHeader の class に opacity-50 が含まれない（Blockly廃止によりエディタ単独構成のため常時表示）', () => {

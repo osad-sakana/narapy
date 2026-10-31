@@ -4,6 +4,9 @@ export type RawCompletion = {
   module: string
   parent: string
   parentType: string
+  // 定義行（ユーザーコードのみ意味を持つ。不明は 0）と完全名（例: random.randint）
+  line: number
+  fullName: string
 }
 
 export type CompletionWorkerOut =
@@ -34,6 +37,8 @@ export function parseCompletionItems(parsed: unknown): RawCompletion[] {
       module: sanitizeMeta(rec.module),
       parent: sanitizeMeta(rec.parent),
       parentType: sanitizeMeta(rec.parentType),
+      line: typeof rec.line === 'number' && Number.isInteger(rec.line) && rec.line > 0 ? rec.line : 0,
+      fullName: sanitizeMeta(rec.fullName),
     }]
   })
 }

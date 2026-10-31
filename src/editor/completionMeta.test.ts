@@ -4,16 +4,16 @@ import { META_FIELD_MAX_CHARS, parseCompletionItems } from './completionMeta'
 describe('parseCompletionItems', () => {
   it('メタ情報つきの項目を受け取る', () => {
     const items = parseCompletionItems([
-      { name: 'randint', type: 'function', module: 'random', parent: 'random', parentType: 'module' },
+      { name: 'randint', type: 'function', module: 'random', parent: 'random', parentType: 'module', line: 12, fullName: 'random.randint' },
     ])
     expect(items).toEqual([
-      { name: 'randint', type: 'function', module: 'random', parent: 'random', parentType: 'module' },
+      { name: 'randint', type: 'function', module: 'random', parent: 'random', parentType: 'module', line: 12, fullName: 'random.randint' },
     ])
   })
 
   it('旧形式 {name,type} はメタ情報を空文字で補う', () => {
     expect(parseCompletionItems([{ name: 'a', type: 'instance' }])).toEqual([
-      { name: 'a', type: 'instance', module: '', parent: '', parentType: '' },
+      { name: 'a', type: 'instance', module: '', parent: '', parentType: '', line: 0, fullName: '' },
     ])
   })
 

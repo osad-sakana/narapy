@@ -7,7 +7,7 @@ _AFTER_DOT = _re.compile(r'\.\s*\w*$')
 
 
 def _owner(c, after_dot):
-    # (module, parent, parentType) を返す。import した名前は定義元まで辿る
+    # (module, parent, parentType, line, fullName) を返す。import した名前は定義元まで辿る
     target = c
     p = target.parent()
     if p.type == 'module' and target.module_name == '__main__':
@@ -20,7 +20,7 @@ def _owner(c, after_dot):
         gp = p.parent()
         if gp is not None and gp.type == 'class':
             p = gp
-    return target.module_name or '', p.name or '', p.type or ''
+    return target.module_name or '', p.name or '', p.type or '', target.line, target.full_name or ''
 
 
 def _complete(source, line, col):
@@ -36,8 +36,9 @@ def _complete(source, line, col):
             try:
                 item['module'] = c.module_name or ''
                 if _time.monotonic() < deadline:
-                    module, parent, parent_type = _owner(c, after_dot)
-                    item.update({'module': module, 'parent': parent, 'parentType': parent_type})
+                    module, parent, parent_type, def_line, full_name = _owner(c, after_dot)
+                    item.update({'module': module, 'parent': parent, 'parentType': parent_type,
+                                 'line': def_line, 'fullName': full_name})
             except Exception:
                 pass
             out.append(item)

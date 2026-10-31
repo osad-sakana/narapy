@@ -1,5 +1,6 @@
 import * as monaco from 'monaco-editor'
 import { describeCompletion } from './completionLabel'
+import { describeOrigin } from './completionOrigin'
 import type { CompletionWorkerOut } from './completionMeta'
 
 type WorkerOut = CompletionWorkerOut
@@ -118,6 +119,7 @@ function getOrCreateWorker(): Worker {
       const jediItems = msg.items.map((item) => ({
         label: { label: item.name, description: describeCompletion(item) },
         kind: toKind(item.type),
+        detail: describeOrigin(item) || undefined,
         insertText: item.name,
         filterText: item.name,
         range: entry.range,

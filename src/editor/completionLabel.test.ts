@@ -3,7 +3,7 @@ import { describeCompletion } from './completionLabel'
 import type { RawCompletion } from './completionMeta'
 
 function raw(partial: Partial<RawCompletion>): RawCompletion {
-  return { name: 'x', type: '', module: '', parent: '', parentType: '', ...partial }
+  return { name: 'x', type: '', module: '', parent: '', parentType: '', line: 0, fullName: '', ...partial }
 }
 
 describe('describeCompletion', () => {

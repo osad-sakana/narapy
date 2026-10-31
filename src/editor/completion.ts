@@ -2,8 +2,13 @@ import * as monaco from 'monaco-editor'
 import { describeCompletion } from './completionLabel'
 import { describeOrigin } from './completionOrigin'
 import type { CompletionWorkerOut, RawCompletion } from './completionMeta'
+import { createFormatRequester } from '../format/requester'
+import type { FormatResult } from '../format/result'
 
-type WorkerOut = CompletionWorkerOut
+type WorkerOut =
+  | CompletionWorkerOut
+  | { type: 'formatted'; id: number; result: unknown }
+  | { type: 'format_error'; id: number }
 
 type PendingEntry = {
   resolve: (items: monaco.languages.CompletionItem[]) => void
@@ -124,6 +129,18 @@ export function queryWorker(
   })
 }
 
+// 整形は補完とは別管理（id は nextId を共有するので衝突しない）。
+// 初回は autopep8 の導入を含むため補完より長く待つ。上限は pycodestyle が WASM 上で
+// 補完 Worker を長く塞がないよう、補完(200k)より小さくしている
+const FORMAT_TIMEOUT_MS = 30_000
+const FORMAT_MAX_CHARS = 50_000
+const formatRequester = createFormatRequester({
+  nextId: () => ++nextId,
+  post: (message) => getOrCreateWorker().postMessage(message),
+  timeoutMs: FORMAT_TIMEOUT_MS,
+  maxChars: FORMAT_MAX_CHARS,
+})
+
 // pending エントリをタイマーごとキャンセルして静的候補で解決する
 function evictEntry(id: number): void {
   const entry = pending.get(id)
@@ -137,6 +154,7 @@ function evictEntry(id: number): void {
 function handleWorkerFailure(): void {
   for (const [id] of pending) evictEntry(id)
   for (const [id] of queries) settleQuery(id, null)
+  formatRequester.failAll()
   worker?.terminate()
   worker = null
   workerReady = false
@@ -160,6 +178,7 @@ function getOrCreateWorker(): Worker {
       settleQuery(msg.id, msg.value)
       return
     }
+    if (formatRequester.handle(msg)) return
     const entry = pending.get(msg.id)
     if (!entry) return
     clearTimeout(entry.timer)
@@ -194,6 +213,10 @@ function getOrCreateWorker(): Worker {
   }
 
   return worker
+}
+
+export function requestFormat(code: string): Promise<FormatResult> {
+  return formatRequester.request(code)
 }
 
 export function registerPythonCompletion(): monaco.IDisposable {

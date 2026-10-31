@@ -5,7 +5,7 @@ import completionHelperSource from './completion_helper.py?raw'
 import { parseCompletionItems, type CompletionWorkerOut } from './editor/completionMeta'
 import { memoizeRetryable } from './lib/memoizeRetryable'
 import { AUTOPEP8_REQUIREMENTS, FORMAT_PY } from './format/formatModule'
-import { extractImportedModules } from './editor/importScan'
+import { RETRY_AFTER_MS, selectFreshModules } from './editor/importScan'
 
 type RequestType = 'complete' | 'hover' | 'signature'
 type QueryMessage = { type: RequestType; id: number; code: string; line: number; col: number }
@@ -102,18 +102,35 @@ const getInit = memoizeRetryable(init)
 
 getInit().catch(() => undefined)
 
-// import されたモジュールの名前を一度だけ読み込む（失敗したら次の機会に再試行できるよう記録を消す）
-const requestedModules = new Set<string>()
+// 名前 → 次に読み込みを試してよい時刻。読み込み中・成功は Infinity、失敗は再試行できる時刻
+const requestedModules = new Map<string, number>()
+// 共有リンクなどで開いたコードが大きなパッケージを次々に読み込ませないよう、セッション全体の上限を置く
+const MAX_SESSION_MODULES = 20
 
 // import されたパッケージ（numpy・pygame など）を背景で読み込み、jedi が中身を見られるようにする。
 // 補完の応答は待たせず、読み込み後の次の要求から反映される。名前は importScan で識別子に限っている
 function loadImportedPackages(py: PyodideInterface, code: string, typingLine: number): void {
-  const fresh = extractImportedModules(code, typingLine).filter((name) => !requestedModules.has(name))
+  const room = MAX_SESSION_MODULES - requestedModules.size
+  if (room <= 0) return
+  const fresh = selectFreshModules(code, typingLine, requestedModules, Date.now()).slice(0, room)
   if (fresh.length === 0) return
-  fresh.forEach((name) => requestedModules.add(name))
-  py.loadPackagesFromImports(fresh.map((name) => `import ${name}`).join('\n'), { messageCallback: () => undefined })
-    .then(() => py.runPython('_refresh_modules()'))
-    .catch(() => fresh.forEach((name) => requestedModules.delete(name)))
+  fresh.forEach((name) => requestedModules.set(name, Infinity))
+
+  // loadPackage は通信失敗でも reject せず errorCallback に流して resolve するため、そこで失敗を検知する
+  let failed = false
+  const source = fresh.map((name) => `import ${name}`).join('\n')
+  py.loadPackagesFromImports(source, {
+    messageCallback: () => undefined,
+    errorCallback: () => { failed = true },
+  })
+    .then(() => {
+      if (failed) throw new Error('package load failed')
+      py.runPython('_refresh_modules()')
+    })
+    .catch(() => {
+      const retryAt = Date.now() + RETRY_AFTER_MS
+      fresh.forEach((name) => requestedModules.set(name, retryAt))
+    })
 }
 
 function isValidId(id: unknown): id is number {

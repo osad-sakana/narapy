@@ -53,7 +53,7 @@ export function initFormatController({ editor, button, getEditorPath }: FormatCo
         after: result.code,
       })
       if (decision === 'unchanged') report({ status: 'unchanged' })
-      if (decision === 'stale') appendLog('整形: 編集されたため中止しました。もう一度お試しください', 'info')
+      if (decision === 'stale') appendLog('整形: 編集またはファイル切替のため中止しました。もう一度お試しください', 'info')
       if (decision !== 'apply') return
 
       const edit = computeMinimalEdit(before, result.code)

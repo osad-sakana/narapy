@@ -108,6 +108,11 @@ describe('parseIndentTree', () => {
     expect(types(parseIndentTree(src))).toEqual(['other', 'assignment', 'assignment', 'assignment', 'other'])
   })
 
+  it('文字列の中の = で代入と誤判定しない', () => {
+    const src = ['return "a=b"', 'assert x, "k=v"', 'del d["a=b"]', "return 'key=' + v", 'd["k=1"] = 2'].join('\n')
+    expect(types(parseIndentTree(src))).toEqual(['other', 'other', 'other', 'other', 'assignment'])
+  })
+
   it('複数行の文は1ノードで、先頭行番号と改行を保つ', () => {
     const tree = parseIndentTree('x = [\n    1,\n    2,\n]\ny = 1')
     expect(tree).toHaveLength(2)

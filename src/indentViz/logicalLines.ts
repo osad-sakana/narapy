@@ -5,8 +5,6 @@ export interface LogicalLine {
   readonly text: string
   /** 文が始まる物理行（1始まり） */
   readonly line: number
-  /** 直前に空行があったか（コメント行は空行にも文にも数えない） */
-  readonly blankBefore: boolean
 }
 
 const TAB_WIDTH = 4
@@ -97,13 +95,11 @@ interface Part {
 interface Pending {
   readonly indent: number
   readonly line: number
-  readonly blankBefore: boolean
   readonly parts: Part[]
 }
 
 interface Accumulator {
   pending: Pending | null
-  blankBefore: boolean
   state: ScanState
 }
 
@@ -122,15 +118,14 @@ function flushPending(acc: Accumulator, result: LogicalLine[]): void {
   if (!pending || pending.parts.length === 0) return
   const text = joinParts(pending.parts)
   if (!STRING_ONLY.test(text)) {
-    result.push({ indent: pending.indent, text, line: pending.line, blankBefore: pending.blankBefore })
+    result.push({ indent: pending.indent, text, line: pending.line })
   }
-  acc.blankBefore = false
 }
 
 // 入力途中で閉じ括弧が無いとき、以降すべてが1文に飲まれて構造が見えなくなるのを防ぐ。
 // 括弧の中でも、文の開始位置以下のインデントで始まる「…:」終わりのブロック見出しが来たら
 // そこで前の文を打ち切る（正しいコードの括弧内にこの形の行は現れない）
-const BLOCK_HEADER = /^(?:async\s+)?(?:if|elif|else|for|while|def|class|try|except|finally|with)\b.*:\s*(?:#.*)?$/
+const BLOCK_HEADER = /^(?:async\s+)?(?:if|elif|else|for|while|def|class|try|except|finally|with|match|case)\b.*:\s*(?:#.*)?$/
 
 function abandonsUnclosedBracket(acc: Accumulator, raw: string): boolean {
   const { pending, state } = acc
@@ -144,16 +139,13 @@ function abandonsUnclosedBracket(acc: Accumulator, raw: string): boolean {
  */
 export function splitLogicalLines(source: string): LogicalLine[] {
   const result: LogicalLine[] = []
-  const acc: Accumulator = { pending: null, blankBefore: false, state: { depth: 0, triple: null } }
+  const acc: Accumulator = { pending: null, state: { depth: 0, triple: null } }
 
   for (const [index, raw] of source.split(/\r\n|\r|\n/).entries()) {
     if (abandonsUnclosedBracket(acc, raw)) flushPending(acc, result)
-    if (acc.pending === null && raw.trim() === '') {
-      acc.blankBefore = true
-      continue
-    }
+    if (acc.pending === null && raw.trim() === '') continue
     const scanned = scanLine(raw, acc.state)
-    const pending = acc.pending ?? { indent: leadingWidth(raw), line: index + 1, blankBefore: acc.blankBefore, parts: [] }
+    const pending = acc.pending ?? { indent: leadingWidth(raw), line: index + 1, parts: [] }
     const piece = scanned.continued ? scanned.code.trimEnd().slice(0, -1) : scanned.code
     if (piece.trim()) pending.parts.push({ indent: leadingWidth(piece), text: piece.trim() })
     acc.pending = pending

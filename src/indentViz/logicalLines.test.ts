@@ -5,19 +5,14 @@ describe('splitLogicalLines', () => {
   it('インデント幅と行番号を保持する', () => {
     const lines = splitLogicalLines('if x:\n    y = 1')
     expect(lines).toEqual([
-      { indent: 0, text: 'if x:', line: 1, blankBefore: false },
-      { indent: 4, text: 'y = 1', line: 2, blankBefore: false },
+      { indent: 0, text: 'if x:', line: 1 },
+      { indent: 4, text: 'y = 1', line: 2 },
     ])
   })
 
   it('タブは4スペースとして数える', () => {
     const [, second] = splitLogicalLines('if x:\n\ty = 1')
     expect(second.indent).toBe(4)
-  })
-
-  it('空行は次の論理行の blankBefore になる', () => {
-    const lines = splitLogicalLines('a = 1\n\n\nb = 2')
-    expect(lines.map(l => l.blankBefore)).toEqual([false, true])
   })
 
   it('コメント行と行末コメントを除く', () => {
@@ -76,6 +71,10 @@ describe('splitLogicalLines', () => {
   it('閉じていない括弧は、文の開始以下のインデントのブロック見出しで打ち切る', () => {
     const lines = splitLogicalLines('print(\nif x:\n    y = 1\nz = 2')
     expect(lines.map(l => l.text)).toEqual(['print(', 'if x:', 'y = 1', 'z = 2'])
+  })
+
+  it('未閉括弧の直後の match も打ち切りに使う', () => {
+    expect(splitLogicalLines('foo(\nmatch x:\n    case 1:').map(l => l.text)).toEqual(['foo(', 'match x:', 'case 1:'])
   })
 
   it('括弧内のより深いインデントの行は打ち切りに使わない', () => {

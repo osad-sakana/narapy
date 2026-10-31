@@ -61,7 +61,7 @@ export function renderNode(node: VizNode): HTMLElement {
   const label = renderLabel(node)
   if (label) header.appendChild(label)
   header.appendChild(renderCode([
-    ...node.decorators.map(highlightDecorator).map(s => [...s]),
+    ...node.decorators.map(highlightDecorator),
     ...highlightStatement(node.text, node.type),
   ]))
   block.appendChild(header)

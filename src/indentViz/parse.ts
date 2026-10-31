@@ -38,9 +38,12 @@ function compoundType(text: string): StatementType | null {
   return null
 }
 
+const STRING_LITERAL = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g
+
 function simpleType(text: string): StatementType {
   if (IMPORT.test(text)) return 'import'
-  const head = firstLine(text)
+  // 文字列の中の = を代入と取り違えないよう、リテラルの中身を空にしてから判定する
+  const head = firstLine(text).replace(STRING_LITERAL, '""')
   if (ASSIGNMENT.test(head) || (!head.startsWith('lambda') && ANNOTATION.test(head))) return 'assignment'
   return 'other'
 }

@@ -42,8 +42,9 @@ export function describeCompletion(raw: RawCompletion): string {
     if (raw.type === 'class') return '組み込みクラス'
     if (raw.type === 'instance' || raw.type === 'statement') return '組み込み定数'
   }
-  if (raw.module === USER_MODULE) return describeUserDefined(raw)
-  if (raw.module !== '' && raw.parentType === 'module') {
+  // parentType が空 = 時間予算切れでメタ情報が無い。ユーザー定義と決めつけず汎用ラベルに任せる
+  if (raw.module === USER_MODULE && raw.parentType !== '') return describeUserDefined(raw)
+  if (raw.module !== '' && raw.module !== USER_MODULE && raw.parentType !== 'function') {
     return describeModuleMember(raw.module, raw.type)
   }
   return describeFallback(raw.type)

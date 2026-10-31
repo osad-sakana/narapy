@@ -1,6 +1,7 @@
 import jedi as _jedi, json as _json, re as _re, time as _time
 
 # parent() / goto() は jedi の推論を伴い重いので、時間予算を超えたら以降は軽い情報だけにする
+# （呼び出し前にしか確認しないため、上限ではなく目安）
 _META_BUDGET_SEC = 0.3
 _AFTER_DOT = _re.compile(r'\.\s*\w*$')
 

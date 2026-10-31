@@ -19,7 +19,7 @@ def _narapy_format(source):
         return _json.dumps({'status': 'failed'})
     try:
         import autopep8 as _ap
-        # E401 は `import os, sys` を2文に分割して AST が変わり rejected になるため除外する。
+        # E401 は import os, sys を2文に分割して AST が変わり rejected になるため除外する。
         # それ以外は autopep8 の既定の ignore（E226 等）と同じ
         out = _ap.fix_code(source, options={
             'aggressive': 0,

@@ -30,6 +30,7 @@ import { initTheme } from './theme/index'
 import { initFormatController } from './format/controller'
 import { initHamburgerMenu } from './menu/ui'
 import { applyNewProject } from './menu/applyNewProject'
+import { createIndentVizMenuAction } from './indentViz/modal'
 import { createInstructorController } from './instructor/controller'
 import { createInstructorMenuAction, syncInstructorMenuItem, initInstructorBaselineButton } from './instructor/ui'
 import { createStepperController } from './stepper/controller'
@@ -315,4 +316,8 @@ initHamburgerMenu([
     },
   },
   createInstructorMenuAction(instructorController),
+  createIndentVizMenuAction({
+    getFileName: () => fileSwitcher.getEditorPath(),
+    getContent: () => getValue(editor),
+  }),
 ])

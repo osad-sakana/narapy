@@ -1,11 +1,8 @@
 import * as monaco from 'monaco-editor'
 import { describeCompletion } from './completionLabel'
-import type { RawCompletion } from './completionMeta'
+import type { CompletionWorkerOut } from './completionMeta'
 
-type WorkerOut =
-  | { type: 'ready' }
-  | { type: 'completions'; id: number; items: RawCompletion[] }
-  | { type: 'complete_error'; id: number }
+type WorkerOut = CompletionWorkerOut
 
 type PendingEntry = {
   resolve: (items: monaco.languages.CompletionItem[]) => void
@@ -67,7 +64,7 @@ function buildStaticItems(range: monaco.IRange): monaco.languages.CompletionItem
   return [
     ...STATIC_KEYWORDS.map((kw) => staticItem(kw, Keyword, 'キーワード', range)),
     ...STATIC_BUILTINS.map((fn) => staticItem(fn, Function, '組み込み関数', range)),
-    ...STATIC_EXCEPTIONS.map((ex) => staticItem(ex, Class, '例外クラス', range)),
+    ...STATIC_EXCEPTIONS.map((ex) => staticItem(ex, Class, '組み込みクラス', range)),
   ]
 }
 

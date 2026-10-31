@@ -6,6 +6,11 @@ export type RawCompletion = {
   parentType: string
 }
 
+export type CompletionWorkerOut =
+  | { type: 'ready' }
+  | { type: 'completions'; id: number; items: RawCompletion[] }
+  | { type: 'complete_error'; id: number }
+
 export const META_FIELD_MAX_CHARS = 64
 
 // eslint-disable-next-line no-control-regex

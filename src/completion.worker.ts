@@ -1,14 +1,12 @@
 /// <reference lib="webworker" />
 
 import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from './lib/pyodideLoader'
-import { parseCompletionItems, type RawCompletion } from './editor/completionMeta'
+import completionHelperSource from './completion_helper.py?raw'
+import { parseCompletionItems, type CompletionWorkerOut } from './editor/completionMeta'
 
 type InMessage = { type: 'complete'; id: number; code: string; line: number; col: number }
 
-type OutMessage =
-  | { type: 'ready' }
-  | { type: 'completions'; id: number; items: RawCompletion[] }
-  | { type: 'complete_error'; id: number }
+type OutMessage = CompletionWorkerOut
 
 interface LoadPackageOptions {
   messageCallback?: (msg: string) => void
@@ -36,32 +34,7 @@ async function init(): Promise<void> {
   pyodide = await loadPyodide({ indexURL: PYODIDE_CDN })
   await pyodide.loadPackage(['jedi'], { messageCallback: () => undefined })
 
-  pyodide.runPython(`
-import jedi as _jedi, json as _json
-
-# parent() は jedi の推論を伴い重いので、先頭の候補だけメタ情報を付ける
-_META_LIMIT = 150
-
-def _meta(c):
-    try:
-        p = c.parent()
-        return {'module': c.module_name or '', 'parent': p.name or '', 'parentType': p.type or ''}
-    except Exception:
-        return {}
-
-def _complete(source, line, col):
-    try:
-        comps = _jedi.Script(source=source).complete(line, col)
-        out = []
-        for i, c in enumerate(comps):
-            item = {'name': c.name, 'type': c.type}
-            if i < _META_LIMIT:
-                item.update(_meta(c))
-            out.append(item)
-        return _json.dumps(out)
-    except Exception:
-        return '[]'
-`)
+  pyodide.runPython(completionHelperSource)
 
   self.postMessage({ type: 'ready' } satisfies OutMessage)
 }

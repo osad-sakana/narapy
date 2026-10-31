@@ -27,16 +27,16 @@ const BUILTIN_FUNCTIONS: Readonly<Record<string, JaDoc>> = {
     params: { obj: '長さを調べる文字列・リスト・辞書など' },
   },
   'builtins.range': {
-    summary: '連続した整数の並びを作ります。for 文でよく使います。',
+    summary: '一定の間隔で並んだ整数を作ります。for 文でよく使います。',
     params: {
       start: '開始する値（含む）。省略すると 0',
-      stop: '終了する値（含まない）',
+      stop: '終了する値（含まない）。引数が1つだけのときは、これが終了値になります',
       step: '増やす幅。省略すると 1',
     },
   },
   'builtins.int': {
-    summary: '値を整数に変換します。',
-    params: { x: '変換する値（数値や "123" のような文字列）', base: '何進数の文字列か（初期値は 10）' },
+    summary: '値を整数に変換します。int(3.9) は 3 になり、"3.5" のような小数の文字列はエラーになります。',
+    params: { x: '変換する値（数値や "123" のような文字列）。小数は小数点以下が切り捨てられます', base: '何進数の文字列か（初期値は 10）' },
   },
   'builtins.float': { summary: '値を小数（浮動小数点数）に変換します。' },
   'builtins.str': {
@@ -89,19 +89,19 @@ const BUILTIN_FUNCTIONS: Readonly<Record<string, JaDoc>> = {
     params: { iterable: '合計する数値の並び（リストなど）', start: '合計に最初に足す値（初期値は 0）' },
   },
   'builtins.round': {
-    summary: '数値を四捨五入（偶数丸め）します。',
+    summary: '数値を最も近い値に丸めます。ちょうど中間（.5）のときは偶数の側に丸めるので、round(2.5) は 2、round(3.5) は 4 です（いわゆる四捨五入とは異なります）。',
     params: { number: '丸める数値', ndigits: '小数点以下の桁数。省略すると整数に丸めます' },
   },
   'builtins.sorted': {
-    summary: '並べ替えた新しいリストを返します（元の並びは変わりません）。',
+    summary: '小さい順に並べ替えた新しいリストを返します（元の並びは変わりません）。',
     params: {
       iterable: '並べ替える元の並び',
-      key: '並べ替えの基準にする関数',
-      reverse: 'True にすると大きい順（降順）になります',
+      key: '並べ替えの基準にする関数。key=len のように名前を付けて指定します',
+      reverse: 'True にすると大きい順（降順）になります。reverse=True のように名前を付けて指定します',
     },
   },
   'builtins.reversed': {
-    summary: '逆順に取り出せる並びを返します。',
+    summary: '逆順に取り出せる並びを返します（リストではないので、list() で囲むとリストになります）。',
     params: { sequence: '逆順にする元の並び' },
   },
   'builtins.enumerate': {
@@ -109,7 +109,7 @@ const BUILTIN_FUNCTIONS: Readonly<Record<string, JaDoc>> = {
     params: { iterable: '元の並び', start: '番号の開始値（初期値は 0）' },
   },
   'builtins.zip': {
-    summary: '複数の並びを、同じ位置の値ごとにまとめます。',
+    summary: '複数の並びを、同じ位置の値ごとにまとめます（リストではないので、list() で囲むとリストになります）。',
     params: {
       iter1: '1つ目の並び',
       iter2: '2つ目の並び',
@@ -118,11 +118,11 @@ const BUILTIN_FUNCTIONS: Readonly<Record<string, JaDoc>> = {
     },
   },
   'builtins.map': {
-    summary: '並びの各要素に関数を適用した結果を返します。',
+    summary: '並びの各要素に関数を適用した結果を返します（リストではないので、list() で囲むとリストになります）。',
     params: { func: '各要素に適用する関数', iter1: '元の並び', iter2: '2つ目の並び' },
   },
   'builtins.filter': {
-    summary: '条件に合う要素だけを取り出します。',
+    summary: '条件に合う要素だけを取り出します（リストではないので、list() で囲むとリストになります）。',
     params: { function: '条件を判定する関数（True の要素が残ります）', iterable: '元の並び' },
   },
   'builtins.type': {
@@ -137,7 +137,7 @@ const BUILTIN_FUNCTIONS: Readonly<Record<string, JaDoc>> = {
     summary: 'ファイルを開きます。with 文と一緒に使うと自動で閉じます。',
     params: {
       file: 'ファイルの名前（パス）',
-      mode: '"r"（読む）、"w"（書く）、"a"（追記）など',
+      mode: '"r"（読む）、"w"（書く。元の内容は消えます）、"a"（最後に追記）など',
       encoding: '文字コード（日本語なら "utf-8" を指定）',
     },
   },
@@ -162,7 +162,7 @@ const BUILTIN_FUNCTIONS: Readonly<Record<string, JaDoc>> = {
     params: { iterable: '調べる並び' },
   },
   'builtins.all': {
-    summary: 'すべてが True なら True を返します。',
+    summary: 'すべてが True なら True を返します（空の並びでは True になります）。',
     params: { iterable: '調べる並び' },
   },
   'builtins.bin': { summary: '整数を2進数の文字列にします。', params: { number: '整数' } },
@@ -190,8 +190,10 @@ const BUILTIN_METHODS: Readonly<Record<string, JaDoc>> = {
     params: { iterable: 'つなぐ文字列の並び' },
   },
   'builtins.str.strip': {
-    summary: '両端の空白（や指定した文字）を取り除きます。',
-    params: { chars: '取り除く文字（省略すると空白と改行）' },
+    summary: '両端の空白（や指定した文字）を取り除いた新しい文字列を返します。',
+    params: {
+      chars: '取り除く文字の集まり。文字列としてではなく、1文字ずつどれかに当たれば取り除きます（省略すると、全角スペース・タブ・改行を含む空白）',
+    },
   },
   'builtins.str.replace': {
     summary: '文字列の一部を別の文字列に置き換えた新しい文字列を返します。',
@@ -218,16 +220,19 @@ const BUILTIN_METHODS: Readonly<Record<string, JaDoc>> = {
     params: { object: '追加する要素' },
   },
   'builtins.list.remove': {
-    summary: '指定した値と等しい最初の要素を削除します。',
+    summary: '指定した値と等しい最初の要素を削除します。見つからないとエラー（ValueError）になります。',
     params: { value: '削除する値' },
   },
   'builtins.list.pop': {
-    summary: '指定した位置の要素を取り出して削除します。',
+    summary: '指定した位置の要素を取り出して削除し、取り出した要素を返します。',
     params: { index: '取り出す位置（省略すると最後）' },
   },
   'builtins.list.sort': {
-    summary: 'リストをその場で並べ替えます。',
-    params: { key: '並べ替えの基準にする関数', reverse: 'True にすると大きい順（降順）' },
+    summary: 'リストをその場で小さい順に並べ替えます。結果は返さず（戻り値は None）、リスト自体が変わります。新しいリストが欲しいときは sorted() を使います。',
+    params: {
+      key: '並べ替えの基準にする関数。key=len のように名前を付けて指定します',
+      reverse: 'True にすると大きい順（降順）。reverse=True のように名前を付けて指定します',
+    },
   },
   'builtins.list.insert': {
     summary: '指定した位置に要素を挿入します。',
@@ -238,7 +243,7 @@ const BUILTIN_METHODS: Readonly<Record<string, JaDoc>> = {
     params: { iterable: '追加する要素の並び' },
   },
   'builtins.list.index': {
-    summary: '指定した値が最初に現れる位置を返します。',
+    summary: '指定した値が最初に現れる位置を返します。見つからないとエラー（ValueError）になります（str.find のように -1 は返しません）。',
     params: { value: '探す値', start: '探し始める位置', stop: '探し終わる位置' },
   },
   'builtins.list.count': {
@@ -262,8 +267,12 @@ const RANDOM_FUNCTIONS: Readonly<Record<string, JaDoc>> = {
     params: { a: '最小値（含む）', b: '最大値（含む）' },
   },
   'random.randrange': {
-    summary: 'range と同じ範囲から、ランダムな整数を返します（stop は含まれません）。',
-    params: { start: '開始する値（含む）', stop: '終了する値（含まない）', step: '増やす幅' },
+    summary: 'range と同じ範囲から、ランダムな整数を返します（stop は含まれません）。randrange(10) のように1つだけ渡すと、0 から 9 の中から選びます。',
+    params: {
+      start: '開始する値（含む）。引数が1つだけのときは、これが終了値（含まない）になり、0 から始まります',
+      stop: '終了する値（含まない）',
+      step: '増やす幅',
+    },
   },
   'random.choice': {
     summary: '並びからランダムに1つ選んで返します。',
@@ -275,7 +284,7 @@ const RANDOM_FUNCTIONS: Readonly<Record<string, JaDoc>> = {
       population: '選ぶ元の並び',
       weights: '選ばれやすさの重み',
       cum_weights: '累積した重み',
-      k: '選ぶ個数',
+      k: '選ぶ個数。k=3 のように名前を付けて指定します',
     },
   },
   'random.shuffle': {
@@ -283,7 +292,7 @@ const RANDOM_FUNCTIONS: Readonly<Record<string, JaDoc>> = {
     params: { x: '並べ替えるリスト' },
   },
   'random.sample': {
-    summary: '並びから、重複なしでランダムに k 個選んでリストで返します。',
+    summary: '並びから、同じ位置を二度選ばずにランダムに k 個選んでリストで返します。k が要素数より多いとエラーになります。',
     params: { population: '選ぶ元の並び', k: '選ぶ個数', counts: '各要素の個数' },
   },
   'random.uniform': {
@@ -300,19 +309,19 @@ const RANDOM_FUNCTIONS: Readonly<Record<string, JaDoc>> = {
   },
 }
 
-const JA_DOCS: Readonly<Record<string, JaDoc>> = {
+export const JA_DOCS: Readonly<Record<string, JaDoc>> = {
   ...BUILTIN_FUNCTIONS,
   ...BUILTIN_METHODS,
   ...RANDOM_FUNCTIONS,
 }
 
-// random.randint は代入で束ねられたメソッドとして解決されると random.Random.randint になる
-const RANDOM_INSTANCE_PREFIX = 'random.Random.'
+// random.randint は代入で束ねられたメソッドとして解決されると random.Random.randint に、
+// random.random は _random.Random.random になる
+const RANDOM_INSTANCE_PREFIXES = ['random.Random.', '_random.Random.']
 
 export function lookupJaDoc(fullName: string): JaDoc | undefined {
-  const key = fullName.startsWith(RANDOM_INSTANCE_PREFIX)
-    ? `random.${fullName.slice(RANDOM_INSTANCE_PREFIX.length)}`
-    : fullName
+  const prefix = RANDOM_INSTANCE_PREFIXES.find((p) => fullName.startsWith(p))
+  const key = prefix ? `random.${fullName.slice(prefix.length)}` : fullName
   return Object.hasOwn(JA_DOCS, key) ? JA_DOCS[key] : undefined
 }
 

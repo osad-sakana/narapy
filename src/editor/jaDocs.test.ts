@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lookupJaDoc, lookupJaParam, paramName } from './jaDocs'
+import { JA_DOCS, lookupJaDoc, lookupJaParam, paramName } from './jaDocs'
 
 describe('lookupJaDoc', () => {
   it('組み込み関数・メソッド・random を引ける', () => {
@@ -20,15 +20,31 @@ describe('lookupJaDoc', () => {
     expect(lookupJaDoc('')).toBeUndefined()
   })
 
-  it('すべての項目に要約があり、引数説明は空でない', () => {
-    for (const name of [
-      'builtins.print', 'builtins.range', 'builtins.open', 'builtins.list.sort',
-      'random.randrange', 'random.sample', 'typing.Mapping.get',
-    ]) {
-      const doc = lookupJaDoc(name)
-      expect(doc?.summary).not.toBe('')
-      for (const text of Object.values(doc?.params ?? {})) expect(text).not.toBe('')
+  it('random.random（_random.Random.random）も引ける', () => {
+    expect(lookupJaDoc('_random.Random.random')).toBe(lookupJaDoc('random.random'))
+  })
+
+  it('全項目に要約があり、引数名・説明は空でなく、キーは jedi の full_name の形', () => {
+    const entries = Object.entries(JA_DOCS)
+    expect(entries.length).toBeGreaterThan(60)
+    for (const [key, doc] of entries) {
+      expect(key).toMatch(/^[\w.]+$/)
+      expect(doc.summary.trim()).not.toBe('')
+      for (const [name, text] of Object.entries(doc.params ?? {})) {
+        expect(name).toMatch(/^[A-Za-z_]\w*$/)
+        expect(text.trim()).not.toBe('')
+      }
     }
+  })
+
+  it('randrange は引数が1つのときの意味を説明している', () => {
+    expect(lookupJaDoc('random.randrange')?.params?.start).toContain('1つだけ')
+  })
+
+  it('round は四捨五入ではなく偶数丸めであることを説明している', () => {
+    const summary = lookupJaDoc('builtins.round')?.summary ?? ''
+    expect(summary).toContain('偶数')
+    expect(summary).toContain('異なります')
   })
 })
 

@@ -1,6 +1,6 @@
-import { lookupJaDoc, lookupJaParam, type JaDoc } from './jaDocs'
-
 // hover / 引数ヘルプ用: Worker の jedi 応答の検証と Monaco 向け整形（Monaco を import しない純関数）
+
+import { lookupJaDoc, lookupJaParam, type JaDoc } from './jaDocs'
 
 export type HoverInfo = {
   name: string
@@ -53,7 +53,13 @@ export function parseSignatureInfo(value: unknown): SignatureInfo | null {
     ? rec.params.filter((p): p is string => typeof p === 'string').map((p) => p.slice(0, FIELD_MAX_CHARS))
     : []
   const index = typeof rec.index === 'number' && Number.isInteger(rec.index) && rec.index >= 0 ? rec.index : -1
-  return { name: rec.name.slice(0, FIELD_MAX_CHARS), fullName: str(rec.fullName, FIELD_MAX_CHARS), params, index, doc: str(rec.doc, DOC_MAX_CHARS) }
+  return {
+    name: rec.name.slice(0, FIELD_MAX_CHARS),
+    fullName: str(rec.fullName, FIELD_MAX_CHARS),
+    params,
+    index,
+    doc: str(rec.doc, DOC_MAX_CHARS),
+  }
 }
 
 export type SignatureHelpInfo = {
@@ -86,8 +92,11 @@ export function signatureDocMarkdown(doc: string): string | undefined {
   return doc === '' ? undefined : fenced('text', doc)
 }
 
-function jaParamList(params: JaDoc['params']): string {
+// シグネチャに実際に出てくる引数だけを列挙する（別のオーバーロードや内部名を出さない）。
+// シグネチャが無いときは辞書の全引数を出す
+function jaParamList(params: JaDoc['params'], signature: string): string {
   return Object.entries(params ?? {})
+    .filter(([name]) => signature === '' || new RegExp(`[(\\s,*]${name}\\s*[:,)=]`).test(signature))
     .map(([name, text]) => `- \`${name}\`: ${text}`)
     .join('\n')
 }
@@ -98,7 +107,8 @@ export function hoverMarkdown(info: HoverInfo): string {
   const parts = [fenced('python', head)]
   if (ja) {
     parts.push(ja.summary)
-    if (ja.params) parts.push(jaParamList(ja.params))
+    const list = jaParamList(ja.params, info.signature)
+    if (list !== '') parts.push(list)
   }
   if (info.doc !== '') parts.push(fenced('text', info.doc))
   return parts.join('\n\n')

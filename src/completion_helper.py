@@ -91,7 +91,7 @@ def _hover(source, line, col):
             signature = _BOUND_SELF.sub(lambda m: '()' if m.group(2) == ')' else '(', signature)
         return _json.dumps({
             'name': n.name,
-            'fullName': n.full_name or '',
+            'fullName': n.full_name or (sigs[0].full_name if sigs else '') or '',
             'type': n.type,
             'signature': signature,
             'doc': (n.docstring(raw=True) or '')[:_DOC_MAX],

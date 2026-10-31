@@ -152,4 +152,25 @@ describe('日本語辞書の反映', () => {
     const md = hoverMarkdown({ name: 'f', fullName: 'mine.f', type: 'function', signature: 'f()', doc: '', description: '' })
     expect(md).toBe('```python\nf()\n```')
   })
+
+  it('hover: 引数の説明は表示中のシグネチャに出てくる引数だけに絞る', () => {
+    const md = hoverMarkdown({
+      name: 'max', fullName: 'builtins.max', type: 'function',
+      signature: 'max(iterable: Iterable[_T], key: None=...)', doc: '', description: '',
+    })
+    expect(md).toContain('- `iterable`:')
+    expect(md).toContain('- `key`:')
+    expect(md).not.toContain('- `arg1`:')
+    expect(md).not.toContain('- `_args`:')
+  })
+
+  it('hover: 可変長引数（*values）の説明も出る', () => {
+    const md = hoverMarkdown({
+      name: 'print', fullName: 'builtins.print', type: 'function',
+      signature: 'print(*values: object, sep: Optional[str]=...) -> None', doc: '', description: '',
+    })
+    expect(md).toContain('- `values`:')
+    expect(md).toContain('- `sep`:')
+    expect(md).not.toContain('- `flush`:')
+  })
 })

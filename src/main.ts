@@ -30,6 +30,7 @@ import { initTheme } from './theme/index'
 import { initFormatController } from './format/controller'
 import { initHamburgerMenu } from './menu/ui'
 import { applyNewProject } from './menu/applyNewProject'
+import { initIndentVizPanel } from './indentViz/panel'
 import { createInstructorController } from './instructor/controller'
 import { createInstructorMenuAction, syncInstructorMenuItem, initInstructorBaselineButton } from './instructor/ui'
 import { createStepperController } from './stepper/controller'
@@ -204,6 +205,10 @@ try {
 // ここでは既存モデルを全破棄して開き、旧プロジェクトの undo 履歴を持ち越さない(issue #47)
 openProjectFileWithReset(getActiveFile(), getActiveContent())
 editorFileName.textContent = getActiveFile()
+
+// --- インデント構造パネル (issue #84) ---
+// 初期ファイルを開いた後に初期化する（以降の内容変更・ファイル切替は panel 側が購読する）
+initIndentVizPanel(editor, () => fileSwitcher.getEditorPath())
 
 
 const runner = initRunner(

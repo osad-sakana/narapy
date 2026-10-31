@@ -34,6 +34,7 @@ narapy/
 │   ├── urlload/            # URLの #code= / #project= / ?project=<URL> 読み込み
 │   ├── makeUrl/            # /make-url（共有リンク生成ページ）のロジック
 │   ├── makeExercise/       # /make-exercise（演習リンク生成ページ）のロジック
+│   ├── indentViz/          # インデント構造サイドパネル（常時反映・幅リサイズ可。issue #84。logicalLines→parse→highlight→render は純粋関数中心、DOM接続は panel.ts）
 │   ├── layout/             # パネルレイアウト（split.js、状態をlocalStorageに永続化）
 │   ├── about/              # ライセンス表示
 │   ├── theme/              # カラーパレット・テーマ切り替え

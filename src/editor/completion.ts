@@ -1,11 +1,12 @@
 import * as monaco from 'monaco-editor'
+import { describeCompletion } from './completionLabel'
+import { describeOrigin } from './completionOrigin'
+import type { CompletionWorkerOut, RawCompletion } from './completionMeta'
 import { createFormatRequester } from '../format/requester'
 import type { FormatResult } from '../format/result'
 
 type WorkerOut =
-  | { type: 'ready' }
-  | { type: 'completions'; id: number; items: Array<{ name: string; type: string }> }
-  | { type: 'complete_error'; id: number }
+  | CompletionWorkerOut
   | { type: 'formatted'; id: number; result: unknown }
   | { type: 'format_error'; id: number }
 
@@ -51,17 +52,31 @@ const STATIC_EXCEPTIONS = [
   'ZeroDivisionError','FileNotFoundError',
 ]
 
+function staticItem(
+  name: string,
+  kind: monaco.languages.CompletionItemKind,
+  description: string,
+  range: monaco.IRange,
+): monaco.languages.CompletionItem {
+  return { label: { label: name, description }, kind, insertText: name, filterText: name, range }
+}
+
+// label.detail は名前の直後に常時表示される（item.detail は詳細パネルを開かないと見えない）
+function originSuffix(item: RawCompletion): string | undefined {
+  const origin = describeOrigin(item)
+  return origin === '' ? undefined : `  ${origin}`
+}
+
+function labelText(item: monaco.languages.CompletionItem): string {
+  return typeof item.label === 'string' ? item.label : item.label.label
+}
+
 function buildStaticItems(range: monaco.IRange): monaco.languages.CompletionItem[] {
+  const { Keyword, Function, Class } = monaco.languages.CompletionItemKind
   return [
-    ...STATIC_KEYWORDS.map((kw) => ({
-      label: kw, kind: monaco.languages.CompletionItemKind.Keyword, insertText: kw, range,
-    })),
-    ...STATIC_BUILTINS.map((fn) => ({
-      label: fn, kind: monaco.languages.CompletionItemKind.Function, insertText: fn, range,
-    })),
-    ...STATIC_EXCEPTIONS.map((ex) => ({
-      label: ex, kind: monaco.languages.CompletionItemKind.Class, insertText: ex, range,
-    })),
+    ...STATIC_KEYWORDS.map((kw) => staticItem(kw, Keyword, 'キーワード', range)),
+    ...STATIC_BUILTINS.map((fn) => staticItem(fn, Function, '組み込み関数', range)),
+    ...STATIC_EXCEPTIONS.map((ex) => staticItem(ex, Class, '組み込みクラス', range)),
   ]
 }
 
@@ -126,14 +141,15 @@ function getOrCreateWorker(): Worker {
 
     if (msg.type === 'completions') {
       const jediItems = msg.items.map((item) => ({
-        label: item.name,
+        label: { label: item.name, detail: originSuffix(item), description: describeCompletion(item) },
         kind: toKind(item.type),
         insertText: item.name,
+        filterText: item.name,
         range: entry.range,
       }))
       const jediNames = new Set(msg.items.map((i) => i.name))
       const extras = buildStaticItems(entry.range).filter(
-        (item) => !jediNames.has(item.label as string),
+        (item) => !jediNames.has(labelText(item)),
       )
       entry.resolve([...jediItems, ...extras])
     } else {

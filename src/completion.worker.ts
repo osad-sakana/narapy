@@ -1,6 +1,8 @@
 /// <reference lib="webworker" />
 
 import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from './lib/pyodideLoader'
+import completionHelperSource from './completion_helper.py?raw'
+import { parseCompletionItems, type CompletionWorkerOut } from './editor/completionMeta'
 import { memoizeRetryable } from './lib/memoizeRetryable'
 import { AUTOPEP8_REQUIREMENTS, FORMAT_PY } from './format/formatModule'
 
@@ -9,9 +11,7 @@ type FormatMessage = { type: 'format'; id: number; code: string }
 type InMessage = CompleteMessage | FormatMessage
 
 type OutMessage =
-  | { type: 'ready' }
-  | { type: 'completions'; id: number; items: Array<{ name: string; type: string }> }
-  | { type: 'complete_error'; id: number }
+  | CompletionWorkerOut
   | { type: 'formatted'; id: number; result: unknown }
   | { type: 'format_error'; id: number }
 
@@ -81,16 +81,7 @@ async function init(): Promise<void> {
   const py = await loadPyodide({ indexURL: PYODIDE_CDN })
   await py.loadPackage(['jedi'], { messageCallback: () => undefined })
 
-  py.runPython(`
-import jedi as _jedi, json as _json
-
-def _complete(source, line, col):
-    try:
-        comps = _jedi.Script(source=source).complete(line, col)
-        return _json.dumps([{'name': c.name, 'type': c.type} for c in comps])
-    except Exception:
-        return '[]'
-`)
+  py.runPython(completionHelperSource)
 
   pyodide = py
   self.postMessage({ type: 'ready' } satisfies OutMessage)
@@ -161,14 +152,7 @@ self.onmessage = async (event: MessageEvent<InMessage>) => {
     // runPythonの戻り値をランタイム検証してから使う（L-3）
     const json = typeof result === 'string' ? result : '[]'
     const parsed: unknown = JSON.parse(json)
-    const items = Array.isArray(parsed)
-      ? parsed.filter((item): item is { name: string; type: string } =>
-          typeof item === 'object' && item !== null &&
-          typeof (item as Record<string, unknown>).name === 'string' &&
-          (item as Record<string, unknown>).name !== '' &&
-          typeof (item as Record<string, unknown>).type === 'string',
-        )
-      : []
+    const items = parseCompletionItems(parsed)
 
     self.postMessage({ type: 'completions', id, items } satisfies OutMessage)
   } catch {

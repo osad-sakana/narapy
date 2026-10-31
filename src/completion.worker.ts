@@ -10,7 +10,9 @@ import { RETRY_AFTER_MS, selectFreshModules } from './editor/importScan'
 type RequestType = 'complete' | 'hover' | 'signature'
 type QueryMessage = { type: RequestType; id: number; code: string; line: number; col: number }
 type FormatMessage = { type: 'format'; id: number; code: string }
-type InMessage = QueryMessage | FormatMessage
+// import の先読み。応答は返さない（読み込みは背景で進む）
+type PreloadMessage = { type: 'preload'; code: string; line: number }
+type InMessage = QueryMessage | FormatMessage | PreloadMessage
 
 // 呼び出す Python 関数名は固定の対応表から選ぶ（メッセージ由来の文字列を実行に使わない）
 const PY_FUNCTIONS: Record<RequestType, string> = {
@@ -126,6 +128,9 @@ function loadImportedPackages(py: PyodideInterface, code: string, typingLine: nu
     .then(() => {
       if (failed) throw new Error('package load failed')
       py.runPython('_refresh_modules()')
+      // 初回の補完が解析待ちでタイムアウトしないよう、読み込み直後に解析しておく
+      py.globals.set('_warm_names', fresh.join(','))
+      py.runPython('_warm_modules(_warm_names)')
     })
     .catch(() => {
       const retryAt = Date.now() + RETRY_AFTER_MS
@@ -142,10 +147,19 @@ function isQueryMessage(msg: InMessage): msg is QueryMessage {
   const q = msg as Partial<QueryMessage>
   return (
     Object.hasOwn(PY_FUNCTIONS, msg.type) &&
-    isValidId(msg.id) &&
-    typeof msg.code === 'string' &&
+    isValidId(q.id) &&
+    typeof q.code === 'string' &&
     typeof q.line === 'number' && Number.isInteger(q.line) && q.line >= 1 &&
     typeof q.col === 'number' && Number.isInteger(q.col) && q.col >= 0
+  )
+}
+
+function isPreloadMessage(msg: InMessage): msg is PreloadMessage {
+  const p = msg as Partial<PreloadMessage>
+  return (
+    msg.type === 'preload' &&
+    typeof p.code === 'string' &&
+    typeof p.line === 'number' && Number.isInteger(p.line) && p.line >= 1
   )
 }
 
@@ -180,6 +194,15 @@ self.onmessage = async (event: MessageEvent<InMessage>) => {
   if (!msg) return
   if (isFormatMessage(msg)) {
     await handleFormat(msg)
+    return
+  }
+  if (isPreloadMessage(msg)) {
+    try {
+      await getInit()
+      if (pyodide) loadImportedPackages(pyodide, msg.code, msg.line)
+    } catch {
+      // 初期化に失敗した場合は、次の補完要求の再試行に任せる
+    }
     return
   }
   if (!isQueryMessage(msg)) return

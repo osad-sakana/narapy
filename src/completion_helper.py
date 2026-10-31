@@ -130,3 +130,15 @@ def _refresh_modules():
         _jedi.cache.clear_time_caches(True)
     except Exception:
         pass
+
+
+def _warm_modules(names):
+    # 読み込んだパッケージを一度だけ解析しておく。最初の補完で解析すると、補完の待ち時間(2秒)を
+    # 超えて候補が出ないため、背景で済ませる。名前は識別子のものだけを受け付ける
+    for name in names.split(','):
+        if not name.isidentifier():
+            continue
+        try:
+            _jedi.Script(code='import %s\n%s.' % (name, name)).complete(2, len(name) + 1)
+        except Exception:
+            pass

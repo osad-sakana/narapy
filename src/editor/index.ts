@@ -3,7 +3,8 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { getFontSize } from './fontSize'
 import { PALETTES, bareHex, type Palette, type ResolvedTheme } from '../theme/palette'
 import { getResolvedTheme, onThemeChange } from '../theme/index'
-import { registerPythonCompletion } from './completion'
+import { preloadImports, registerPythonCompletion } from './completion'
+import { createImportPreloader } from './importPreload'
 import { registerPythonIntel } from './intelProviders'
 import { openSuggestDetailsOnce } from './suggestDetails'
 import type { ModelRegistryHost } from './modelRegistry'
@@ -86,6 +87,17 @@ function defineThemes(): void {
   }
 }
 
+// コードが変わったら、import されたパッケージの読み込みを先に始める
+const IMPORT_PRELOAD_DELAY_MS = 500
+
+function watchImports(editor: monaco.editor.IStandaloneCodeEditor): void {
+  const preloader = createImportPreloader({ delayMs: IMPORT_PRELOAD_DELAY_MS, send: preloadImports })
+  editor.onDidChangeModelContent(() => {
+    preloader.schedule(editor.getValue(), editor.getPosition()?.lineNumber ?? 0)
+  })
+  editor.onDidDispose(() => preloader.dispose())
+}
+
 export function createEditor(container: HTMLElement): EditorInstance {
   defineThemes()
   // setTheme はエディタ単位ではなくグローバルに効くため、インスタンスは参照しない
@@ -128,6 +140,7 @@ export function createEditor(container: HTMLElement): EditorInstance {
   })
 
   openSuggestDetailsOnce(editor)
+  watchImports(editor)
 
   return editor
 }

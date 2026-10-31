@@ -232,6 +232,12 @@ export function requestFormat(code: string): Promise<FormatResult> {
   return formatRequester.request(code)
 }
 
+// import が書かれたら、補完の要求を待たずにそのパッケージの読み込みを Worker に頼む
+export function preloadImports(code: string, cursorLine: number): void {
+  if (code.length > CODE_MAX_CHARS) return
+  getOrCreateWorker().postMessage({ type: 'preload', code, line: cursorLine })
+}
+
 export function registerPythonCompletion(): monaco.IDisposable {
   getOrCreateWorker()
 

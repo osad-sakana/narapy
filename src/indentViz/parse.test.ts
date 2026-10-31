@@ -113,6 +113,21 @@ describe('parseIndentTree', () => {
     expect(types(parseIndentTree(src))).toEqual(['other', 'other', 'other', 'other', 'assignment'])
   })
 
+  it('日本語の変数名でも代入・for・複合文を判定できる', () => {
+    expect(types(parseIndentTree('合計 = 0\nfor 番号 in 一覧:\n    pass\n合計: int = 1'))).toEqual(['assignment', 'for', 'assignment'])
+  })
+
+  it('キーワードで始まる非ASCII識別子を複合文にしない', () => {
+    expect(types(parseIndentTree('for合計 = 1\nif変数 = 2'))).toEqual(['assignment', 'assignment'])
+  })
+
+  it('デコレータ付きの def / class はデコレータの行から数える', () => {
+    const [fn] = parseIndentTree('x = 1\n@a\n@b\ndef f():\n    pass')
+    expect(fn.line).toBe(1)
+    const tree = parseIndentTree('x = 1\n@a\n@b\ndef f():\n    pass')
+    expect(tree.map(n => n.line)).toEqual([1, 2])
+  })
+
   it('複数行の文は1ノードで、先頭行番号と改行を保つ', () => {
     const tree = parseIndentTree('x = [\n    1,\n    2,\n]\ny = 1')
     expect(tree).toHaveLength(2)

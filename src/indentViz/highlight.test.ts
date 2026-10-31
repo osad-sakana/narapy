@@ -47,4 +47,11 @@ describe('highlightStatement', () => {
   it('複数行の文は行数を保つ', () => {
     expect(highlightStatement('x = [\n  1,\n]', 'assignment')).toHaveLength(3)
   })
+
+  it('日本語の変数名もハイライトできる', () => {
+    const [assign] = highlightStatement('合計 = 1', 'assignment')
+    expect(assign.find(x => x.cls === 'var')?.text).toBe('合計')
+    const [loop] = highlightStatement('for 番号 in 一覧:', 'for')
+    expect(loop.find(x => x.cls === 'loopvar')?.text).toBe('番号')
+  })
 })

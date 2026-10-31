@@ -18,13 +18,14 @@ export interface VizNode {
   readonly children: readonly VizNode[]
 }
 
-const HARD_COMPOUND = /^(?:async\s+)?(def|class|if|elif|else|for|while|try|except|finally|with)\b/
-const SOFT_COMPOUND = /^(match|case)\b/
-const IMPORT = /^(?:import\s|from\s+\S+\s+import\b)/
+// 識別子は日本語などの非ASCIIも使えるので、\w / \b ではなく Unicode の文字クラスで判定する
+const HARD_COMPOUND = /^(?:async\s+)?(def|class|if|elif|else|for|while|try|except|finally|with)(?![\p{L}\p{N}_])/u
+const SOFT_COMPOUND = /^(match|case)(?![\p{L}\p{N}_])/u
+const IMPORT = /^(?:import\s|from\s+\S+\s+import(?![\p{L}\p{N}_]))/u
 
 // 左辺に括弧を許さないことで foo(a=1) のキーワード引数を代入から除く
-const ASSIGNMENT = /^[\w.[\],\s*'"-]+(?:\/\/|\*\*|>>|<<|[-+*/%@&|^])?=(?!=)/
-const ANNOTATION = /^[A-Za-z_][\w.]*\s*:\s*[^=\s]/
+const ASSIGNMENT = /^[\p{L}\p{N}_.[\],\s*'"-]+(?:\/\/|\*\*|>>|<<|[-+*/%@&|^])?=(?!=)/u
+const ANNOTATION = /^[\p{L}_][\p{L}\p{N}_.]*\s*:\s*[^=\s]/u
 
 function firstLine(text: string): string {
   return text.split('\n', 1)[0]
@@ -91,7 +92,8 @@ function parseScope(ctx: ParseContext, parentIndent: number, insideClass: boolea
       type,
       decorators: keepsDecorators ? decorators.map(d => d.text) : [],
       text: line.text,
-      line: line.line,
+      // デコレータ付きは先頭のデコレータ行から数える（エディタ上端との対応を取るため）
+      line: keepsDecorators && decorators.length > 0 ? decorators[0].line : line.line,
       children,
     })
     decorators = []

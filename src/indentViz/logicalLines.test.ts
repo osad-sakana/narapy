@@ -73,6 +73,10 @@ describe('splitLogicalLines', () => {
     expect(lines.map(l => l.text)).toEqual(['print(', 'if x:', 'y = 1', 'z = 2'])
   })
 
+  it('match / case は式が続かない行（辞書キー等）では打ち切らない', () => {
+    expect(splitLogicalLines('d = {\nmatch: 1,\ncase :2,\n}')).toHaveLength(1)
+  })
+
   it('未閉括弧の直後の match も打ち切りに使う', () => {
     expect(splitLogicalLines('foo(\nmatch x:\n    case 1:').map(l => l.text)).toEqual(['foo(', 'match x:', 'case 1:'])
   })

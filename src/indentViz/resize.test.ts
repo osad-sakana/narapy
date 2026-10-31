@@ -149,4 +149,44 @@ describe('attachResize', () => {
     window.dispatchEvent(new Event('resize'))
     expect(panel.style.width).toBe('600px')
   })
+
+  it('起動時の上限が狭くても、希望幅は保存値のまま持ち、広がれば戻る', () => {
+    const { panel, max } = setup(600, 300)
+    expect(panel.style.width).toBe('300px')
+    max.value = 800
+    window.dispatchEvent(new Event('resize'))
+    expect(panel.style.width).toBe('600px')
+  })
+})
+
+describe('attachResize の兄弟パネル監視', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('エディタ列の幅が変わったら上限をかけ直す（自パネルは監視しない）', () => {
+    const observed: Element[] = []
+    let notify: () => void = () => {}
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(cb: () => void) { notify = cb }
+      observe(el: Element): void { observed.push(el) }
+    })
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 1 })
+
+    const row = document.createElement('section')
+    const explorer = document.createElement('aside')
+    const editor = document.createElement('div')
+    editor.className = 'flex-1'
+    const panel = document.createElement('aside')
+    row.append(explorer, editor, panel)
+    const handle = document.createElement('div')
+    const max = { value: 800 }
+    attachResize({ panel, handle, initialWidth: 600, getMaxWidth: () => max.value, onCommit: vi.fn() })
+
+    expect(observed).toEqual([editor])
+    max.value = 350
+    notify()
+    expect(panel.style.width).toBe('350px')
+  })
 })

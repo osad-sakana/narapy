@@ -19,9 +19,9 @@ const OTHER_KEYWORD_TONES: Readonly<Record<string, StatementType>> = {
   pass: 'other', raise: 'other', assert: 'other',
 }
 
-const COMPOUND_KEYWORD = /^(\s*)((?:async\s+)?(?:def|class|if|elif|else|for|while|try|except|finally|with|match|case))\b(.*)$/
-const FOR_LOOP = /^(\s*)(async\s+)?(for)\s+([A-Za-z_][\w,\s]*?)\s+(in)\s+(.*)$/
-const ASSIGN = /^([A-Za-z_][\w,\s[\].]*?)\s*=\s*(?!=)(.*)$/
+const COMPOUND_KEYWORD = /^(\s*)((?:async\s+)?(?:def|class|if|elif|else|for|while|try|except|finally|with|match|case))(?![\p{L}\p{N}_])(.*)$/u
+const FOR_LOOP = /^(\s*)(async\s+)?(for)\s+([\p{L}_][\p{L}\p{N}_,\s]*?)\s+(in)\s+(.*)$/u
+const ASSIGN = /^([\p{L}_][\p{L}\p{N}_,\s[\].]*?)\s*=\s*(?!=)(.*)$/u
 
 function highlightFor(line: string): Segment[] | null {
   const m = FOR_LOOP.exec(line)
@@ -50,7 +50,7 @@ function highlightAssignment(lines: readonly string[]): Segment[][] {
 }
 
 function highlightOther(line: string): Segment[] {
-  const m = /^(\s*)([A-Za-z_]\w*)(.*)$/.exec(line)
+  const m = /^(\s*)([\p{L}_][\p{L}\p{N}_]*)(.*)$/u.exec(line)
   const tone = m ? OTHER_KEYWORD_TONES[m[2]] : undefined
   return m && tone ? [plain(m[1]), seg(m[2], 'keyword', tone), plain(m[3])] : [plain(line)]
 }

@@ -7,9 +7,14 @@ const MAX_WIDTH = 800
 const MIN_EDITOR_WIDTH = 320
 const KEY_STEP = 16
 
+/** 与えられた上限を、パネルとして取りうる範囲 [MIN_WIDTH, MAX_WIDTH] に丸める */
+export function limitFor(maxWidth: number): number {
+  return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.floor(maxWidth)))
+}
+
 /** 幅を [MIN_WIDTH, maxWidth] に収める。数値でない値は既定幅として扱う */
 export function clampWidth(width: number, maxWidth: number): number {
-  const max = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.floor(maxWidth)))
+  const max = limitFor(maxWidth)
   const wanted = Number.isFinite(width) ? width : DEFAULT_WIDTH
   return Math.min(max, Math.max(MIN_WIDTH, Math.round(wanted)))
 }
@@ -44,11 +49,27 @@ export function saveWidth(storage: Pick<Storage, 'setItem'> | null, width: numbe
   }
 }
 
+function observeSiblings(panel: HTMLElement, onChange: () => void): void {
+  const row = panel.parentElement
+  if (!row || typeof ResizeObserver === 'undefined') return
+  let frame: number | undefined
+  const observer = new ResizeObserver(() => {
+    if (frame !== undefined) return
+    frame = window.requestAnimationFrame(() => {
+      frame = undefined
+      onChange()
+    })
+  })
+  for (const el of row.children) {
+    if (el !== panel && el.classList.contains('flex-1')) observer.observe(el)
+  }
+}
+
 export interface ResizeOptions {
   readonly panel: HTMLElement
   readonly handle: HTMLElement
   readonly initialWidth: number
-  /** 今パネルに割ける最大幅（他の固定幅パネルの開閉で変わる） */
+  /** 今パネルに割ける最大幅（他の固定幅パネルの開閉で変わる。変化はエディタ列の ResizeObserver で拾う） */
   readonly getMaxWidth: () => number
   readonly onCommit: (width: number) => void
 }
@@ -58,11 +79,12 @@ export interface ResizeOptions {
  * パネルは右端に固定されているので、左へ動かすほど広がる。
  */
 export function attachResize({ panel, handle, initialWidth, getMaxWidth, onCommit }: ResizeOptions): void {
-  // 希望幅と実際に適用した幅を分ける。ウィンドウを縮めてから広げたら希望幅へ戻れるようにする
-  let desired = clampWidth(initialWidth, getMaxWidth())
+  // 希望幅と実際に適用した幅を分ける。ウィンドウを縮めてから広げたら希望幅へ戻れるようにする。
+  // 起動時の上限はその時点のものでしかないので、希望幅は絶対上限だけで収める
+  let desired = clampWidth(initialWidth, MAX_WIDTH)
 
   function apply(): number {
-    const max = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.floor(getMaxWidth())))
+    const max = limitFor(getMaxWidth())
     const width = clampWidth(desired, max)
     panel.style.width = `${width}px`
     handle.setAttribute('aria-valuemin', String(MIN_WIDTH))
@@ -110,7 +132,10 @@ export function attachResize({ panel, handle, initialWidth, getMaxWidth, onCommi
     onCommit(desired)
   })
 
-  // ウィンドウや他パネルの幅が変わったとき、上限を超えたままにならないようにする
+  // ウィンドウ幅の変化に加え、ステップ実行パネルの開閉やエクスプローラーの幅変更でも
+  // エディタ列の幅が変わる。上限を超えたままにならないよう、flex-1 の兄弟（エディタ列）も監視する。
+  // 自パネルは監視しない（apply が自分の幅を変えるため循環する）。再適用は同じ結果に収束する
   window.addEventListener('resize', apply)
+  observeSiblings(panel, apply)
   apply()
 }

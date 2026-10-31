@@ -1,5 +1,6 @@
 import * as monaco from 'monaco-editor'
-import { parseFormatResult, type FormatResult } from '../format/result'
+import { createFormatRequester } from '../format/requester'
+import type { FormatResult } from '../format/result'
 
 type WorkerOut =
   | { type: 'ready' }
@@ -73,10 +74,17 @@ let worker: Worker | null = null
 let workerReady = false
 let nextId = 0
 const pending = new Map<number, PendingEntry>()
-// 整形リクエストは補完とは別マップで管理する（id は nextId を共有するので衝突しない）
-const pendingFormats = new Map<number, (result: FormatResult) => void>()
-// 初回は autopep8 の導入（micropip）を含むため補完より長く待つ
+// 整形は補完とは別管理（id は nextId を共有するので衝突しない）。
+// 初回は autopep8 の導入を含むため補完より長く待つ。上限は pycodestyle が WASM 上で
+// 補完 Worker を長く塞がないよう、補完(200k)より小さくしている
 const FORMAT_TIMEOUT_MS = 30_000
+const FORMAT_MAX_CHARS = 50_000
+const formatRequester = createFormatRequester({
+  nextId: () => ++nextId,
+  post: (message) => getOrCreateWorker().postMessage(message),
+  timeoutMs: FORMAT_TIMEOUT_MS,
+  maxChars: FORMAT_MAX_CHARS,
+})
 
 // pending エントリをタイマーごとキャンセルして静的候補で解決する
 function evictEntry(id: number): void {
@@ -90,8 +98,7 @@ function evictEntry(id: number): void {
 // Worker クラッシュ時に全 pending を解決してワーカーを再生成可能な状態にする（HIGH-2）
 function handleWorkerFailure(): void {
   for (const [id] of pending) evictEntry(id)
-  for (const resolve of pendingFormats.values()) resolve({ status: 'unavailable' })
-  pendingFormats.clear()
+  formatRequester.failAll()
   worker?.terminate()
   worker = null
   workerReady = false
@@ -111,17 +118,7 @@ function getOrCreateWorker(): Worker {
       workerReady = true
       return
     }
-    if (msg.type === 'formatted' || msg.type === 'format_error') {
-      const done = pendingFormats.get(msg.id)
-      if (!done) return
-      pendingFormats.delete(msg.id)
-      done(
-        msg.type === 'formatted'
-          ? (parseFormatResult(msg.result) ?? { status: 'unavailable' })
-          : { status: 'unavailable' },
-      )
-      return
-    }
+    if (formatRequester.handle(msg)) return
     const entry = pending.get(msg.id)
     if (!entry) return
     clearTimeout(entry.timer)
@@ -157,20 +154,7 @@ function getOrCreateWorker(): Worker {
 }
 
 export function requestFormat(code: string): Promise<FormatResult> {
-  if (code.length > CODE_MAX_CHARS) return Promise.resolve({ status: 'too_large' })
-
-  const id = ++nextId
-  return new Promise<FormatResult>((resolve) => {
-    const timer = setTimeout(() => {
-      pendingFormats.delete(id)
-      resolve({ status: 'timeout' })
-    }, FORMAT_TIMEOUT_MS)
-    pendingFormats.set(id, (result) => {
-      clearTimeout(timer)
-      resolve(result)
-    })
-    getOrCreateWorker().postMessage({ type: 'format', id, code })
-  })
+  return formatRequester.request(code)
 }
 
 export function registerPythonCompletion(): monaco.IDisposable {

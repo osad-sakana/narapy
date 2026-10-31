@@ -35,10 +35,11 @@ let pyodide: PyodideInterface | null = null
 // autopep8 は初回の整形時だけ導入する（補完の準備完了を PyPI 待ちにしないため）。
 // 失敗したらメモを捨て、オフライン復帰後に再試行できるようにする。
 let formatterReady: Promise<void> | null = null
+const INSTALL_TIMEOUT_MS = 25_000
 
 function ensureFormatter(py: PyodideInterface): Promise<void> {
   if (formatterReady) return formatterReady
-  const attempt = (async () => {
+  const install = (async () => {
     await py.loadPackage('micropip', { messageCallback: () => undefined })
     py.globals.set('_reqs', AUTOPEP8_REQUIREMENTS)
     await py.runPythonAsync(`
@@ -47,6 +48,11 @@ await _mp.install(list(_reqs))
 `)
     py.runPython(FORMAT_PY)
   })()
+  // micropip がハングしても次回以降に再試行できるよう、Worker 側でも時間切れにする
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('formatter install timeout')), INSTALL_TIMEOUT_MS)
+  })
+  const attempt = Promise.race([install, timeout])
   formatterReady = attempt
   attempt.catch(() => { if (formatterReady === attempt) formatterReady = null })
   return attempt
@@ -75,7 +81,19 @@ def _complete(source, line, col):
   self.postMessage({ type: 'ready' } satisfies OutMessage)
 }
 
-const initPromise = init()
+// init 失敗後も次のリクエストで再試行できるよう、失敗したらメモを捨てる
+let initPromise: Promise<void> | null = null
+
+function getInit(): Promise<void> {
+  if (!initPromise) {
+    const attempt = init()
+    initPromise = attempt
+    attempt.catch(() => { if (initPromise === attempt) initPromise = null })
+  }
+  return initPromise
+}
+
+getInit().catch(() => undefined)
 
 function isValidId(id: unknown): id is number {
   return typeof id === 'number' && Number.isInteger(id)
@@ -97,7 +115,7 @@ function isFormatMessage(msg: InMessage): msg is FormatMessage {
 
 async function handleFormat({ id, code }: FormatMessage): Promise<void> {
   try {
-    await initPromise
+    await getInit()
     if (!pyodide) throw new Error('pyodide not ready')
     await ensureFormatter(pyodide)
     pyodide.globals.set('_fmt_src', code)
@@ -123,7 +141,7 @@ self.onmessage = async (event: MessageEvent<InMessage>) => {
   const { id, code, line, col } = msg
 
   try {
-    await initPromise
+    await getInit()
     if (!pyodide) {
       self.postMessage({ type: 'complete_error', id } satisfies OutMessage)
       return

@@ -15,6 +15,10 @@ describe('parseFormatResult', () => {
     expect(parseFormatResult({ status: 'rejected' })).toEqual({ status: 'rejected' })
   })
 
+  it('failed を受け付ける', () => {
+    expect(parseFormatResult({ status: 'failed' })).toEqual({ status: 'failed' })
+  })
+
   it.each([
     null, 'x', 1, {}, { status: 'ok' }, { status: 'ok', code: 1 },
     { status: 'syntax_error', line: 'a', msg: 'x' }, { status: 'syntax_error', line: 1.5, msg: 'x' },
@@ -30,7 +34,7 @@ describe('formatMessage', () => {
   })
 
   it('結果ごとに文言がある', () => {
-    for (const status of ['unchanged', 'rejected', 'unavailable', 'too_large', 'timeout'] as const) {
+    for (const status of ['unchanged', 'rejected', 'failed', 'unavailable', 'too_large', 'timeout'] as const) {
       expect(formatMessage({ status })).not.toBe('')
     }
   })

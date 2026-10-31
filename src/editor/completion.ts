@@ -8,6 +8,7 @@ type WorkerOut = CompletionWorkerOut
 type PendingEntry = {
   resolve: (items: monaco.languages.CompletionItem[]) => void
   range: monaco.IRange
+  afterDot: boolean
   timer: ReturnType<typeof setTimeout>
 }
 
@@ -62,11 +63,18 @@ function originSuffix(item: RawCompletion): string | undefined {
   return origin === '' ? undefined : `  ${origin}`
 }
 
+// _ で始まる内部名（__all__ や _acos 等）は一覧の後ろへ回し、使う頻度の高い名前を先に出す
+function sortKey(name: string): string {
+  return `${name.startsWith('_') ? '1' : '0'}${name}`
+}
+
 function labelText(item: monaco.languages.CompletionItem): string {
   return typeof item.label === 'string' ? item.label : item.label.label
 }
 
-function buildStaticItems(range: monaco.IRange): monaco.languages.CompletionItem[] {
+// `random.` のようにドットの後ろでは、キーワードや組み込み関数は的外れなので出さない
+function buildStaticItems(range: monaco.IRange, afterDot: boolean): monaco.languages.CompletionItem[] {
+  if (afterDot) return []
   const { Keyword, Function, Class } = monaco.languages.CompletionItemKind
   return [
     ...STATIC_KEYWORDS.map((kw) => staticItem(kw, Keyword, 'キーワード', range)),
@@ -79,11 +87,42 @@ function buildStaticItems(range: monaco.IRange): monaco.languages.CompletionItem
 const CODE_MAX_CHARS = 200_000
 // 未解決リクエストの上限（超えたら最古をフォールバック解決してリソース枯渇を防ぐ）
 const PENDING_MAX = 5
+// hover / 引数ヘルプの応答待ち上限
+const QUERY_TIMEOUT_MS = 2000
+const AFTER_DOT = /\.\s*\w*$/
 
 let worker: Worker | null = null
 let workerReady = false
 let nextId = 0
 const pending = new Map<number, PendingEntry>()
+const queries = new Map<number, { resolve: (value: unknown) => void; timer: ReturnType<typeof setTimeout> }>()
+
+function settleQuery(id: number, value: unknown): void {
+  const q = queries.get(id)
+  if (!q) return
+  queries.delete(id)
+  clearTimeout(q.timer)
+  q.resolve(value)
+}
+
+// hover / 引数ヘルプの問い合わせ。Worker 未準備・長大コード・タイムアウト・失敗は null
+export function queryWorker(
+  type: 'hover' | 'signature',
+  model: monaco.editor.ITextModel,
+  position: monaco.IPosition,
+): Promise<unknown> {
+  if (!workerReady) return Promise.resolve(null)
+  const code = model.getValue()
+  if (code.length > CODE_MAX_CHARS) return Promise.resolve(null)
+  const id = ++nextId
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => settleQuery(id, null), QUERY_TIMEOUT_MS)
+    queries.set(id, { resolve, timer })
+    getOrCreateWorker().postMessage({
+      type, id, code, line: position.lineNumber, col: position.column - 1,
+    })
+  })
+}
 
 // pending エントリをタイマーごとキャンセルして静的候補で解決する
 function evictEntry(id: number): void {
@@ -91,12 +130,13 @@ function evictEntry(id: number): void {
   if (!entry) return
   pending.delete(id)
   clearTimeout(entry.timer)
-  entry.resolve(buildStaticItems(entry.range))
+  entry.resolve(buildStaticItems(entry.range, entry.afterDot))
 }
 
 // Worker クラッシュ時に全 pending を解決してワーカーを再生成可能な状態にする（HIGH-2）
 function handleWorkerFailure(): void {
   for (const [id] of pending) evictEntry(id)
+  for (const [id] of queries) settleQuery(id, null)
   worker?.terminate()
   worker = null
   workerReady = false
@@ -116,6 +156,10 @@ function getOrCreateWorker(): Worker {
       workerReady = true
       return
     }
+    if (msg.type === 'query_result') {
+      settleQuery(msg.id, msg.value)
+      return
+    }
     const entry = pending.get(msg.id)
     if (!entry) return
     clearTimeout(entry.timer)
@@ -127,15 +171,16 @@ function getOrCreateWorker(): Worker {
         kind: toKind(item.type),
         insertText: item.name,
         filterText: item.name,
+        sortText: sortKey(item.name),
         range: entry.range,
       }))
       const jediNames = new Set(msg.items.map((i) => i.name))
-      const extras = buildStaticItems(entry.range).filter(
+      const extras = buildStaticItems(entry.range, entry.afterDot).filter(
         (item) => !jediNames.has(labelText(item)),
       )
       entry.resolve([...jediItems, ...extras])
     } else {
-      entry.resolve(buildStaticItems(entry.range))
+      entry.resolve(buildStaticItems(entry.range, entry.afterDot))
     }
   }
 
@@ -155,6 +200,7 @@ export function registerPythonCompletion(): monaco.IDisposable {
   getOrCreateWorker()
 
   return monaco.languages.registerCompletionItemProvider('python', {
+    triggerCharacters: ['.'],
     async provideCompletionItems(model, position) {
       const word = model.getWordUntilPosition(position)
       const range: monaco.IRange = {
@@ -164,13 +210,19 @@ export function registerPythonCompletion(): monaco.IDisposable {
         endColumn: word.endColumn,
       }
 
+      const lineHead = model.getValueInRange({
+        startLineNumber: position.lineNumber, startColumn: 1,
+        endLineNumber: position.lineNumber, endColumn: position.column,
+      })
+      const afterDot = AFTER_DOT.test(lineHead)
+
       if (!workerReady) {
-        return { suggestions: buildStaticItems(range) }
+        return { suggestions: buildStaticItems(range, afterDot) }
       }
 
       const code = model.getValue()
       if (code.length > CODE_MAX_CHARS) {
-        return { suggestions: buildStaticItems(range) }
+        return { suggestions: buildStaticItems(range, afterDot) }
       }
 
       const id = ++nextId
@@ -186,11 +238,12 @@ export function registerPythonCompletion(): monaco.IDisposable {
 
         const timer = setTimeout(() => {
           pending.delete(id)
-          resolve({ suggestions: buildStaticItems(range) })
+          resolve({ suggestions: buildStaticItems(range, afterDot) })
         }, 2000)
 
         pending.set(id, {
           range,
+          afterDot,
           timer,
           resolve: (items) => {
             resolve({ suggestions: items })

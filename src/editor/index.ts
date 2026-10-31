@@ -4,6 +4,7 @@ import { getFontSize } from './fontSize'
 import { PALETTES, bareHex, type Palette, type ResolvedTheme } from '../theme/palette'
 import { getResolvedTheme, onThemeChange } from '../theme/index'
 import { registerPythonCompletion } from './completion'
+import { registerPythonIntel } from './intelProviders'
 import type { ModelRegistryHost } from './modelRegistry'
 
 export type EditorInstance = monaco.editor.IStandaloneCodeEditor
@@ -17,6 +18,7 @@ window.MonacoEnvironment = {
 }
 
 registerPythonCompletion()
+registerPythonIntel()
 
 const THEME_NAMES: Record<ResolvedTheme, string> = {
   dark: 'narapy-dark',
@@ -112,8 +114,8 @@ export function createEditor(container: HTMLElement): EditorInstance {
     acceptSuggestionOnEnter: 'off',
     tabCompletion: 'on',
     suggest: { showStatusBar: true },
-    parameterHints: { enabled: false },
-    hover: { enabled: false },
+    parameterHints: { enabled: true, cycle: true },
+    hover: { enabled: true, delay: 300 },
     // Ctrl+Enter / Cmd+Enter でコード実行（main.ts でハンドル）
     overviewRulerLanes: 0,
     hideCursorInOverviewRuler: true,

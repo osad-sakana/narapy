@@ -57,3 +57,47 @@ def _complete(source, line, col):
         return _json.dumps(out)
     except Exception:
         return '[]'
+
+
+# docstring の長さ上限（巨大なモジュール docstring を Worker 間で送らない）
+_DOC_MAX = 4000
+
+
+def _hover(source, line, col):
+    try:
+        script = _jedi.Script(code=source)
+        names = script.help(line, col)
+        if not names:
+            return 'null'
+        n = names[0]
+        if n.type == 'statement':
+            # random.randint のように代入で束ねられた関数・クラスは定義元まで辿る
+            inferred = [d for d in script.infer(line, col) if d.type in ('function', 'class')]
+            if inferred:
+                n = inferred[0]
+        sigs = n.get_signatures() if n.type in ('function', 'class') else []
+        return _json.dumps({
+            'name': n.name,
+            'type': n.type,
+            'signature': sigs[0].to_string() if sigs else '',
+            'doc': (n.docstring(raw=True) or '')[:_DOC_MAX],
+            'description': n.description or '',
+        })
+    except Exception:
+        return 'null'
+
+
+def _signature(source, line, col):
+    try:
+        sigs = _jedi.Script(code=source).get_signatures(line, col)
+        if not sigs:
+            return 'null'
+        s = sigs[0]
+        return _json.dumps({
+            'name': s.name,
+            'params': [p.to_string() for p in s.params],
+            'index': s.index if s.index is not None else -1,
+            'doc': (s.docstring(raw=True) or '')[:_DOC_MAX],
+        })
+    except Exception:
+        return 'null'

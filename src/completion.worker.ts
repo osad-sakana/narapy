@@ -4,7 +4,15 @@ import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from './lib/pyodideLoad
 import completionHelperSource from './completion_helper.py?raw'
 import { parseCompletionItems, type CompletionWorkerOut } from './editor/completionMeta'
 
-type InMessage = { type: 'complete'; id: number; code: string; line: number; col: number }
+type RequestType = 'complete' | 'hover' | 'signature'
+type InMessage = { type: RequestType; id: number; code: string; line: number; col: number }
+
+// 呼び出す Python 関数名は固定の対応表から選ぶ（メッセージ由来の文字列を実行に使わない）
+const PY_FUNCTIONS: Record<RequestType, string> = {
+  complete: '_complete',
+  hover: '_hover',
+  signature: '_signature',
+}
 
 type OutMessage = CompletionWorkerOut
 
@@ -41,13 +49,19 @@ async function init(): Promise<void> {
 
 const initPromise = init()
 
+function postFailure(type: RequestType, id: number): void {
+  const out: OutMessage =
+    type === 'complete' ? { type: 'complete_error', id } : { type: 'query_result', id, value: null }
+  self.postMessage(out)
+}
+
 self.onmessage = async (event: MessageEvent<InMessage>) => {
   const msg = event.data
 
   // ランタイムでメッセージ構造を検証することで型アサーション由来の不正入力を防ぐ
   if (
     !msg ||
-    msg.type !== 'complete' ||
+    !(msg.type in PY_FUNCTIONS) ||
     typeof msg.id !== 'number' || !Number.isInteger(msg.id) ||
     typeof msg.code !== 'string' ||
     typeof msg.line !== 'number' || !Number.isInteger(msg.line) || msg.line < 1 ||
@@ -59,22 +73,25 @@ self.onmessage = async (event: MessageEvent<InMessage>) => {
   try {
     await initPromise
     if (!pyodide) {
-      self.postMessage({ type: 'complete_error', id } satisfies OutMessage)
+      postFailure(msg.type, id)
       return
     }
     // line/col もglobals経由で渡してテンプレート文字列への直接埋込みを廃止
     pyodide.globals.set('_src', code)
     pyodide.globals.set('_line', line)
     pyodide.globals.set('_col', col)
-    const result = pyodide.runPython('_complete(_src, _line, _col)')
+    const result = pyodide.runPython(`${PY_FUNCTIONS[msg.type]}(_src, _line, _col)`)
 
     // runPythonの戻り値をランタイム検証してから使う（L-3）
-    const json = typeof result === 'string' ? result : '[]'
+    const json = typeof result === 'string' ? result : 'null'
     const parsed: unknown = JSON.parse(json)
-    const items = parseCompletionItems(parsed)
 
-    self.postMessage({ type: 'completions', id, items } satisfies OutMessage)
+    if (msg.type === 'complete') {
+      self.postMessage({ type: 'completions', id, items: parseCompletionItems(parsed) } satisfies OutMessage)
+    } else {
+      self.postMessage({ type: 'query_result', id, value: parsed } satisfies OutMessage)
+    }
   } catch {
-    self.postMessage({ type: 'complete_error', id } satisfies OutMessage)
+    postFailure(msg.type, id)
   }
 }

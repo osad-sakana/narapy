@@ -1,9 +1,12 @@
 import * as monaco from 'monaco-editor'
+import { parseFormatResult, type FormatResult } from '../format/result'
 
 type WorkerOut =
   | { type: 'ready' }
   | { type: 'completions'; id: number; items: Array<{ name: string; type: string }> }
   | { type: 'complete_error'; id: number }
+  | { type: 'formatted'; id: number; result: unknown }
+  | { type: 'format_error'; id: number }
 
 type PendingEntry = {
   resolve: (items: monaco.languages.CompletionItem[]) => void
@@ -70,6 +73,10 @@ let worker: Worker | null = null
 let workerReady = false
 let nextId = 0
 const pending = new Map<number, PendingEntry>()
+// 整形リクエストは補完とは別マップで管理する（id は nextId を共有するので衝突しない）
+const pendingFormats = new Map<number, (result: FormatResult) => void>()
+// 初回は autopep8 の導入（micropip）を含むため補完より長く待つ
+const FORMAT_TIMEOUT_MS = 30_000
 
 // pending エントリをタイマーごとキャンセルして静的候補で解決する
 function evictEntry(id: number): void {
@@ -83,6 +90,8 @@ function evictEntry(id: number): void {
 // Worker クラッシュ時に全 pending を解決してワーカーを再生成可能な状態にする（HIGH-2）
 function handleWorkerFailure(): void {
   for (const [id] of pending) evictEntry(id)
+  for (const resolve of pendingFormats.values()) resolve({ status: 'unavailable' })
+  pendingFormats.clear()
   worker?.terminate()
   worker = null
   workerReady = false
@@ -100,6 +109,17 @@ function getOrCreateWorker(): Worker {
     const msg = event.data
     if (msg.type === 'ready') {
       workerReady = true
+      return
+    }
+    if (msg.type === 'formatted' || msg.type === 'format_error') {
+      const done = pendingFormats.get(msg.id)
+      if (!done) return
+      pendingFormats.delete(msg.id)
+      done(
+        msg.type === 'formatted'
+          ? (parseFormatResult(msg.result) ?? { status: 'unavailable' })
+          : { status: 'unavailable' },
+      )
       return
     }
     const entry = pending.get(msg.id)
@@ -134,6 +154,23 @@ function getOrCreateWorker(): Worker {
   }
 
   return worker
+}
+
+export function requestFormat(code: string): Promise<FormatResult> {
+  if (code.length > CODE_MAX_CHARS) return Promise.resolve({ status: 'too_large' })
+
+  const id = ++nextId
+  return new Promise<FormatResult>((resolve) => {
+    const timer = setTimeout(() => {
+      pendingFormats.delete(id)
+      resolve({ status: 'timeout' })
+    }, FORMAT_TIMEOUT_MS)
+    pendingFormats.set(id, (result) => {
+      clearTimeout(timer)
+      resolve(result)
+    })
+    getOrCreateWorker().postMessage({ type: 'format', id, code })
+  })
 }
 
 export function registerPythonCompletion(): monaco.IDisposable {

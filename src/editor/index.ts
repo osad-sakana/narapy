@@ -3,7 +3,10 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { getFontSize } from './fontSize'
 import { PALETTES, bareHex, type Palette, type ResolvedTheme } from '../theme/palette'
 import { getResolvedTheme, onThemeChange } from '../theme/index'
-import { registerPythonCompletion } from './completion'
+import { preloadImports, registerPythonCompletion } from './completion'
+import { createImportPreloader } from './importPreload'
+import { registerPythonIntel } from './intelProviders'
+import { openSuggestDetailsOnce } from './suggestDetails'
 import type { ModelRegistryHost } from './modelRegistry'
 
 export type EditorInstance = monaco.editor.IStandaloneCodeEditor
@@ -17,6 +20,7 @@ window.MonacoEnvironment = {
 }
 
 registerPythonCompletion()
+registerPythonIntel()
 
 const THEME_NAMES: Record<ResolvedTheme, string> = {
   dark: 'narapy-dark',
@@ -83,6 +87,17 @@ function defineThemes(): void {
   }
 }
 
+// コードが変わったら、import されたパッケージの読み込みを先に始める
+const IMPORT_PRELOAD_DELAY_MS = 500
+
+function watchImports(editor: monaco.editor.IStandaloneCodeEditor): void {
+  const preloader = createImportPreloader({ delayMs: IMPORT_PRELOAD_DELAY_MS, send: preloadImports })
+  editor.onDidChangeModelContent(() => {
+    preloader.schedule(editor.getValue(), editor.getPosition()?.lineNumber ?? 0)
+  })
+  editor.onDidDispose(() => preloader.dispose())
+}
+
 export function createEditor(container: HTMLElement): EditorInstance {
   defineThemes()
   // setTheme はエディタ単位ではなくグローバルに効くため、インスタンスは参照しない
@@ -112,8 +127,8 @@ export function createEditor(container: HTMLElement): EditorInstance {
     acceptSuggestionOnEnter: 'off',
     tabCompletion: 'on',
     suggest: { showStatusBar: true },
-    parameterHints: { enabled: false },
-    hover: { enabled: false },
+    parameterHints: { enabled: true, cycle: true },
+    hover: { enabled: true, delay: 300 },
     // Ctrl+Enter / Cmd+Enter でコード実行（main.ts でハンドル）
     overviewRulerLanes: 0,
     hideCursorInOverviewRuler: true,
@@ -123,6 +138,9 @@ export function createEditor(container: HTMLElement): EditorInstance {
       horizontalScrollbarSize: 6,
     },
   })
+
+  openSuggestDetailsOnce(editor)
+  watchImports(editor)
 
   return editor
 }

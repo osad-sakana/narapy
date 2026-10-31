@@ -13,6 +13,8 @@ export type CompletionWorkerOut =
   | { type: 'ready' }
   | { type: 'completions'; id: number; items: RawCompletion[] }
   | { type: 'complete_error'; id: number }
+  // hover / 引数ヘルプの応答。失敗は value: null
+  | { type: 'query_result'; id: number; value: unknown }
 
 export const META_FIELD_MAX_CHARS = 64
 

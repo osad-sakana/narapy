@@ -1,7 +1,7 @@
 import * as monaco from 'monaco-editor'
 import { describeCompletion } from './completionLabel'
 import { describeOrigin } from './completionOrigin'
-import type { CompletionWorkerOut } from './completionMeta'
+import type { CompletionWorkerOut, RawCompletion } from './completionMeta'
 
 type WorkerOut = CompletionWorkerOut
 
@@ -54,6 +54,12 @@ function staticItem(
   range: monaco.IRange,
 ): monaco.languages.CompletionItem {
   return { label: { label: name, description }, kind, insertText: name, filterText: name, range }
+}
+
+// label.detail は名前の直後に常時表示される（item.detail は詳細パネルを開かないと見えない）
+function originSuffix(item: RawCompletion): string | undefined {
+  const origin = describeOrigin(item)
+  return origin === '' ? undefined : `  ${origin}`
 }
 
 function labelText(item: monaco.languages.CompletionItem): string {
@@ -117,9 +123,8 @@ function getOrCreateWorker(): Worker {
 
     if (msg.type === 'completions') {
       const jediItems = msg.items.map((item) => ({
-        label: { label: item.name, description: describeCompletion(item) },
+        label: { label: item.name, detail: originSuffix(item), description: describeCompletion(item) },
         kind: toKind(item.type),
-        detail: describeOrigin(item) || undefined,
         insertText: item.name,
         filterText: item.name,
         range: entry.range,

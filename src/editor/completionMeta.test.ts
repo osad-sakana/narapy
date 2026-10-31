@@ -49,4 +49,11 @@ describe('parseCompletionItems', () => {
     expect(item.module).toHaveLength(META_FIELD_MAX_CHARS)
     expect(item.parent).toBe('p q')
   })
+
+  it('line は正の整数以外を 0 にする', () => {
+    const lines = [-1, 1.5, '3', null, NaN, 0, 7].map(
+      (line) => parseCompletionItems([{ name: 'a', type: 'function', line }])[0].line,
+    )
+    expect(lines).toEqual([0, 0, 0, 0, 0, 0, 7])
+  })
 })

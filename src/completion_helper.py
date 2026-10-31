@@ -6,15 +6,27 @@ _META_BUDGET_SEC = 0.3
 _AFTER_DOT = _re.compile(r'\.\s*\w*$')
 
 
+def _parent(name):
+    try:
+        return name.parent()
+    except Exception:
+        return None
+
+
 def _owner(c, after_dot):
     # (module, parent, parentType, line, fullName) を返す。import した名前は定義元まで辿る
     target = c
-    p = target.parent()
+    p = _parent(target)
+    if p is None:
+        # import os のように親を持たないモジュール自身
+        return target.module_name or '', '', target.type or '', target.line, target.full_name or ''
     if p.type == 'module' and target.module_name == '__main__':
         defs = target.goto(follow_imports=True)
         if defs and defs[0].module_name != '__main__':
             target = defs[0]
-            p = target.parent()
+            p = _parent(target)
+            if p is None:
+                return target.module_name or '', '', target.type or '', target.line, target.full_name or ''
     if after_dot and p.type == 'function':
         # __init__ 内の self.x は所属クラスのメンバとして扱う
         gp = p.parent()

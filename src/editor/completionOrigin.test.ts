@@ -13,6 +13,12 @@ describe('describeOrigin', () => {
   it('定義行が不明なら空', () => {
     expect(describeOrigin({ ...base, module: '__main__' })).toBe('')
   })
+  it('解決できない import は import 元の完全名', () => {
+    expect(describeOrigin({ ...base, type: 'module', module: '__main__', line: 1, fullName: 'pygame' })).toBe('pygame')
+  })
+  it('ユーザー定義の完全名（__main__.x）は定義行を優先', () => {
+    expect(describeOrigin({ ...base, module: '__main__', line: 3, fullName: '__main__.greet' })).toBe('3行目で定義')
+  })
   it('他モジュールは完全名', () => {
     expect(describeOrigin({ ...base, module: 'random', fullName: 'random.randint' })).toBe('random.randint')
   })

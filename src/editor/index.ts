@@ -5,6 +5,7 @@ import { PALETTES, bareHex, type Palette, type ResolvedTheme } from '../theme/pa
 import { getResolvedTheme, onThemeChange } from '../theme/index'
 import { registerPythonCompletion } from './completion'
 import { registerPythonIntel } from './intelProviders'
+import { openSuggestDetailsOnce } from './suggestDetails'
 import type { ModelRegistryHost } from './modelRegistry'
 
 export type EditorInstance = monaco.editor.IStandaloneCodeEditor
@@ -125,6 +126,8 @@ export function createEditor(container: HTMLElement): EditorInstance {
       horizontalScrollbarSize: 6,
     },
   })
+
+  openSuggestDetailsOnce(editor)
 
   return editor
 }

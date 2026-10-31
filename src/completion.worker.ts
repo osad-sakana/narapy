@@ -77,7 +77,7 @@ async function init(): Promise<void> {
     PYODIDE_MJS_HASH,
   ) as PyodideModule
 
-  // 途中で失敗した再試行で Pyodide を二重に読み込まないよう、完了後にだけ代入する
+  // 途中まで初期化されたインスタンスを公開しないよう、完了後にだけ代入する
   const py = await loadPyodide({ indexURL: PYODIDE_CDN })
   await py.loadPackage(['jedi'], { messageCallback: () => undefined })
 

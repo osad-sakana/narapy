@@ -27,6 +27,7 @@ import { clearSharedLinkMark, markLoadedFromSharedLink } from './pygame/sharedLi
 import { applyProjectLoad } from './fileio/applyProjectLoad'
 import { createFileSwitcher } from './editor/fileSwitcher'
 import { initTheme } from './theme/index'
+import { initFormatController } from './format/controller'
 import { initHamburgerMenu } from './menu/ui'
 import { applyNewProject } from './menu/applyNewProject'
 import { createInstructorController } from './instructor/controller'
@@ -129,6 +130,12 @@ editor.addCommand(
   KeyMod.CtrlCmd | KeyCode.Enter,
   () => document.getElementById('runBtn')?.click(),
 )
+
+initFormatController({
+  editor,
+  button: document.getElementById('formatBtn') as HTMLButtonElement,
+  getEditorPath: () => fileSwitcher.getEditorPath(),
+})
 
 // --- ファイルエクスプローラー初期化 ---
 const explorerContainer = document.getElementById('fileExplorer') as HTMLElement

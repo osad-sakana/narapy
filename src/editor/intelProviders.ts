@@ -1,6 +1,6 @@
 import * as monaco from 'monaco-editor'
 import { queryWorker } from './completion'
-import { hoverMarkdown, parseHoverInfo, parseSignatureHelp, signatureDocMarkdown, signatureLabel } from './intel'
+import { describeSignature, hoverMarkdown, parseHoverInfo, parseSignatureHelp } from './intel'
 
 function registerHover(): monaco.IDisposable {
   return monaco.languages.registerHoverProvider('python', {
@@ -28,12 +28,14 @@ function registerSignatureHelp(): monaco.IDisposable {
       return {
         value: {
           signatures: help.signatures.map((info) => {
-            const { label, parameters } = signatureLabel(info)
-            const doc = signatureDocMarkdown(info.doc)
+            const view = describeSignature(info)
             return {
-              label,
-              parameters: parameters.map((range) => ({ label: range })),
-              documentation: doc === undefined ? undefined : { value: doc },
+              label: view.label,
+              parameters: view.parameters.map((p) => ({
+                label: p.range,
+                documentation: p.documentation,
+              })),
+              documentation: view.documentation === undefined ? undefined : { value: view.documentation },
               activeParameter: info.index,
             }
           }),

@@ -1,7 +1,10 @@
+import { lookupJaDoc, lookupJaParam, type JaDoc } from './jaDocs'
+
 // hover / 引数ヘルプ用: Worker の jedi 応答の検証と Monaco 向け整形（Monaco を import しない純関数）
 
 export type HoverInfo = {
   name: string
+  fullName: string
   type: string
   signature: string
   doc: string
@@ -10,6 +13,7 @@ export type HoverInfo = {
 
 export type SignatureInfo = {
   name: string
+  fullName: string
   params: string[]
   // いま入力中の引数の位置。不明は -1
   index: number
@@ -34,6 +38,7 @@ export function parseHoverInfo(value: unknown): HoverInfo | null {
   if (!rec || typeof rec.name !== 'string' || rec.name === '') return null
   return {
     name: rec.name.slice(0, FIELD_MAX_CHARS),
+    fullName: str(rec.fullName, FIELD_MAX_CHARS),
     type: str(rec.type, FIELD_MAX_CHARS),
     signature: str(rec.signature, FIELD_MAX_CHARS),
     doc: str(rec.doc, DOC_MAX_CHARS),
@@ -48,7 +53,7 @@ export function parseSignatureInfo(value: unknown): SignatureInfo | null {
     ? rec.params.filter((p): p is string => typeof p === 'string').map((p) => p.slice(0, FIELD_MAX_CHARS))
     : []
   const index = typeof rec.index === 'number' && Number.isInteger(rec.index) && rec.index >= 0 ? rec.index : -1
-  return { name: rec.name.slice(0, FIELD_MAX_CHARS), params, index, doc: str(rec.doc, DOC_MAX_CHARS) }
+  return { name: rec.name.slice(0, FIELD_MAX_CHARS), fullName: str(rec.fullName, FIELD_MAX_CHARS), params, index, doc: str(rec.doc, DOC_MAX_CHARS) }
 }
 
 export type SignatureHelpInfo = {
@@ -81,11 +86,40 @@ export function signatureDocMarkdown(doc: string): string | undefined {
   return doc === '' ? undefined : fenced('text', doc)
 }
 
+function jaParamList(params: JaDoc['params']): string {
+  return Object.entries(params ?? {})
+    .map(([name, text]) => `- \`${name}\`: ${text}`)
+    .join('\n')
+}
+
 export function hoverMarkdown(info: HoverInfo): string {
   const head = info.signature || info.description || info.name
+  const ja = lookupJaDoc(info.fullName)
   const parts = [fenced('python', head)]
+  if (ja) {
+    parts.push(ja.summary)
+    if (ja.params) parts.push(jaParamList(ja.params))
+  }
   if (info.doc !== '') parts.push(fenced('text', info.doc))
   return parts.join('\n\n')
+}
+
+export type SignatureView = {
+  label: string
+  parameters: Array<{ range: [number, number]; documentation?: string }>
+  // 日本語の要約（辞書にあれば）に続けて英語の docstring を出す
+  documentation?: string
+}
+
+export function describeSignature(info: SignatureInfo): SignatureView {
+  const { label, parameters } = signatureLabel(info)
+  const ja = lookupJaDoc(info.fullName)
+  const docs = [ja?.summary, signatureDocMarkdown(info.doc)].filter((d): d is string => d !== undefined)
+  return {
+    label,
+    parameters: parameters.map((range, i) => ({ range, documentation: lookupJaParam(ja, info.params[i]) })),
+    documentation: docs.length === 0 ? undefined : docs.join('\n\n'),
+  }
 }
 
 export function signatureLabel(info: SignatureInfo): { label: string; parameters: Array<[number, number]> } {

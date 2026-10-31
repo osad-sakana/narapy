@@ -16,7 +16,9 @@ export type SignatureInfo = {
   doc: string
 }
 
+// completion_helper.py の _DOC_MAX と同じ値に保つこと
 export const DOC_MAX_CHARS = 4000
+const SIGNATURES_MAX = 5
 const FIELD_MAX_CHARS = 300
 
 function str(value: unknown, max: number): string {
@@ -49,9 +51,34 @@ export function parseSignatureInfo(value: unknown): SignatureInfo | null {
   return { name: rec.name.slice(0, FIELD_MAX_CHARS), params, index, doc: str(rec.doc, DOC_MAX_CHARS) }
 }
 
+export type SignatureHelpInfo = {
+  signatures: SignatureInfo[]
+  // 最初に開くオーバーロード（入力中の引数位置が特定できたもの）
+  active: number
+}
+
+export function parseSignatureHelp(value: unknown): SignatureHelpInfo | null {
+  const rec = asRecord(value)
+  if (!rec || !Array.isArray(rec.signatures)) return null
+  const signatures = rec.signatures
+    .slice(0, SIGNATURES_MAX)
+    .map(parseSignatureInfo)
+    .filter((sig): sig is SignatureInfo => sig !== null)
+  if (signatures.length === 0) return null
+  const active =
+    typeof rec.active === 'number' && Number.isInteger(rec.active) && rec.active >= 0 && rec.active < signatures.length
+      ? rec.active
+      : 0
+  return { signatures, active }
+}
+
 // docstring をコードフェンスで囲んで改行・インデントを保つ。本文中の ``` は無害化する
 function fenced(lang: string, text: string): string {
   return `\`\`\`${lang}\n${text.replace(/```/g, "'''")}\n\`\`\``
+}
+
+export function signatureDocMarkdown(doc: string): string | undefined {
+  return doc === '' ? undefined : fenced('text', doc)
 }
 
 export function hoverMarkdown(info: HoverInfo): string {

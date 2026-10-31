@@ -3,7 +3,9 @@ import {
   DOC_MAX_CHARS,
   hoverMarkdown,
   parseHoverInfo,
+  parseSignatureHelp,
   parseSignatureInfo,
+  signatureDocMarkdown,
   signatureLabel,
 } from './intel'
 
@@ -78,5 +80,36 @@ describe('signatureLabel', () => {
 
   it('引数なし', () => {
     expect(signatureLabel({ name: 'f', params: [], index: -1, doc: '' })).toEqual({ label: 'f()', parameters: [] })
+  })
+})
+
+describe('parseSignatureHelp', () => {
+  const sig = (index: number) => ({ name: 'range', params: ['a'], index, doc: '' })
+
+  it('複数のオーバーロードと active を受け取る', () => {
+    const help = parseSignatureHelp({ active: 1, signatures: [sig(-1), sig(1)] })
+    expect(help?.signatures).toHaveLength(2)
+    expect(help?.active).toBe(1)
+  })
+
+  it('active が範囲外・非整数なら 0', () => {
+    expect(parseSignatureHelp({ active: 5, signatures: [sig(0)] })?.active).toBe(0)
+    expect(parseSignatureHelp({ active: -1, signatures: [sig(0)] })?.active).toBe(0)
+    expect(parseSignatureHelp({ active: '1', signatures: [sig(0)] })?.active).toBe(0)
+  })
+
+  it('不正な要素は捨て、1件も残らなければ null、件数は 5 件まで', () => {
+    expect(parseSignatureHelp({ signatures: [null, 1] })).toBeNull()
+    expect(parseSignatureHelp({ signatures: 'x' })).toBeNull()
+    expect(parseSignatureHelp(null)).toBeNull()
+    expect(parseSignatureHelp({ signatures: Array.from({ length: 9 }, () => sig(0)) })?.signatures).toHaveLength(5)
+  })
+})
+
+describe('signatureDocMarkdown', () => {
+  it('空なら undefined、あれば text フェンスで囲みフェンスを無害化する', () => {
+    expect(signatureDocMarkdown('')).toBeUndefined()
+    expect(signatureDocMarkdown('a')).toBe('```text\na\n```')
+    expect(signatureDocMarkdown('x ``` y')).not.toContain('x ```')
   })
 })

@@ -59,8 +59,12 @@ def _complete(source, line, col):
         return '[]'
 
 
-# docstring の長さ上限（巨大なモジュール docstring を Worker 間で送らない）
+# docstring の長さ上限（巨大なモジュール docstring を Worker 間で送らない）。
+# editor/intel.ts の DOC_MAX_CHARS と同じ値に保つこと
 _DOC_MAX = 4000
+# range のようなオーバーロードの多い関数でも返す候補はこの数まで
+_SIGNATURES_MAX = 5
+_BOUND_SELF = _re.compile(r'\((self|cls)(, |\))')
 
 
 def _hover(source, line, col):
@@ -70,16 +74,25 @@ def _hover(source, line, col):
         if not names:
             return 'null'
         n = names[0]
+        if n.type == 'keyword' and not n.name.isidentifier():
+            # ( . = などの記号にカーソルが乗っただけで長い解説を出さない
+            return 'null'
+        inferred_from_assignment = False
         if n.type == 'statement':
             # random.randint のように代入で束ねられた関数・クラスは定義元まで辿る
             inferred = [d for d in script.infer(line, col) if d.type in ('function', 'class')]
             if inferred:
                 n = inferred[0]
+                inferred_from_assignment = True
         sigs = n.get_signatures() if n.type in ('function', 'class') else []
+        signature = sigs[0].to_string() if sigs else ''
+        if inferred_from_assignment:
+            # 束ねられたインスタンスのメソッドは self が残るので隠す
+            signature = _BOUND_SELF.sub(lambda m: '()' if m.group(2) == ')' else '(', signature)
         return _json.dumps({
             'name': n.name,
             'type': n.type,
-            'signature': sigs[0].to_string() if sigs else '',
+            'signature': signature,
             'doc': (n.docstring(raw=True) or '')[:_DOC_MAX],
             'description': n.description or '',
         })
@@ -92,12 +105,17 @@ def _signature(source, line, col):
         sigs = _jedi.Script(code=source).get_signatures(line, col)
         if not sigs:
             return 'null'
-        s = sigs[0]
+        shown = sigs[:_SIGNATURES_MAX]
+        # オーバーロードのうち、いま入力中の引数位置を特定できたものを最初に開く
+        active = next((i for i, s in enumerate(shown) if s.index is not None), 0)
         return _json.dumps({
-            'name': s.name,
-            'params': [p.to_string() for p in s.params],
-            'index': s.index if s.index is not None else -1,
-            'doc': (s.docstring(raw=True) or '')[:_DOC_MAX],
+            'active': active,
+            'signatures': [{
+                'name': s.name,
+                'params': [p.to_string() for p in s.params],
+                'index': s.index if s.index is not None else -1,
+                'doc': (s.docstring(raw=True) or '')[:_DOC_MAX],
+            } for s in shown],
         })
     except Exception:
         return 'null'

@@ -94,7 +94,8 @@ const CODE_MAX_CHARS = 200_000
 const PENDING_MAX = 5
 // hover / 引数ヘルプの応答待ち上限
 const QUERY_TIMEOUT_MS = 2000
-const AFTER_DOT = /\.\s*\w*$/
+// 日本語の識別子（obj.名前）もドット直後として扱う
+const AFTER_DOT = /\.\s*[\p{L}\p{N}_]*$/u
 
 let worker: Worker | null = null
 let workerReady = false
@@ -110,16 +111,25 @@ function settleQuery(id: number, value: unknown): void {
   q.resolve(value)
 }
 
-// hover / 引数ヘルプの問い合わせ。Worker 未準備・長大コード・タイムアウト・失敗は null
+// 種別ごとに最新の 1 件だけ待つ。Worker は同期実行で 1 件ずつしか処理できないため、
+// Monaco が捨てた古い hover が補完のタイムアウトを巻き込まないようにする
+const latestQuery = new Map<string, number>()
+
+// hover / 引数ヘルプの問い合わせ。
+// 取り消し済み・Worker 未準備・長大コード・タイムアウト・失敗・後続の問い合わせに置き換えられたときは null
 export function queryWorker(
   type: 'hover' | 'signature',
   model: monaco.editor.ITextModel,
   position: monaco.IPosition,
+  token: monaco.CancellationToken,
 ): Promise<unknown> {
-  if (!workerReady) return Promise.resolve(null)
+  if (token.isCancellationRequested || !workerReady) return Promise.resolve(null)
   const code = model.getValue()
   if (code.length > CODE_MAX_CHARS) return Promise.resolve(null)
   const id = ++nextId
+  const previous = latestQuery.get(type)
+  if (previous !== undefined) settleQuery(previous, null)
+  latestQuery.set(type, id)
   return new Promise((resolve) => {
     const timer = setTimeout(() => settleQuery(id, null), QUERY_TIMEOUT_MS)
     queries.set(id, { resolve, timer })

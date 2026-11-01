@@ -158,7 +158,7 @@
 
           <!-- テキストエディタ -->
           <div id="editorPanel" class="flex flex-col overflow-hidden border-b border-line bg-editor">
-            <!-- プロジェクトバー: タイトル入力・切替・新規・削除 (src/project/ui.ts) -->
+            <!-- プロジェクトバー: タイトル入力・切替・新規・削除・共有リンク (src/project/ui.ts) -->
             <div id="projectBar" class="flex items-center gap-2 px-4 py-1.5 bg-panel border-b border-line shrink-0">
               <label for="projectTitleInput" class="sr-only">プロジェクト名</label>
               <input
@@ -184,6 +184,11 @@
                 type="button"
                 class="h-7 px-2.5 rounded text-xs text-muted enabled:hover:text-ink enabled:hover:bg-hover border border-line transition-colors shrink-0 disabled:opacity-40"
               ><i class="fa-solid fa-trash" aria-hidden="true"></i> 削除</button>
+              <button
+                id="shareProjectBtn"
+                type="button"
+                class="h-7 px-2.5 rounded text-xs text-muted hover:text-ink hover:bg-hover border border-line transition-colors shrink-0"
+              ><i class="fa-solid fa-share-nodes" aria-hidden="true"></i> 共有リンクを作る</button>
             </div>
             <div id="editorHeader" class="flex items-center justify-between px-4 py-2.5 bg-panel border-b border-line shrink-0">
               <div class="flex items-center gap-2.5 min-w-0">

@@ -6,7 +6,8 @@ const HTML = `
   <input id="projectTitleInput" />
   <select id="projectSelect"></select>
   <button id="newProjectBtn"></button>
-  <button id="deleteProjectBtn"></button>`
+  <button id="deleteProjectBtn"></button>
+  <button id="shareProjectBtn"></button>`
 
 function setup(projects = [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }], currentId = 'a') {
   document.body.innerHTML = HTML
@@ -17,6 +18,7 @@ function setup(projects = [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }], cu
     onSwitch: vi.fn(),
     onRename: vi.fn(),
     onDelete: vi.fn(),
+    onShare: vi.fn(),
   }
   const bar = initProjectBar(document, deps)
   return { deps, bar }
@@ -57,5 +59,11 @@ describe('initProjectBar', () => {
   it('プロジェクトが 1 件だけなら削除ボタンを無効にする', () => {
     setup([{ id: 'a', title: 'A' }])
     expect($<HTMLButtonElement>('deleteProjectBtn').disabled).toBe(true)
+  })
+
+  it('共有ボタンで onShare が呼ばれる', () => {
+    const { deps } = setup()
+    $('shareProjectBtn').click()
+    expect(deps.onShare).toHaveBeenCalledTimes(1)
   })
 })

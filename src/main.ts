@@ -35,6 +35,7 @@ import { initFormatController } from './format/controller'
 import { initHamburgerMenu } from './menu/ui'
 import { applyProjectSwitch, type ApplyProjectSwitchDeps } from './project/applyProjectSwitch'
 import { initProjectBar } from './project/ui'
+import { openShareModal } from './share/shareModal'
 import { DEFAULT_PROJECT_TITLE, SHARED_PROJECT_TITLE, titleFromFileName, toSafeFileName } from './project/title'
 import { initIndentVizPanel } from './indentViz/panel'
 import { createInstructorController } from './instructor/controller'
@@ -322,6 +323,17 @@ const projectBar = initProjectBar(document, {
     else projectBar.refresh()
   },
   onRename: (title) => { renameProject(title) },
+  onShare: () => {
+    void openShareModal({
+      getState: async () => {
+        // エディタが実際に表示しているパスへ同期してから読む（保存ボタンと同じ手順）
+        updateFileContent(fileSwitcher.getEditorPath(), getValue(editor))
+        await flushStore()
+        return { files: getFiles(), directories: getDirectories(), activeFile: getActiveFile() }
+      },
+      isExercise: () => getCurrentExercise() !== undefined,
+    })
+  },
   onDelete: (id) => {
     if (!canChangeProject()) return
     const target = listProjects().find(p => p.id === id)

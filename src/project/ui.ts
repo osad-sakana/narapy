@@ -7,6 +7,7 @@ export interface ProjectBarDeps {
   onSwitch: (id: string) => void
   onRename: (title: string) => void
   onDelete: (id: string) => void
+  onShare: () => void
 }
 
 export interface ProjectBar {
@@ -19,6 +20,7 @@ export function initProjectBar(root: ParentNode, deps: ProjectBarDeps): ProjectB
   const select = root.querySelector<HTMLSelectElement>('#projectSelect')!
   const newBtn = root.querySelector<HTMLButtonElement>('#newProjectBtn')!
   const deleteBtn = root.querySelector<HTMLButtonElement>('#deleteProjectBtn')!
+  const shareBtn = root.querySelector<HTMLButtonElement>('#shareProjectBtn')!
 
   function refresh(): void {
     const projects = deps.listProjects()
@@ -45,6 +47,7 @@ export function initProjectBar(root: ParentNode, deps: ProjectBarDeps): ProjectB
   select.addEventListener('change', () => deps.onSwitch(select.value))
   newBtn.addEventListener('click', () => deps.onCreate())
   deleteBtn.addEventListener('click', () => deps.onDelete(deps.getCurrent().id))
+  shareBtn.addEventListener('click', () => deps.onShare())
 
   refresh()
   return { refresh }

@@ -175,7 +175,7 @@ describe('showPygameModal', () => {
 
     expect(canvas().width).toBe(480)
     expect(canvas().height).toBe(320)
-    expect(modal()!.textContent).toContain('🎮 My Game')
+    expect(modal()!.textContent).toContain('My Game')
   })
 
   it('SDL が document.title を書き換えても元のタイトルへ戻す', async () => {

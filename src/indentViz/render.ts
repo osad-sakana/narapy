@@ -1,6 +1,7 @@
 import { highlightDecorator, highlightStatement, type Segment, type SegmentClass } from './highlight'
 import type { VizNode } from './parse'
-import { TYPE_COLORS, TYPE_LABELS } from './style'
+import { TYPE_COLORS, TYPE_ICONS, TYPE_LABELS } from './style'
+import { setIconLabel } from '../ui/icon'
 
 const SEGMENT_CLASSES: Readonly<Record<SegmentClass, string>> = {
   plain: '',
@@ -40,10 +41,12 @@ function renderLabel(node: VizNode): HTMLElement | null {
   const label = TYPE_LABELS[node.type]
   if (!label) return null
   const pill = document.createElement('span')
-  pill.className = 'shrink-0 px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap'
+  pill.className = 'shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap'
   pill.style.backgroundColor = TYPE_COLORS[node.type]
   pill.style.color = '#0d1117'
-  pill.textContent = label
+  const icon = TYPE_ICONS[node.type]
+  if (icon) setIconLabel(pill, icon, label)
+  else pill.textContent = label
   return pill
 }
 

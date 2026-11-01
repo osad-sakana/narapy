@@ -2,11 +2,12 @@ import { KeyMod, KeyCode, editor as monacoEditor } from 'monaco-editor'
 import type { EditorInstance } from '../editor/index'
 import { requestFormat } from '../editor/completion'
 import { appendLog } from '../runner/log'
+import { setIconLabel } from '../ui/icon'
 import { decideApply } from './decide'
 import { computeMinimalEdit } from './minimalEdit'
 import { formatMessage, type FormatResult } from './result'
 
-const LABEL = '✨ 整形'
+const LABEL = '整形'
 const LABEL_BUSY = '準備中…'
 
 export interface FormatControllerDeps {
@@ -26,7 +27,8 @@ export function initFormatController({ editor, button, getEditorPath }: FormatCo
   const setBusy = (value: boolean): void => {
     busy = value
     button.disabled = value
-    button.textContent = value ? LABEL_BUSY : LABEL
+    if (value) setIconLabel(button, 'spinner fa-spin', LABEL_BUSY)
+    else setIconLabel(button, 'wand-magic-sparkles', LABEL)
   }
 
   const format = async (): Promise<void> => {

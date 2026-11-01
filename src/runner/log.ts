@@ -1,4 +1,5 @@
 import { buildErrorIssueUrl } from './issueReport'
+import { setIconLabel } from '../ui/icon'
 
 export type LogKind = 'output' | 'result' | 'error' | 'info' | 'warn'
 
@@ -109,8 +110,8 @@ export function appendErrorBlock(block: ErrorBlock): void {
   if (block.hint) {
     for (const hintLine of block.hint.split('\n')) {
       const hintEl = document.createElement('div')
-      hintEl.textContent = `💡 ${hintLine}`
-      hintEl.className = 'text-warn text-xs'
+      setIconLabel(hintEl, 'lightbulb', hintLine)
+      hintEl.className = 'text-warn text-xs flex items-baseline gap-1.5'
       wrapper.appendChild(hintEl)
     }
   }

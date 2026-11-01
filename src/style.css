@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* FontAwesome（自前バンドル。CSP の font-src 'self' で読める） */
+@import "@fortawesome/fontawesome-free/css/fontawesome.min.css";
+@import "@fortawesome/fontawesome-free/css/solid.min.css";
+
 /* フォント設定: Tailwind v4 の @theme でデフォルトを上書き */
 @theme {
   --font-sans: 'BIZ UDPGothic', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;

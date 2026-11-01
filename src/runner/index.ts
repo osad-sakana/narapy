@@ -12,6 +12,7 @@ import { setRunStatus, type RunStatus } from './runStatus'
 import { routeRun } from '../pygame/detect'
 import { showPygameModal } from '../pygame/pygameModal'
 import { confirmPygameRun } from '../pygame/sharedLinkGuard'
+import { setIconLabel } from '../ui/icon'
 
 // 60 秒間応答がなければ Worker を強制終了する
 const EXECUTION_TIMEOUT_MS = 60_000
@@ -91,11 +92,11 @@ export function initRunner(
     if (state) {
       runGeneration++
       runBtn.className = STOP_STYLE
-      runBtn.textContent = '■ 停止'
+      setIconLabel(runBtn, 'stop', '停止')
       armExecutionTimeout()
     } else {
       runBtn.className = RUN_STYLE
-      runBtn.textContent = '▶ 実行'
+      setIconLabel(runBtn, 'play', '実行')
       clearExecutionTimeout()
     }
     // 実行中はステップ実行・採点の開始を割り込ませない（通常実行中に重ねて走らせると
@@ -334,11 +335,11 @@ export function initRunner(
     const text = getLogText()
     if (!text) return
     await navigator.clipboard.writeText(text)
-    const originalHTML = copyLogBtn.innerHTML
-    copyLogBtn.textContent = '✓ コピーしました'
+    const originalNodes = Array.from(copyLogBtn.childNodes, node => node.cloneNode(true))
+    setIconLabel(copyLogBtn, 'check', 'コピーしました')
     copyLogBtn.classList.add('text-success')
     setTimeout(() => {
-      copyLogBtn.innerHTML = originalHTML
+      copyLogBtn.replaceChildren(...originalNodes)
       copyLogBtn.classList.remove('text-success')
     }, 1500)
   })

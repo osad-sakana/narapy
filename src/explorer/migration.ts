@@ -14,7 +14,7 @@ export function newProjectId(): string {
 }
 
 export function toProjectRecord(state: FileState, title: string, now = Date.now()): ProjectRecord {
-  return { ...state, id: newProjectId(), title, updatedAt: now }
+  return { ...state, id: newProjectId(), title, createdAt: now, updatedAt: now }
 }
 
 // IndexedDB v1（単一プロジェクト）のスナップショットを 1 件のプロジェクトへ変換する。

@@ -38,6 +38,7 @@ export type TreeNode = TreeFileNode | TreeDirNode
 export interface ProjectRecord extends FileState {
   id: string
   title: string
+  createdAt: number
   updatedAt: number
 }
 

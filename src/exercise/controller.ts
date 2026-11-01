@@ -17,13 +17,13 @@ export interface ExerciseController {
   // プロジェクトが（再）読込されるたびに呼ぶ。演習でなければ current を null にし、
   // 採点関連UIを隠す（通常のプロジェクトを開いた後に演習パネルが残らないようにする）
   onProjectLoaded: (exercise: ExerciseMeta | undefined, files: FileEntry[], activeFile: string) => void
+  // 保存済みの演習（取り込み時の問題文・テスト・採点対象）を復元する。リロードやプロジェクト
+  // 切替で使い、現在のファイル内容や開いているファイルに採点の基準が引きずられないようにする
+  restoreExercise: (saved: { meta: ExerciseMeta; snapshot: ExerciseSnapshot | null } | undefined) => void
   // 採点対象として固定するファイルのパス。呼び出し側（main.ts）がこのパスの「今の」
   // 内容をストアから取得して採点する（エディタで別ファイルを開いていても、常にこの
   // ファイルが採点されるようにするため、内容そのものではなくパスだけを返す。
   // issue #65 レビュー指摘対応: 採点対象がエディタの表示中ファイルに引きずられる事故を防ぐ）
-  // 保存済みの演習（取り込み時の問題文・テスト・採点対象）を復元する。リロードやプロジェクト
-  // 切替で使い、現在のファイル内容や開いているファイルに採点の基準が引きずられないようにする
-  restoreExercise: (saved: { meta: ExerciseMeta; snapshot: ExerciseSnapshot | null } | undefined) => void
   getEntryPath: () => string | null
   getTestCode: () => string | null
   onGradeResult: (json: string) => void

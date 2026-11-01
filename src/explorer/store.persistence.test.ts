@@ -81,6 +81,19 @@ describe('store と IndexedDB の往復', () => {
     expect(getCurrentExercise()?.snapshot).toEqual(saved?.exerciseSnapshot)
   })
 
+  it('activeFile が存在しない .exercise は壊れた演習として扱う', () => {
+    createProject('BADACTIVE', {
+      files: [
+        { path: 'problem.md', content: { kind: 'text', data: '問題' } },
+        { path: 'test.py', content: { kind: 'text', data: 'T' } },
+      ],
+      directories: [],
+      activeFile: 'missing.py',
+      exercise: { problem: 'problem.md', test: 'test.py' },
+    })
+    expect(getCurrentExercise()?.snapshot).toBeNull()
+  })
+
   it('壊れた演習は snapshot が null になる', () => {
     createProject('BROKEN', {
       files: [{ path: 'main.py', content: { kind: 'text', data: '' } }],

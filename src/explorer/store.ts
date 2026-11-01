@@ -127,7 +127,8 @@ function cloneState(input: FileState): FileState {
 export function createProject(title: string, input?: ProjectInput): ProjectSummary {
   const now = Date.now()
   const cloned = cloneState(input ?? cloneDefault())
-  const resolved = resolveExercise(input?.exercise, cloned.files, cloned.activeFile)
+  // 補正前の activeFile で解決する（無効な activeFile の .exercise を壊れた演習として扱うため）
+  const resolved = resolveExercise(input?.exercise, cloned.files, input?.activeFile ?? cloned.activeFile)
   const record: ProjectRecord = {
     ...cloned,
     id: newProjectId(),

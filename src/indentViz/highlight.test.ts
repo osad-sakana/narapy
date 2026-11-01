@@ -54,8 +54,17 @@ describe('highlightStatement', () => {
     expect(inputs(lines[0])).toEqual(['x', '[\n  1,\n]'])
   })
 
-  it('解釈できない代入（注釈つきなど）は元の文字列のまま出す', () => {
-    expect(flat(highlightStatement('y: int = 3', 'assignment')[0])).toBe('y: int = 3')
+  it('演算子つき代入・添字・型注釈も、左辺と右辺を入力欄にする', () => {
+    const augmented = highlightStatement('x += 1', 'assignment')[0]
+    expect(inputs(augmented)).toEqual(['x', '1'])
+    expect(keywords(augmented)).toEqual(['+='])
+    expect(inputs(highlightStatement('d["k"] = 1', 'assignment')[0])).toEqual(['d["k"]', '1'])
+    expect(inputs(highlightStatement('y: int = 3', 'assignment')[0])).toEqual(['y: int', '3'])
+    expect(keywords(highlightStatement('x //= 2', 'assignment')[0])).toEqual(['//='])
+  })
+
+  it('比較の == は代入として扱わない', () => {
+    expect(highlightStatement('a == b', 'assignment')[0].some(s => s.cls === 'input')).toBe(false)
   })
 
   it('return / break / pass などの語を強調し、他の文はそのまま出す', () => {

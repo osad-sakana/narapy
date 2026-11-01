@@ -2,10 +2,10 @@ import { setIconLabel } from '../ui/icon'
 import { groupChains, isCompound } from './chains'
 import { highlightDecorator, highlightStatement, type Segment } from './highlight'
 import type { VizNode } from './parse'
-import { TYPE_COLORS, TYPE_ICONS, TYPE_INK, TYPE_LABELS } from './style'
+import { fillOf, INK_COLOR, TYPE_COLORS, TYPE_ICONS, TYPE_LABELS } from './style'
 
 // 見た目（形・切り欠き・白い入力欄）は style.css の .viz-* が担当する。
-// ここでは要素の構造と、塗りの色・文字色（--viz-color / --viz-ink）の指定だけを行う。
+// ここでは要素の構造と、色（--viz-color=縁取りの元、--viz-fill=塗り、--viz-ink=文字）の指定だけを行う。
 // テストや同期処理が見る hook は data-* 属性（data-line / data-statement / data-role）。
 
 function setRole(el: HTMLElement, role: string): HTMLElement {
@@ -14,8 +14,10 @@ function setRole(el: HTMLElement, role: string): HTMLElement {
 }
 
 function paint(el: HTMLElement, node: VizNode): void {
-  el.style.setProperty('--viz-color', TYPE_COLORS[node.type])
-  el.style.setProperty('--viz-ink', TYPE_INK[node.type])
+  const color = TYPE_COLORS[node.type]
+  el.style.setProperty('--viz-color', color)
+  el.style.setProperty('--viz-fill', fillOf(color))
+  el.style.setProperty('--viz-ink', INK_COLOR)
 }
 
 function markSource(el: HTMLElement, node: VizNode): void {

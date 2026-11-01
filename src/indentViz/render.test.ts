@@ -72,6 +72,7 @@ describe('renderTree', () => {
   it('ブロックごとに塗りの色と文字色を持つ', () => {
     const block = render('x = 1').querySelector<HTMLElement>('.viz-block')
     expect(block?.style.getPropertyValue('--viz-color')).toMatch(/^#/)
+    expect(block?.style.getPropertyValue('--viz-fill')).toMatch(/^#/)
     expect(block?.style.getPropertyValue('--viz-ink')).toMatch(/^#/)
   })
 

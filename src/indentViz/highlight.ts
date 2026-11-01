@@ -4,7 +4,7 @@ import { parseImportNames, type StatementType } from './parse'
  * keyword: ブロックの語（if / for / = など）。input: Scratch の入力欄にあたる白い楕円
  * （条件・式・変数名・import 名）。plain: それ以外の文字
  */
-export type SegmentClass = 'plain' | 'keyword' | 'input'
+type SegmentClass = 'plain' | 'keyword' | 'input'
 
 export interface Segment {
   readonly text: string
@@ -20,7 +20,8 @@ const SIMPLE_KEYWORDS: ReadonlySet<string> = new Set(['return', 'yield', 'break'
 // 識別子は日本語などの非ASCIIも使えるので、\w / \b ではなく Unicode の文字クラスで判定する
 const COMPOUND_KEYWORD = /^\s*((?:async\s+)?(?:def|class|if|elif|else|for|while|try|except|finally|with|match|case))(?![\p{L}\p{N}_])([\s\S]*)$/u
 const FOR_LOOP = /^\s*(async\s+)?for\s+([\p{L}_][\p{L}\p{N}_,\s]*?)\s+in\s+([\s\S]*)$/u
-const ASSIGN = /^([\p{L}_][\p{L}\p{N}_,\s[\].]*?)\s*=\s*(?!=)([\s\S]*)$/u
+// 左辺は添字（d["k"]）や型注釈（y: int）も含む。演算子つき代入（+= など）の演算子は = と一緒に語にする
+const ASSIGN = /^([\p{L}_][\p{L}\p{N}_,\s[\].'"*:-]*?)\s*(\/\/|\*\*|>>|<<|[-+*/%@&|^])?=\s*(?!=)([\s\S]*)$/u
 
 /** Scratch のブロックに「:」は無いので、見出しの末尾のコロンは表示しない */
 function stripColon(text: string): string {
@@ -48,7 +49,7 @@ function highlightCompound(text: string): Segment[] {
 function highlightAssignment(text: string): Segment[] {
   const m = ASSIGN.exec(text)
   if (!m) return [plain(text)]
-  return [input(m[1].trim()), plain(' '), keyword('='), plain(' '), input(m[2].trim())]
+  return [input(m[1].trim()), plain(' '), keyword(`${m[2] ?? ''}=`), plain(' '), input(m[3].trim())]
 }
 
 function highlightSimpleLine(line: string): Segment[] {

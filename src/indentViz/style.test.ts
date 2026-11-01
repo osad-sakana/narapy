@@ -1,35 +1,30 @@
 import { describe, expect, it } from 'vitest'
-import { inkOn, TYPE_COLORS, TYPE_INK } from './style'
+import { contrastRatio, fillOf, INK_COLOR, TYPE_COLORS } from './style'
 
-function ratio(a: string, b: string): number {
-  const lum = (hex: string): number => {
-    const n = Number.parseInt(hex.slice(1), 16)
-    const c = (v: number): number => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4)
-    return 0.2126 * c((n >> 16) & 255) + 0.7152 * c((n >> 8) & 255) + 0.0722 * c(n & 255)
-  }
-  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
-  return (hi + 0.05) / (lo + 0.05)
-}
+describe('fillOf', () => {
+  it('元の色を白に寄せる（白は白のまま、黒は 45% 白に寄る）', () => {
+    expect(fillOf('#ffffff')).toBe('#ffffff')
+    expect(fillOf('#000000')).toBe('#737373')
+  })
 
-describe('inkOn', () => {
-  it('明るい塗りには濃い文字、暗い塗りには白を選ぶ', () => {
-    expect(inkOn('#ffffff')).toBe('#1b1b29')
-    expect(inkOn('#000000')).toBe('#ffffff')
+  it('常に元の色より明るい（元の色が白でない限り）', () => {
+    for (const color of Object.values(TYPE_COLORS)) {
+      expect(contrastRatio(fillOf(color), '#ffffff')).toBeLessThan(contrastRatio(color, '#ffffff'))
+    }
   })
 })
 
-describe('TYPE_INK', () => {
-  it('すべてのブロック色で、選んだ文字色は反対の文字色よりコントラストが高い', () => {
-    for (const [type, fill] of Object.entries(TYPE_COLORS)) {
-      const ink = TYPE_INK[type as keyof typeof TYPE_INK]
-      const other = ink === '#ffffff' ? '#1b1b29' : '#ffffff'
-      expect(ratio(fill, ink)).toBeGreaterThanOrEqual(ratio(fill, other))
+describe('ブロックの文字色', () => {
+  it('実際に表示される塗りの上で、すべてのブロック色が WCAG AA（4.5）以上', () => {
+    for (const [type, color] of Object.entries(TYPE_COLORS)) {
+      expect(contrastRatio(fillOf(color), INK_COLOR), type).toBeGreaterThanOrEqual(4.5)
     }
   })
+})
 
-  it('どのブロック色でも文字が実用的に読める（コントラスト比 3 以上）', () => {
-    for (const [type, fill] of Object.entries(TYPE_COLORS)) {
-      expect(ratio(fill, TYPE_INK[type as keyof typeof TYPE_INK]), type).toBeGreaterThanOrEqual(3)
-    }
+describe('contrastRatio', () => {
+  it('白と黒は 21、同色は 1', () => {
+    expect(contrastRatio('#ffffff', '#000000')).toBeCloseTo(21, 0)
+    expect(contrastRatio('#336699', '#336699')).toBeCloseTo(1, 5)
   })
 })

@@ -1,7 +1,7 @@
 import type { StatementType } from './parse'
 
 // 意味（文の種類）で色分けする。Scratch のブロックと同じく塗りつぶしで描くので、
-// ライト／ダーク共通の色にし、文字色は塗りごとにコントラストの高い方を選ぶ（TYPE_INK）
+// ライト／ダーク共通の色にする。実際の塗りは fillOf() で白に寄せた薄い色
 export const TYPE_COLORS: Readonly<Record<StatementType, string>> = {
   if: '#ffb84d', elif: '#ffb84d', else: '#ffb84d',
   for: '#ffab19', while: '#ffab19',
@@ -55,8 +55,11 @@ export const TYPE_ICONS: Readonly<Partial<Record<StatementType, string>>> = {
   import: 'cube',
 }
 
-const INK_DARK = '#1b1b29'
-const INK_LIGHT = '#ffffff'
+/** ブロック上の文字色。塗りは常に薄い色なので、白文字は使わず濃色に固定する */
+export const INK_COLOR = '#1b1b29'
+
+/** 塗りは文の種類の色を白に寄せる。この割合が「元の色」の比率（残りが白） */
+const FILL_COLOR_RATIO = 0.55
 
 function channel(value: number): number {
   const v = value / 255
@@ -68,16 +71,16 @@ function luminance(hex: string): number {
   return 0.2126 * channel((n >> 16) & 255) + 0.7152 * channel((n >> 8) & 255) + 0.0722 * channel(n & 255)
 }
 
-function contrast(a: string, b: string): number {
+/** WCAG のコントラスト比（1〜21） */
+export function contrastRatio(a: string, b: string): number {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
   return (hi + 0.05) / (lo + 0.05)
 }
 
-/** 塗りの色の上に載せる文字色。白と濃色のうちコントラスト比が高い方 */
-export function inkOn(fill: string): string {
-  return contrast(fill, INK_LIGHT) >= contrast(fill, INK_DARK) ? INK_LIGHT : INK_DARK
+/** 文の種類の色を白に寄せた、実際に表示するブロックの塗りの色 */
+export function fillOf(color: string): string {
+  const n = Number.parseInt(color.slice(1), 16)
+  const mix = (shift: number): string =>
+    Math.round(((n >> shift) & 255) * FILL_COLOR_RATIO + 255 * (1 - FILL_COLOR_RATIO)).toString(16).padStart(2, '0')
+  return `#${mix(16)}${mix(8)}${mix(0)}`
 }
-
-export const TYPE_INK: Readonly<Record<StatementType, string>> = Object.fromEntries(
-  Object.entries(TYPE_COLORS).map(([type, fill]) => [type, inkOn(fill)]),
-) as Record<StatementType, string>

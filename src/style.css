@@ -203,8 +203,7 @@
 
 .viz-block,
 .viz-c {
-  /* 塗りは文の種類の色を白に寄せた薄い色。縁取りは元の色から作るので境目は濃く残る */
-  --viz-fill: color-mix(in srgb, var(--viz-color) 55%, #fff);
+  /* 塗り（--viz-fill）は render.ts が文の種類の色を白に寄せて渡す。縁取りは元の色（--viz-color）から作るので境目は濃く残る */
   position: relative;
   background-color: var(--viz-fill);
   color: var(--viz-ink);
@@ -265,7 +264,8 @@
 }
 
 .viz-code {
-  flex: 1;
+  /* 基準幅を持たせ、幅が足りなければラベルの下へ折り返す（細い列になって1文字ずつ縦に並ばないように） */
+  flex: 1 1 8em;
   min-width: 0;
   font-family: var(--font-mono);
   font-weight: 600;
@@ -282,9 +282,10 @@
   display: inline-block;
   max-width: 100%;
   padding: 0 8px;
-  border-radius: 999px;
+  /* 長い式が折り返しても形が崩れないよう、完全な楕円ではなく大きめの角丸にする */
+  border-radius: 12px;
   background-color: #fff;
-  color: #2b2b3a;
+  color: var(--viz-ink);
   font-weight: 500;
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.18);
   vertical-align: middle;

@@ -197,6 +197,8 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  /* ブロック同士の軽い余白。口の上下（見出し・下の腕との間）には付けない */
+  gap: 3px;
 }
 
 .viz-block,

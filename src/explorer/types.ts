@@ -34,3 +34,14 @@ export interface TreeDirNode {
 }
 
 export type TreeNode = TreeFileNode | TreeDirNode
+
+export interface ProjectRecord extends FileState {
+  id: string
+  title: string
+  updatedAt: number
+}
+
+export interface ProjectSummary {
+  id: string
+  title: string
+}

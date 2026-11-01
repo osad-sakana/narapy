@@ -18,6 +18,25 @@ describe('buildNarapyArchive / parseNarapyArchive', () => {
     expect(restored).toEqual(project)
   })
 
+  it('タイトル付きなら往復でき、無ければ title は undefined(issue #86)', () => {
+    const base: NarapyProject = {
+      version: 2,
+      files: [{ path: 'main.py', content: { kind: 'text', data: 'print(1)' } }],
+      directories: [],
+      activeFile: 'main.py',
+    }
+    expect(parseNarapyArchive(buildNarapyArchive({ ...base, title: '課題1' })).title).toBe('課題1')
+    expect(parseNarapyArchive(buildNarapyArchive(base)).title).toBeUndefined()
+  })
+
+  it('titleが文字列でない場合はメタデータエラーとして拒否する', () => {
+    const archive = zipSync({
+      'narapy.json': strToU8(JSON.stringify({ version: 2, activeFile: 'main.py', directories: [], title: 1 })),
+      'files/main.py': strToU8(''),
+    })
+    expect(() => parseNarapyArchive(archive)).toThrow('メタデータの形式が不正です')
+  })
+
   it('exerciseメタデータ付き(.exercise)も往復できる(issue #65)', () => {
     const project: NarapyProject = {
       version: 2,

@@ -338,7 +338,7 @@ importProjectBtn.addEventListener('click', () => {
   openNarapyFilePicker(
     (project, fileName) => {
       if (!canChangeProject()) return
-      createProject(titleFromFileName(fileName), {
+      createProject(project.title ?? titleFromFileName(fileName), {
         files: project.files,
         directories: project.directories,
         activeFile: project.activeFile,
@@ -366,6 +366,7 @@ exportProjectBtn.addEventListener('click', async () => {
     })),
     directories: getDirectories().map(d => ({ path: d.path })),
     activeFile: getActiveFile(),
+    title: getCurrentProject().title,
   }, `${toSafeFileName(getCurrentProject().title)}.narapy`)
 })
 

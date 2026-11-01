@@ -17,6 +17,8 @@ export interface NarapyProject {
   directories: DirectoryEntry[]
   activeFile: string
   exercise?: ExerciseMeta
+  // プロジェクトのタイトル(issue #86)。任意項目で、無ければ取り込み側がファイル名から作る
+  title?: string
 }
 
 interface NarapyMetadataV2 {
@@ -24,6 +26,7 @@ interface NarapyMetadataV2 {
   activeFile: string
   directories: string[]
   exercise?: ExerciseMeta
+  title?: string
 }
 
 interface NarapyMetadataV1 {
@@ -53,6 +56,7 @@ export function buildNarapyArchive(project: NarapyProject) {
     activeFile: project.activeFile,
     directories: project.directories.map(d => d.path),
     ...(project.exercise ? { exercise: project.exercise } : {}),
+    ...(project.title ? { title: project.title } : {}),
   }
   archive[META_FILENAME] = strToU8(JSON.stringify(metadata, null, 2))
 
@@ -142,6 +146,7 @@ export function parseNarapyArchive(data: Uint8Array): NarapyProject {
     directories: metaRaw.directories.map(p => ({ path: p })),
     activeFile: metaRaw.activeFile,
     ...(metaRaw.exercise ? { exercise: metaRaw.exercise } : {}),
+    ...(metaRaw.title ? { title: metaRaw.title } : {}),
   }
 }
 
@@ -188,6 +193,7 @@ function isMetaV2(value: unknown): value is NarapyMetadataV2 {
   // exercise は任意フィールド。値があるのに形が不正な場合のみ拒否する
   // （欠けているだけなら通常の .narapy プロジェクトとして扱う）
   if (obj['exercise'] !== undefined && !isExerciseMeta(obj['exercise'])) return false
+  if (obj['title'] !== undefined && typeof obj['title'] !== 'string') return false
   return true
 }
 

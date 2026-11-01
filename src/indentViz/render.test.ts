@@ -34,6 +34,13 @@ describe('renderTree', () => {
     expect(mouth?.querySelector('[data-statement="assignment"]')?.textContent).toContain('y')
   })
 
+  it('1行の本体のブロックには data-inline が付き、見出しと通常の子には付かない', () => {
+    const root = render('if x: y = 1')
+    expect(root.querySelector('.viz-c-head')?.hasAttribute('data-inline')).toBe(false)
+    expect(root.querySelector('[data-role="mouth"] .viz-block')?.getAttribute('data-inline')).toBe('true')
+    expect(render('if x:\n    y = 1').querySelector('[data-inline]')).toBeNull()
+  })
+
   it('本体のない複合文（入力途中）は空の口を持つ', () => {
     const mouth = render('if x:').querySelector('[data-role="mouth"]')
     expect(mouth).not.toBeNull()

@@ -71,7 +71,7 @@ export function initIndentVizPanel(editor: EditorInstance, getPath: () => string
       ? buildContent(editor.getValue())
       : message('Python ファイル（.py）を開くと構造が表示されます。')
     body!.replaceChildren(content)
-    blocks = [...content.querySelectorAll<HTMLElement>('[data-line]')]
+    blocks = [...content.querySelectorAll<HTMLElement>('[data-line]:not([data-inline])')]
     blockLines = blocks.map(el => Number(el.dataset.line))
     syncScroll()
   }

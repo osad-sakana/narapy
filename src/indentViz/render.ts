@@ -23,6 +23,8 @@ function paint(el: HTMLElement, node: VizNode): void {
 function markSource(el: HTMLElement, node: VizNode): void {
   el.dataset.line = String(node.line)
   el.dataset.statement = node.type
+  // 見出しと同じ行にある本体は、スクロール同期の対象にしない（見出しが隠れるため）
+  if (node.inline) el.dataset.inline = 'true'
 }
 
 function renderSegment(segment: Segment): Node {

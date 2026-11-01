@@ -102,6 +102,23 @@ describe('parseIndentTree', () => {
     expect(node.children.map(c => [c.type, c.text])).toEqual([['assignment', 'y = 1']])
   })
 
+  it('1行の本体には inline の印が付き、インデントされた子には付かない', () => {
+    const [node] = parseIndentTree('for i in x: print(i)\n    more()')
+    expect(node.children.map(c => c.inline === true)).toEqual([true, false])
+  })
+
+  it('1行に書かれた case も複合文になり、本体は子になる', () => {
+    const [match] = parseIndentTree('match c:\n    case 1: return 1\n    case _: pass')
+    expect(match.children.map(c => [c.type, c.text, c.children.map(x => x.text)])).toEqual([
+      ['case', 'case 1:', ['return 1']], ['case', 'case _:', ['pass']],
+    ])
+  })
+
+  it('変数・属性・注釈としての match / case は複合文にしない', () => {
+    const src = ['match = {1: 2}', 'case: int = 1', 'match.group(1)', 'match.x = {1: 2}', 'match(x)', 'case = lambda: 1'].join('\n')
+    expect(types(parseIndentTree(src))).toEqual(['assignment', 'assignment', 'other', 'assignment', 'other', 'assignment'])
+  })
+
   it('1行の本体は、続くインデントされた子より前に並ぶ', () => {
     const [node] = parseIndentTree('for i in x: print(i)\n    more()')
     expect(node.children.map(c => c.text)).toEqual(['print(i)', 'more()'])

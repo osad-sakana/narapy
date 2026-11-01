@@ -5,6 +5,7 @@ const CLOSERS = ')]}'
  * 複合文の見出しを閉じるコロンの位置を返す（見つからなければ -1）。
  * 括弧・文字列の中、`:=`、lambda のコロンは見出しの終わりではないので飛ばす。
  * 1行で書かれた `if x: y = 1` を、見出しと本体に分けるために使う。
+ * 既知の制約: Python 3.12 の f-string 内の同種の引用符の入れ子（f"{d["a:b"]}"）は追えない（logicalLines.ts も同様）。
  */
 export function findHeaderColon(text: string): number {
   let depth = 0

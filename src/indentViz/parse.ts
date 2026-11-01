@@ -17,11 +17,15 @@ export interface VizNode {
   /** 先頭行の行番号（1始まり） */
   readonly line: number
   readonly children: readonly VizNode[]
+  /** `if x: y = 1` の y = 1 のように、見出しと同じ行に書かれた本体。スクロール同期の目印にしない */
+  readonly inline?: boolean
 }
 
 // 識別子は日本語などの非ASCIIも使えるので、\w / \b ではなく Unicode の文字クラスで判定する
 const HARD_COMPOUND = /^(?:async\s+)?(def|class|if|elif|else|for|while|try|except|finally|with)(?![\p{L}\p{N}_])/u
-const SOFT_COMPOUND = /^(match|case)(?![\p{L}\p{N}_])/u
+// match / case はソフトキーワード。後ろに式が続く形（match x: / case [a, b]: / case 1: pass）だけを構文とみなし、
+// match = {1: 2} や match.group(1) や case: int = 1 は変数・属性・注釈として扱う
+const SOFT_COMPOUND = /^(match|case)(?![\p{L}\p{N}_])\s*[^\s:=,)\]}.]/u
 const IMPORT = /^(?:import\s|from\s+\S+\s+import(?![\p{L}\p{N}_]))/u
 
 // 左辺に括弧を許さないことで foo(a=1) のキーワード引数を代入から除く
@@ -36,7 +40,7 @@ function compoundType(text: string): StatementType | null {
   const hard = HARD_COMPOUND.exec(text)
   if (hard) return hard[1] as StatementType
   const soft = SOFT_COMPOUND.exec(text)
-  if (soft && text.endsWith(':')) return soft[1] as StatementType
+  if (soft && findHeaderColon(text) !== -1) return soft[1] as StatementType
   return null
 }
 
@@ -82,7 +86,7 @@ function splitInlineBody(text: string): { header: string; body: string } {
 
 function inlineBodyNode(body: string, line: number): VizNode[] {
   if (body === '') return []
-  return [{ type: simpleType(body), decorators: [], text: body, line, children: [] }]
+  return [{ type: simpleType(body), decorators: [], text: body, line, children: [], inline: true }]
 }
 
 function parseScope(ctx: ParseContext, parentIndent: number, insideClass: boolean): VizNode[] {

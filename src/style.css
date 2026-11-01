@@ -237,7 +237,17 @@
 .viz-c-mouth {
   min-height: 14px;
   margin-left: 12px;
+  /* 親の右の枠線（1px）の上まで口を広げ、子の右端を親の外側の右端にそろえる。
+     入れ子ごとに右端が内側へずれて段差になるのを防ぐ */
+  margin-right: -1px;
   background-color: var(--color-panel);
+}
+
+/* 口の中のブロックは右の角を直角にする。角丸だと口の地色がのぞいて右側に窪みができる */
+.viz-c-mouth .viz-block,
+.viz-c-mouth .viz-c {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .viz-c-mouth > .viz-stack > :first-child {

@@ -1,3 +1,4 @@
+import { findHeaderColon } from './headerColon'
 import { splitLogicalLines, type LogicalLine } from './logicalLines'
 
 export type StatementType =
@@ -16,11 +17,15 @@ export interface VizNode {
   /** 先頭行の行番号（1始まり） */
   readonly line: number
   readonly children: readonly VizNode[]
+  /** `if x: y = 1` の y = 1 のように、見出しと同じ行に書かれた本体。スクロール同期の目印にしない */
+  readonly inline?: boolean
 }
 
 // 識別子は日本語などの非ASCIIも使えるので、\w / \b ではなく Unicode の文字クラスで判定する
 const HARD_COMPOUND = /^(?:async\s+)?(def|class|if|elif|else|for|while|try|except|finally|with)(?![\p{L}\p{N}_])/u
-const SOFT_COMPOUND = /^(match|case)(?![\p{L}\p{N}_])/u
+// match / case はソフトキーワード。後ろに式が続く形（match x: / case [a, b]: / case 1: pass）だけを構文とみなし、
+// match = {1: 2} や match.group(1) や case: int = 1 は変数・属性・注釈として扱う
+const SOFT_COMPOUND = /^(match|case)(?![\p{L}\p{N}_])\s*[^\s:=,)\]}.]/u
 const IMPORT = /^(?:import\s|from\s+\S+\s+import(?![\p{L}\p{N}_]))/u
 
 // 左辺に括弧を許さないことで foo(a=1) のキーワード引数を代入から除く
@@ -35,7 +40,11 @@ function compoundType(text: string): StatementType | null {
   const hard = HARD_COMPOUND.exec(text)
   if (hard) return hard[1] as StatementType
   const soft = SOFT_COMPOUND.exec(text)
-  if (soft && text.endsWith(':')) return soft[1] as StatementType
+  if (!soft) return null
+  // match 文は文法上、同じ行に本体を書けない（コロンは行末）。1行の本体を許すのは case だけ。
+  // こうして match[0]: int = 1 のような添字つきの型注釈を match 文と取り違えない
+  const colon = findHeaderColon(text)
+  if (soft[1] === 'match' ? colon === text.length - 1 : colon !== -1) return soft[1] as StatementType
   return null
 }
 
@@ -72,6 +81,18 @@ function strayDecorators(decorators: readonly LogicalLine[]): VizNode[] {
   return decorators.map(d => ({ type: 'other', decorators: [], text: d.text, line: d.line, children: [] }))
 }
 
+/** 1行に書かれた複合文（`if x: y = 1`）を、見出しと本体（子の文）に分ける */
+function splitInlineBody(text: string): { header: string; body: string } {
+  const colon = findHeaderColon(text)
+  if (colon === -1) return { header: text, body: '' }
+  return { header: text.slice(0, colon + 1), body: text.slice(colon + 1).trim() }
+}
+
+function inlineBodyNode(body: string, line: number): VizNode[] {
+  if (body === '') return []
+  return [{ type: simpleType(body), decorators: [], text: body, line, children: [], inline: true }]
+}
+
 function parseScope(ctx: ParseContext, parentIndent: number, insideClass: boolean): VizNode[] {
   const nodes: VizNode[] = []
   let decorators: LogicalLine[] = []
@@ -87,11 +108,14 @@ function parseScope(ctx: ParseContext, parentIndent: number, insideClass: boolea
     const type = base === 'def' && insideClass ? 'method' : base
     const keepsDecorators = base === 'def' || base === 'class'
     if (!keepsDecorators) nodes.push(...strayDecorators(decorators))
-    const children = compound ? parseScope(ctx, line.indent, insideClass || compound === 'class') : []
+    const { header, body } = compound ? splitInlineBody(line.text) : { header: line.text, body: '' }
+    const children = compound
+      ? [...inlineBodyNode(body, line.line), ...parseScope(ctx, line.indent, insideClass || compound === 'class')]
+      : []
     nodes.push({
       type,
       decorators: keepsDecorators ? decorators.map(d => d.text) : [],
-      text: line.text,
+      text: header,
       // デコレータ付きは先頭のデコレータ行から数える（エディタ上端との対応を取るため）
       line: keepsDecorators && decorators.length > 0 ? decorators[0].line : line.line,
       children,

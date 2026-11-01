@@ -48,7 +48,7 @@ describe('initIndentVizPanel', () => {
 
   it('起動時に現在の内容を描画する', () => {
     initIndentVizPanel(createFakeEditor('def f():\n    pass').editor, () => 'main.py')
-    expect(body()).toContain('def f():')
+    expect(body()).toContain('def f()')
   })
 
   it('内容変更はデバウンスしてから反映する', () => {
@@ -129,5 +129,16 @@ describe('initIndentVizPanel', () => {
   it('必要な要素がなければ何もしない', () => {
     document.body.innerHTML = ''
     expect(() => initIndentVizPanel(createFakeEditor('x = 1').editor, () => 'main.py')).not.toThrow()
+  })
+
+  it('スクロール同期は1行の本体ではなく見出しに合わせる', () => {
+    // 見出し(if)と1行の本体は同じ行番号。本体を対象にすると見出しが上に隠れる
+    const rects = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const top = this.id === 'vizPanelBody' ? 0 : this.hasAttribute('data-inline') ? 100 : Number(this.dataset.line ?? 0) * 10
+      return { top, bottom: top, left: 0, right: 0, width: 0, height: 0, x: 0, y: top, toJSON: () => ({}) }
+    })
+    initIndentVizPanel(createFakeEditor('if x: y = 1\nz = 2').editor, () => 'main.py')
+    expect((document.getElementById('vizPanelBody') as HTMLElement).scrollTop).toBe(10)
+    rects.mockRestore()
   })
 })

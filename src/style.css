@@ -187,3 +187,123 @@
 .monaco-editor .step-current-gutter {
   background-color: var(--color-warn);
 }
+
+/* ─── インデント構造パネル: Scratch 風ブロック（src/indentViz/render.ts） ─────────
+   塗りの色・文字色は要素に inline で渡される --viz-color / --viz-ink（文の種類ごと）。
+   ここでは形（C 字型の腕と口・白い入力欄）だけを作る。切り欠き（くぼみ・出っ張り）は付けず、
+   ブロック同士の境目は縁取りで示す。
+   ハットブロックは付けず、積み木の並びと C 字型の入れ子で包含関係を示す。 */
+.viz-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  /* ブロック同士の軽い余白。口の上下（見出し・下の腕との間）には付けない */
+  gap: 3px;
+}
+
+.viz-block,
+.viz-c {
+  /* 塗り（--viz-fill）は render.ts が文の種類の色を白に寄せて渡す。縁取りは元の色（--viz-color）から作るので境目は濃く残る */
+  position: relative;
+  background-color: var(--viz-fill);
+  color: var(--viz-ink);
+  border-radius: 4px;
+  /* 縁取りは inset の影ではなく border にする。C 字型ブロックの口（子の面）は影を覆い隠すので、
+     影だと左の腕にしか線が出ず、ブロック同士の境目が右側で見えなくなる */
+  border: 1px solid color-mix(in srgb, var(--viz-color) 60%, #000);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.viz-block,
+.viz-c-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 8px;
+}
+
+.viz-c {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 口: 子の積み木が入る凹み。左の腕（C の背骨）は .viz-c の塗りがそのまま見える。
+   見出し・下の腕との間に余白や角丸を作ると、見出しの直下に窪みができるので、
+   子は口の上下にぴったり付け、最初と最後の子の角は直角にする */
+.viz-c-mouth {
+  min-height: 14px;
+  margin-left: 12px;
+  /* 親の右の枠線（1px）の上まで口を広げ、子の右端を親の外側の右端にそろえる。
+     入れ子ごとに右端が内側へずれて段差になるのを防ぐ */
+  margin-right: -1px;
+  background-color: var(--color-panel);
+}
+
+/* 口の中のブロックは右の角を直角にする。角丸だと口の地色がのぞいて右側に窪みができる */
+.viz-c-mouth .viz-block,
+.viz-c-mouth .viz-c {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.viz-c-mouth > .viz-stack > :first-child {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.viz-c-mouth > .viz-stack > :last-child {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.viz-c-foot {
+  height: 10px;
+}
+
+.viz-code {
+  /* 基準幅を持たせ、幅が足りなければラベルの下へ折り返す（細い列になって1文字ずつ縦に並ばないように） */
+  flex: 1 1 8em;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.viz-keyword {
+  font-weight: 700;
+}
+
+/* Scratch の入力欄: 白い楕円に濃い文字。改行を含む式は角の丸い箱にする */
+.viz-input {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0 8px;
+  /* 長い式が折り返しても形が崩れないよう、完全な楕円ではなく大きめの角丸にする */
+  border-radius: 12px;
+  background-color: #fff;
+  color: var(--viz-ink);
+  font-weight: 500;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.18);
+  vertical-align: middle;
+}
+
+.viz-input-multiline {
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+.viz-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background-color: color-mix(in srgb, var(--viz-ink) 14%, transparent);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}

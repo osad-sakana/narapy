@@ -1,35 +1,50 @@
-import { highlightDecorator, highlightStatement, type Segment, type SegmentClass } from './highlight'
-import type { VizNode } from './parse'
-import { TYPE_COLORS, TYPE_ICONS, TYPE_LABELS } from './style'
 import { setIconLabel } from '../ui/icon'
+import { groupChains, isCompound } from './chains'
+import { highlightDecorator, highlightStatement, type Segment } from './highlight'
+import type { VizNode } from './parse'
+import { fillOf, INK_COLOR, TYPE_COLORS, TYPE_ICONS, TYPE_LABELS } from './style'
 
-const SEGMENT_CLASSES: Readonly<Record<SegmentClass, string>> = {
-  plain: '',
-  keyword: 'font-bold',
-  var: 'font-bold',
-  arrow: 'font-bold',
-  badge: 'inline-block px-1.5 rounded text-[0.9em] font-bold',
-  loopvar: 'inline-block px-1.5 rounded text-[0.9em] font-semibold',
+// 見た目（形・切り欠き・白い入力欄）は style.css の .viz-* が担当する。
+// ここでは要素の構造と、色（--viz-color=縁取りの元、--viz-fill=塗り、--viz-ink=文字）の指定だけを行う。
+// テストや同期処理が見る hook は data-* 属性（data-line / data-statement / data-role）。
+
+function setRole(el: HTMLElement, role: string): HTMLElement {
+  el.dataset.role = role
+  return el
+}
+
+function paint(el: HTMLElement, node: VizNode): void {
+  const color = TYPE_COLORS[node.type]
+  el.style.setProperty('--viz-color', color)
+  el.style.setProperty('--viz-fill', fillOf(color))
+  el.style.setProperty('--viz-ink', INK_COLOR)
+}
+
+function markSource(el: HTMLElement, node: VizNode): void {
+  el.dataset.line = String(node.line)
+  el.dataset.statement = node.type
+  // 見出しと同じ行にある本体は、スクロール同期の対象にしない（見出しが隠れるため）
+  if (node.inline) el.dataset.inline = 'true'
 }
 
 function renderSegment(segment: Segment): Node {
   if (segment.cls === 'plain') return document.createTextNode(segment.text)
   const el = document.createElement('span')
-  el.className = SEGMENT_CLASSES[segment.cls]
   el.textContent = segment.text
-  const color = TYPE_COLORS[segment.tone]
-  if (segment.cls === 'badge' || segment.cls === 'loopvar') {
-    el.style.backgroundColor = color
-    el.style.color = '#0d1117'
+  if (segment.cls === 'input') {
+    el.className = 'viz-input'
+    el.dataset.role = 'input'
+    // 改行を含む式は、楕円ではなく角の丸い箱にする
+    if (segment.text.includes('\n')) el.classList.add('viz-input-multiline')
   } else {
-    el.style.color = color
+    el.className = 'viz-keyword'
   }
   return el
 }
 
 function renderCode(lines: readonly (readonly Segment[])[]): HTMLElement {
-  const code = document.createElement('div')
-  code.className = 'flex-1 min-w-0 font-mono text-xs text-ink whitespace-pre-wrap break-words'
+  const code = setRole(document.createElement('div'), 'code')
+  code.className = 'viz-code'
   lines.forEach((segments, i) => {
     if (i > 0) code.appendChild(document.createTextNode('\n'))
     for (const segment of segments) code.appendChild(renderSegment(segment))
@@ -39,49 +54,73 @@ function renderCode(lines: readonly (readonly Segment[])[]): HTMLElement {
 
 function renderLabel(node: VizNode): HTMLElement | null {
   const label = TYPE_LABELS[node.type]
-  if (!label) return null
-  const pill = document.createElement('span')
-  pill.className = 'shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap'
-  pill.style.backgroundColor = TYPE_COLORS[node.type]
-  pill.style.color = '#0d1117'
   const icon = TYPE_ICONS[node.type]
+  if (!label && !icon) return null
+  const pill = setRole(document.createElement('span'), 'label')
+  pill.className = 'viz-label'
   if (icon) setIconLabel(pill, icon, label)
-  else pill.textContent = label
+  else pill.textContent = label ?? ''
   return pill
 }
 
-export function renderNode(node: VizNode): HTMLElement {
-  const color = TYPE_COLORS[node.type]
-  const block = document.createElement('div')
-  block.className = 'rounded-md'
-  block.dataset.line = String(node.line)
-  block.dataset.statement = node.type
-  block.style.borderLeft = `4px solid ${color}`
-  block.style.backgroundColor = `color-mix(in srgb, ${color} 9%, transparent)`
-
-  const header = document.createElement('div')
-  header.className = 'flex items-start gap-2 px-2 py-1'
+/** ブロックの見出し行（ラベル + コード）。複合文の見出し腕と、単純文のブロックで共通 */
+function fillHeader(el: HTMLElement, node: VizNode): void {
   const label = renderLabel(node)
-  if (label) header.appendChild(label)
-  header.appendChild(renderCode([
+  if (label) el.appendChild(label)
+  el.appendChild(renderCode([
     ...node.decorators.map(highlightDecorator),
     ...highlightStatement(node.text, node.type),
   ]))
-  block.appendChild(header)
+}
 
-  if (node.children.length > 0) {
-    const body = document.createElement('div')
-    body.className = 'flex flex-col gap-1 pb-1 pl-3 pr-1'
-    for (const child of node.children) body.appendChild(renderNode(child))
-    block.appendChild(body)
-  }
+/** 代入・import・その他の単純文。子を持たない積み木 */
+function renderStatementBlock(node: VizNode): HTMLElement {
+  const block = document.createElement('div')
+  block.className = 'viz-block'
+  markSource(block, node)
+  paint(block, node)
+  fillHeader(block, node)
   return block
 }
 
-/** 文の木を DOM にする。文字列はすべて textContent / テキストノードで入れる */
+/**
+ * 複合文（とそれに続く節）を C 字型の1つのブロックにする。
+ * 見出し腕 → 口（子の積み木）を節の数だけ繰り返し、最後に下の腕で閉じる。
+ * 色は先頭の文のものを全体に使う（for の else なども同じ色で続く）。
+ */
+function renderCBlock(clauses: readonly VizNode[]): HTMLElement {
+  const block = document.createElement('div')
+  block.className = 'viz-c'
+  paint(block, clauses[0])
+  for (const clause of clauses) {
+    const head = document.createElement('div')
+    head.className = 'viz-c-head'
+    markSource(head, clause)
+    fillHeader(head, clause)
+    const mouth = setRole(document.createElement('div'), 'mouth')
+    mouth.className = 'viz-c-mouth'
+    mouth.appendChild(renderStack(clause.children))
+    block.append(head, mouth)
+  }
+  const foot = document.createElement('div')
+  foot.className = 'viz-c-foot'
+  block.appendChild(foot)
+  return block
+}
+
+function renderStack(nodes: readonly VizNode[]): HTMLElement {
+  const stack = document.createElement('div')
+  stack.className = 'viz-stack'
+  for (const group of groupChains(nodes)) {
+    stack.appendChild(isCompound(group[0].type) ? renderCBlock(group) : renderStatementBlock(group[0]))
+  }
+  return stack
+}
+
+/**
+ * 文の木を Scratch 風のブロックの DOM にする。文字列はすべて textContent / テキストノードで入れる。
+ * 一番上にもハットブロックは付けず、積み木と C 字型ブロックの入れ子だけで包含関係を示す。
+ */
 export function renderTree(nodes: readonly VizNode[]): HTMLElement {
-  const root = document.createElement('div')
-  root.className = 'flex flex-col gap-1'
-  for (const node of nodes) root.appendChild(renderNode(node))
-  return root
+  return renderStack(nodes)
 }

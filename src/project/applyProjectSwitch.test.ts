@@ -17,6 +17,7 @@ function buildDeps() {
       setEditorFileName: track('setEditorFileName'),
       refreshProjectBar: track('refreshProjectBar'),
       clearLog: track('clearLog'),
+      getExercise: vi.fn(() => undefined as { problem: string; test: string } | undefined),
       onExerciseLoaded: track('onExerciseLoaded'),
     },
   }
@@ -44,10 +45,11 @@ describe('applyProjectSwitch', () => {
     expect(deps.onExerciseLoaded).toHaveBeenCalledWith(undefined, files, 'a.py')
   })
 
-  it('取り込んだ演習のメタを渡せる', () => {
+  it('現在のプロジェクトの演習メタを渡す', () => {
     const { deps, files } = buildDeps()
-    const exercise = { problem: 'p', entryPath: 'a.py', testCode: 't' } as never
-    applyProjectSwitch(deps, exercise)
+    const exercise = { problem: 'p', test: 't' }
+    deps.getExercise.mockReturnValue(exercise)
+    applyProjectSwitch(deps)
     expect(deps.onExerciseLoaded).toHaveBeenCalledWith(exercise, files, 'a.py')
   })
 })

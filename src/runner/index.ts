@@ -35,6 +35,8 @@ export interface RunnerHandle {
   // 呼び出し側が明示的に渡す（問題文やtest.pyを開いたまま採点ボタンを押す事故を防ぐため）。
   // entryPath はそのファイルのプロジェクト内相対パス（trace/normalには影響しない）
   runGradeMode: (code: string, testCode: string, entryPath: string) => void
+  // 実行中か。実行中のプロジェクト切替を止める判定に使う(issue #86)
+  isRunning: () => boolean
 }
 
 export function initRunner(
@@ -346,5 +348,6 @@ export function initRunner(
   return {
     runTraceMode: () => startRun('trace'),
     runGradeMode: (code, testCode, entryPath) => startRun('grade', code, testCode, entryPath),
+    isRunning: () => running,
   }
 }

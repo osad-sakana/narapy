@@ -17,10 +17,10 @@ import {
   updateFileContent,
   setActiveFile,
   getAllFilesForRun,
-  loadProject,
   getFiles,
   getDirectories,
-  hasUserContent,
+  getCurrentExercise,
+  listSharedSources,
   listProjects,
   getCurrentProject,
   createProject,
@@ -29,14 +29,14 @@ import {
   deleteProject,
 } from './explorer/store'
 import { applyUrlLoad } from './urlload/applyUrlLoad'
-import { markLoadedFromSharedLink, setCurrentProjectIdProvider } from './pygame/sharedLinkGuard'
+import { markProjectFromSharedLink, setCurrentProjectIdProvider } from './pygame/sharedLinkGuard'
 import { createFileSwitcher } from './editor/fileSwitcher'
 import { initTheme } from './theme/index'
 import { initFormatController } from './format/controller'
 import { initHamburgerMenu } from './menu/ui'
 import { applyProjectSwitch, type ApplyProjectSwitchDeps } from './project/applyProjectSwitch'
 import { initProjectBar } from './project/ui'
-import { DEFAULT_PROJECT_TITLE, titleFromFileName, toSafeFileName } from './project/title'
+import { DEFAULT_PROJECT_TITLE, SHARED_PROJECT_TITLE, titleFromFileName, toSafeFileName } from './project/title'
 import { initIndentVizPanel } from './indentViz/panel'
 import { createInstructorController } from './instructor/controller'
 import { createInstructorMenuAction, syncInstructorMenuItem, initInstructorBaselineButton } from './instructor/ui'
@@ -196,19 +196,32 @@ const exerciseController = createExerciseController({
 problemBtn.addEventListener('click', () => problemPanel.toggle())
 problemPanelCloseBtn.addEventListener('click', () => problemPanel.hide())
 
-// --- URLパラメータからの初期プロジェクト読み込み (issue #32) ---
-// #project= > #code= > ?project=<URL> の優先順位で解決する。既存の作業内容がある場合のみ確認する。
+// --- URLパラメータからの初期プロジェクト読み込み (issue #32 / #86) ---
+// #project= > #code= > ?project=<URL> の優先順位で解決し、新しいプロジェクトとして追加する
+// （既存のプロジェクトは上書きしない）。URL は読込後に消し、リロードで重複して増えないようにする。
 try {
   await applyUrlLoad({
-    hasUserContent,
-    loadProject,
+    createProject: ({ project, source }) => {
+      createProject(SHARED_PROJECT_TITLE, {
+        files: project.files,
+        directories: project.directories,
+        activeFile: project.activeFile,
+        exercise: project.exercise,
+        sharedSource: source,
+      })
+    },
     refreshExplorer,
-    onSharedLinkLoaded: markLoadedFromSharedLink,
-    onExerciseLoaded: (exercise, files, activeFile) => exerciseController.onProjectLoaded(exercise, files, activeFile),
+    clearUrl: () => window.history.replaceState(null, '', window.location.pathname),
   })
 } catch (err) {
   window.alert(err instanceof Error ? err.message : String(err))
 }
+
+// 共有リンク由来のプロジェクト（今回読み込んだもの・過去に保存されたもの）は、
+// pygame 実行前の確認対象にする
+for (const { id, source } of listSharedSources()) markProjectFromSharedLink(id, source)
+// 現在のプロジェクトが演習なら、問題文と採点UIを復元する
+exerciseController.onProjectLoaded(getCurrentExercise(), getFiles(), getActiveFile())
 
 // エディタを永続化済みの内容で初期化。
 // ?project=<URL> の読込待ちの間にユーザーがファイルを選択するとモデルが作られうるため、
@@ -278,11 +291,22 @@ const switchDeps: ApplyProjectSwitchDeps = {
   setEditorFileName: (path: string) => { editorFileName.textContent = path },
   refreshProjectBar: () => projectBar.refresh(),
   clearLog,
+  getExercise: getCurrentExercise,
   onExerciseLoaded: (exercise: ExerciseMeta | undefined, files: FileEntry[], activeFile: string) =>
     exerciseController.onProjectLoaded(exercise, files, activeFile),
 }
 
+// 実行中の結果（ステップ実行・採点・出力）が切替後のプロジェクトに混ざらないよう、
+// 実行中は切り替えない
+function canChangeProject(): boolean {
+  if (!runner.isRunning()) return true
+  appendLog('⚠️ 実行中はプロジェクトを切り替えられません。停止してから操作してください', 'warn')
+  projectBar.refresh()
+  return false
+}
+
 function createNewProject(): void {
+  if (!canChangeProject()) return
   createProject(DEFAULT_PROJECT_TITLE)
   applyProjectSwitch(switchDeps)
   const titleInput = document.getElementById('projectTitleInput') as HTMLInputElement
@@ -295,11 +319,13 @@ const projectBar = initProjectBar(document, {
   getCurrent: getCurrentProject,
   onCreate: createNewProject,
   onSwitch: (id) => {
+    if (!canChangeProject()) return
     if (switchProject(id)) applyProjectSwitch(switchDeps)
     else projectBar.refresh()
   },
   onRename: (title) => { renameProject(title) },
   onDelete: (id) => {
+    if (!canChangeProject()) return
     const target = listProjects().find(p => p.id === id)
     if (!target) return
     if (!window.confirm(`プロジェクト「${target.title}」を削除しますか？この操作は取り消せません。`)) return
@@ -313,12 +339,14 @@ const importProjectBtn = document.getElementById('importProjectBtn') as HTMLButt
 importProjectBtn.addEventListener('click', () => {
   openNarapyFilePicker(
     (project, fileName) => {
+      if (!canChangeProject()) return
       createProject(titleFromFileName(fileName), {
         files: project.files,
         directories: project.directories,
         activeFile: project.activeFile,
+        exercise: project.exercise,
       })
-      applyProjectSwitch(switchDeps, project.exercise)
+      applyProjectSwitch(switchDeps)
     },
     (message) => window.alert(message),
   )
@@ -345,12 +373,7 @@ exportProjectBtn.addEventListener('click', async () => {
 
 initAbout()
 
-// --- 新規プロジェクト作成 (issue #58 / #86) ---
-// 既存のプロジェクトは失われないため、確認なしで新しいプロジェクトを作る
+// 新規プロジェクトの作成はプロジェクトバーの「＋ 新規」から行う (issue #86)
 initHamburgerMenu([
-  {
-    label: '新規プロジェクト作成',
-    onClick: createNewProject,
-  },
   createInstructorMenuAction(instructorController),
 ])

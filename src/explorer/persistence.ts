@@ -43,7 +43,7 @@ function fromV1Stored(stored: V1StoredFile): FileEntry {
 // アップグレード全体が中断され、DB は v1 のままデータも残る。
 function upgradeToV2(db: IDBDatabase, tx: IDBTransaction, oldVersion: number): void {
   if (!db.objectStoreNames.contains(STORE_META)) db.createObjectStore(STORE_META)
-  db.createObjectStore(STORE_PROJECTS, { keyPath: 'id' })
+  if (oldVersion < 2) db.createObjectStore(STORE_PROJECTS, { keyPath: 'id' })
   if (oldVersion !== 1 || !db.objectStoreNames.contains(V1_STORE_FILES)) return
 
   const meta = tx.objectStore(STORE_META)

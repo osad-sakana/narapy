@@ -6,6 +6,7 @@ import {
   confirmPygameRun,
   isFromSharedLink,
   markLoadedFromSharedLink,
+  markProjectFromSharedLink,
 } from './sharedLinkGuard'
 
 const dialog = () => document.querySelector('[role="dialog"]')
@@ -116,5 +117,14 @@ describe('sharedLinkGuard', () => {
     expect(dialog()).not.toBeNull()
     findBtn('キャンセル')?.click()
     expect(await q).toBe(false)
+  })
+
+  it('保存済みの共有リンク由来プロジェクトを id 指定で印付けできる', async () => {
+    let id = 'saved'
+    setCurrentProjectIdProvider(() => id)
+    markProjectFromSharedLink('saved', 'projectUrl')
+    expect(isFromSharedLink()).toBe(true)
+    id = 'other'
+    expect(isFromSharedLink()).toBe(false)
   })
 })

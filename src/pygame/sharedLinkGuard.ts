@@ -17,8 +17,12 @@ export function setCurrentProjectIdProvider(provider: () => string | undefined):
   currentProjectId = provider
 }
 
+export function markProjectFromSharedLink(projectId: string | undefined, source: SharedSource): void {
+  marks.set(projectId, { source, approved: false })
+}
+
 export function markLoadedFromSharedLink(source: SharedSource): void {
-  marks.set(currentProjectId(), { source, approved: false })
+  markProjectFromSharedLink(currentProjectId(), source)
 }
 
 // 共有リンク以外の経路でプロジェクトの中身が置き換わったとき（現在のプロジェクトのみ）

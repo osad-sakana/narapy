@@ -1,4 +1,5 @@
 export const DEFAULT_PROJECT_TITLE = '無題のプロジェクト'
+export const SHARED_PROJECT_TITLE = '共有されたプロジェクト'
 export const MIGRATED_PROJECT_TITLE = 'マイプロジェクト'
 const MAX_TITLE_LENGTH = 50
 

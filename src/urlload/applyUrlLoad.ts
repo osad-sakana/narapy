@@ -1,33 +1,27 @@
-import type { DirectoryEntry, FileEntry } from '../explorer/types'
+import type { FileEntry } from '../explorer/types'
 import type { ExerciseMeta } from '../fileio/index'
-import { confirmOverwriteExistingWork } from './confirmOverwrite'
 import { resolveProjectFromUrl, type UrlLoadResult } from './loadFromUrl'
 
 export interface ApplyUrlLoadDeps {
-  hasUserContent: () => boolean
-  loadProject: (files: FileEntry[], directories: DirectoryEntry[], activeFile: string) => void
+  // 読み込んだプロジェクトを新しいプロジェクトとして作成し、現在のプロジェクトにする。
+  // 既存のプロジェクトは上書きしない(issue #86)
+  createProject: (result: UrlLoadResult) => void
   refreshExplorer: () => void
-  confirm?: () => boolean
   resolve?: () => Promise<UrlLoadResult | null>
-  // #project=/?project=<URL> で読み込んだものが演習(.exercise)かどうかを検知する
-  // 任意フック(issue #65)。通常の.narapyプロジェクトでは undefined で呼ばれる
-  // 共有リンク由来のプロジェクトを読み込んだ直後に呼ぶ(pygame 実行前の確認に使う)
-  onSharedLinkLoaded?: (source: UrlLoadResult['source']) => void
+  // 読込後に URL を消す。残すとリロードのたびに同じプロジェクトが増える
+  clearUrl?: () => void
   onExerciseLoaded?: (exercise: ExerciseMeta | undefined, files: FileEntry[], activeFile: string) => void
 }
 
 // main.tsの起動シーケンスから呼ばれるオーケストレーション。
-// 既存の作業内容がある場合のみ確認し、承認された場合だけ上書きする(issue #32)。
 export async function applyUrlLoad(deps: ApplyUrlLoadDeps): Promise<void> {
   const resolve = deps.resolve ?? resolveProjectFromUrl
-  const confirm = deps.confirm ?? confirmOverwriteExistingWork
 
   const result = await resolve()
   if (!result) return
-  if (deps.hasUserContent() && !confirm()) return
 
-  deps.loadProject(result.project.files, result.project.directories, result.project.activeFile)
+  deps.createProject(result)
+  deps.clearUrl?.()
   deps.refreshExplorer()
-  deps.onSharedLinkLoaded?.(result.source)
   deps.onExerciseLoaded?.(result.project.exercise, result.project.files, result.project.activeFile)
 }

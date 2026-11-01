@@ -1,4 +1,5 @@
-import type { DirectoryEntry, FileContent, FileEntry, FileState, ProjectRecord, ProjectSummary } from './types'
+import type { DirectoryEntry, FileContent, FileEntry, FileState, ProjectInput, ProjectRecord, ProjectSummary, SharedSource } from './types'
+import type { ExerciseMeta } from '../fileio/index'
 import type { RunFile } from '../types'
 import { deleteProjectRecord, loadAll, saveCurrentId, saveProject } from './persistence'
 import { newProjectId, resolveActiveFile } from './migration'
@@ -52,10 +53,11 @@ function currentTitle(): string {
 function persist(): void {
   const existing = projects.find(p => p.id === currentId)
   const record: ProjectRecord = {
+    createdAt: Date.now(),
+    ...existing,
     ...state,
     id: currentId,
     title: currentTitle(),
-    createdAt: existing?.createdAt ?? Date.now(),
     updatedAt: Date.now(),
   }
   projects = projects.map(p => p.id === currentId ? record : p)
@@ -90,6 +92,14 @@ export function getCurrentProject(): ProjectSummary {
   return { id: currentId, title: currentTitle() }
 }
 
+export function getCurrentExercise(): ExerciseMeta | undefined {
+  return projects.find(p => p.id === currentId)?.exercise
+}
+
+export function listSharedSources(): Array<{ id: string; source: SharedSource }> {
+  return projects.flatMap(p => p.sharedSource ? [{ id: p.id, source: p.sharedSource }] : [])
+}
+
 function cloneState(input: FileState): FileState {
   const files = input.files.map(f => ({
     path: f.path,
@@ -105,7 +115,7 @@ function cloneState(input: FileState): FileState {
 }
 
 // 新しいプロジェクトを作って現在のプロジェクトにする。input が無ければ初期状態(main.py 1件)。
-export function createProject(title: string, input?: FileState): ProjectSummary {
+export function createProject(title: string, input?: ProjectInput): ProjectSummary {
   const now = Date.now()
   const record: ProjectRecord = {
     ...cloneState(input ?? cloneDefault()),
@@ -113,6 +123,8 @@ export function createProject(title: string, input?: FileState): ProjectSummary 
     title: normalizeTitle(title),
     createdAt: now,
     updatedAt: now,
+    ...(input?.exercise ? { exercise: input.exercise } : {}),
+    ...(input?.sharedSource ? { sharedSource: input.sharedSource } : {}),
   }
   projects = [...projects, record]
   currentId = record.id

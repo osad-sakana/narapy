@@ -48,7 +48,7 @@ describe('initIndentVizPanel', () => {
 
   it('起動時に現在の内容を描画する', () => {
     initIndentVizPanel(createFakeEditor('def f():\n    pass').editor, () => 'main.py')
-    expect(body()).toContain('def f():')
+    expect(body()).toContain('def f()')
   })
 
   it('内容変更はデバウンスしてから反映する', () => {

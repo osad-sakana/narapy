@@ -1,86 +1,92 @@
 import { parseImportNames, type StatementType } from './parse'
 
-export type SegmentClass = 'plain' | 'keyword' | 'var' | 'arrow' | 'badge' | 'loopvar'
+/**
+ * keyword: ブロックの語（if / for / = など）。input: Scratch の入力欄にあたる白い楕円
+ * （条件・式・変数名・import 名）。plain: それ以外の文字
+ */
+export type SegmentClass = 'plain' | 'keyword' | 'input'
 
 export interface Segment {
   readonly text: string
   readonly cls: SegmentClass
-  /** 色を決める文の種類（TYPE_COLORS のキー）。plain では使わない */
-  readonly tone: StatementType
 }
 
-const plain = (text: string): Segment => ({ text, cls: 'plain', tone: 'other' })
-const seg = (text: string, cls: SegmentClass, tone: StatementType): Segment => ({ text, cls, tone })
+const plain = (text: string): Segment => ({ text, cls: 'plain' })
+const keyword = (text: string): Segment => ({ text, cls: 'keyword' })
+const input = (text: string): Segment => ({ text, cls: 'input' })
 
-// 文頭キーワードの色。return/yield は関数、break/continue はループ、それ以外は other の色にする
-const OTHER_KEYWORD_TONES: Readonly<Record<string, StatementType>> = {
-  return: 'def', yield: 'def',
-  break: 'for', continue: 'for',
-  pass: 'other', raise: 'other', assert: 'other',
+const SIMPLE_KEYWORDS: ReadonlySet<string> = new Set(['return', 'yield', 'break', 'continue', 'pass', 'raise', 'assert'])
+
+// 識別子は日本語などの非ASCIIも使えるので、\w / \b ではなく Unicode の文字クラスで判定する
+const COMPOUND_KEYWORD = /^\s*((?:async\s+)?(?:def|class|if|elif|else|for|while|try|except|finally|with|match|case))(?![\p{L}\p{N}_])([\s\S]*)$/u
+const FOR_LOOP = /^\s*(async\s+)?for\s+([\p{L}_][\p{L}\p{N}_,\s]*?)\s+in\s+([\s\S]*)$/u
+const ASSIGN = /^([\p{L}_][\p{L}\p{N}_,\s[\].]*?)\s*=\s*(?!=)([\s\S]*)$/u
+
+/** Scratch のブロックに「:」は無いので、見出しの末尾のコロンは表示しない */
+function stripColon(text: string): string {
+  return text.trim().replace(/:$/, '').trim()
 }
 
-const COMPOUND_KEYWORD = /^(\s*)((?:async\s+)?(?:def|class|if|elif|else|for|while|try|except|finally|with|match|case))(?![\p{L}\p{N}_])(.*)$/u
-const FOR_LOOP = /^(\s*)(async\s+)?(for)\s+([\p{L}_][\p{L}\p{N}_,\s]*?)\s+(in)\s+(.*)$/u
-const ASSIGN = /^([\p{L}_][\p{L}\p{N}_,\s[\].]*?)\s*=\s*(?!=)(.*)$/u
+function withInput(head: Segment[], value: string): Segment[] {
+  return value ? [...head, plain(' '), input(value)] : head
+}
 
-function highlightFor(line: string): Segment[] | null {
-  const m = FOR_LOOP.exec(line)
+function highlightFor(text: string): Segment[] | null {
+  const m = FOR_LOOP.exec(text)
   if (!m) return null
-  const [, space, asyncKw, kw, variable, inKw, rest] = m
-  return [
-    plain(space),
-    ...(asyncKw ? [seg(asyncKw, 'keyword', 'for')] : []),
-    seg(kw, 'keyword', 'for'), plain(' '),
-    seg(variable, 'loopvar', 'assignment'), plain(' '),
-    seg(inKw, 'keyword', 'for'), plain(' ' + rest),
-  ]
+  const [, asyncKw, variable, iterable] = m
+  const head = [keyword(asyncKw ? 'async for' : 'for'), plain(' '), input(variable.trim()), plain(' '), keyword('in')]
+  return withInput(head, stripColon(iterable))
 }
 
-function highlightCompound(line: string, type: StatementType): Segment[] {
-  const m = COMPOUND_KEYWORD.exec(line)
-  if (!m) return [plain(line)]
-  return [plain(m[1]), seg(m[2], 'keyword', type), plain(m[3])]
+function highlightCompound(text: string): Segment[] {
+  const m = COMPOUND_KEYWORD.exec(text)
+  if (!m) return [plain(text)]
+  return withInput([keyword(m[1])], stripColon(m[2]))
 }
 
-function highlightAssignment(lines: readonly string[]): Segment[][] {
-  const m = ASSIGN.exec(lines[0])
-  if (!m) return lines.map(l => [plain(l)])
-  const head = [seg(m[1], 'var', 'assignment'), plain(' '), seg('=', 'arrow', 'other'), plain(' ' + m[2])]
-  return [head, ...lines.slice(1).map(l => [plain(l)])]
+function highlightAssignment(text: string): Segment[] {
+  const m = ASSIGN.exec(text)
+  if (!m) return [plain(text)]
+  return [input(m[1].trim()), plain(' '), keyword('='), plain(' '), input(m[2].trim())]
 }
 
-function highlightOther(line: string): Segment[] {
-  const m = /^(\s*)([\p{L}_][\p{L}\p{N}_]*)(.*)$/u.exec(line)
-  const tone = m ? OTHER_KEYWORD_TONES[m[2]] : undefined
-  return m && tone ? [plain(m[1]), seg(m[2], 'keyword', tone), plain(m[3])] : [plain(line)]
+function highlightSimpleLine(line: string): Segment[] {
+  const m = /^(\s*)([\p{L}_][\p{L}\p{N}_]*)([\s\S]*)$/u.exec(line)
+  return m && SIMPLE_KEYWORDS.has(m[2]) ? [plain(m[1]), keyword(m[2]), plain(m[3])] : [plain(line)]
 }
 
 function highlightImport(text: string): Segment[] {
   const flat = text.replace(/\s+/g, ' ').trim()
-  const badges = parseImportNames(flat).flatMap(name => [seg(name, 'badge', 'import'), plain(' ')])
-  const from = /^from\s+(\S+)\s+import\b/.exec(flat)
+  const names = parseImportNames(flat).flatMap(name => [input(name), plain(' ')]).slice(0, -1)
+  const from = /^from\s+(\S+)\s+import(?![\p{L}\p{N}_])/u.exec(flat)
   const head = from
-    ? [seg('from', 'keyword', 'other'), plain(` ${from[1]} `), seg('import', 'keyword', 'other'), plain(' ')]
-    : [seg('import', 'keyword', 'other'), plain(' ')]
-  return [...head, ...badges.slice(0, -1)]
+    ? [keyword('from'), plain(` ${from[1]} `), keyword('import'), plain(' ')]
+    : [keyword('import'), plain(' ')]
+  return [...head, ...names]
 }
 
 /**
  * 文を行ごとの装飾セグメントにする。HTML は作らず、文字列はそのまま返すので、
  * 呼び出し側が textContent で入れればエスケープ漏れは起きない。
+ * 複合文・代入・import は入力欄を含む1行にまとめ、複数行の式は入力欄の中で改行を保つ。
  */
 export function highlightStatement(text: string, type: StatementType): Segment[][] {
-  if (type === 'import') return [highlightImport(text)]
-  const lines = text.split('\n')
-  if (type === 'assignment') return highlightAssignment(lines)
-  const [head, ...rest] = lines
-  const first = type === 'other'
-    ? highlightOther(head)
-    : (type === 'for' ? highlightFor(head) : null) ?? highlightCompound(head, type)
-  return [first, ...rest.map(l => [plain(l)])]
+  switch (type) {
+    case 'import':
+      return [highlightImport(text)]
+    case 'assignment':
+      return [highlightAssignment(text)]
+    case 'other': {
+      const [head, ...rest] = text.split('\n')
+      return [highlightSimpleLine(head), ...rest.map(l => [plain(l)])]
+    }
+    default:
+      return [(type === 'for' ? highlightFor(text) : null) ?? highlightCompound(text)]
+  }
 }
 
-/** デコレータ行。関数の色で表示する */
+/** デコレータ行 */
 export function highlightDecorator(line: string): Segment[] {
-  return [seg(line, 'keyword', 'def')]
+  return [keyword(line)]
 }

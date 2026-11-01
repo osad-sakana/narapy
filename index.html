@@ -158,6 +158,33 @@
 
           <!-- テキストエディタ -->
           <div id="editorPanel" class="flex flex-col overflow-hidden border-b border-line bg-editor">
+            <!-- プロジェクトバー: タイトル入力・切替・新規・削除 (src/project/ui.ts) -->
+            <div id="projectBar" class="flex items-center gap-2 px-4 py-1.5 bg-panel border-b border-line shrink-0">
+              <label for="projectTitleInput" class="sr-only">プロジェクト名</label>
+              <input
+                id="projectTitleInput"
+                type="text"
+                maxlength="50"
+                autocomplete="off"
+                placeholder="プロジェクト名"
+                class="flex-1 min-w-0 h-7 px-2 rounded border border-line bg-editor text-ink text-sm placeholder:text-muted focus:outline-none focus:border-accent"
+              />
+              <select
+                id="projectSelect"
+                aria-label="プロジェクトを切り替え"
+                class="max-w-40 h-7 px-1 rounded border border-line bg-editor text-ink text-xs focus:outline-none focus:border-accent"
+              ></select>
+              <button
+                id="newProjectBtn"
+                type="button"
+                class="h-7 px-2.5 rounded text-xs text-muted hover:text-ink hover:bg-hover border border-line transition-colors shrink-0"
+              >＋ 新規</button>
+              <button
+                id="deleteProjectBtn"
+                type="button"
+                class="h-7 px-2.5 rounded text-xs text-muted hover:text-ink hover:bg-hover border border-line transition-colors shrink-0 disabled:opacity-40 disabled:pointer-events-none"
+              >削除</button>
+            </div>
             <div id="editorHeader" class="flex items-center justify-between px-4 py-2.5 bg-panel border-b border-line shrink-0">
               <div class="flex items-center gap-2.5 min-w-0">
                 <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">

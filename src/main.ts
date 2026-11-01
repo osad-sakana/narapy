@@ -6,7 +6,7 @@ import { createEditor, createEditorModelHost, getValue } from './editor/index'
 import { createFileOpener, createModelRegistry } from './editor/modelRegistry'
 import { initFontSizeControls } from './editor/fontSize'
 import { downloadNarapyProject, openNarapyFilePicker, type ExerciseMeta } from './fileio/index'
-import type { DirectoryEntry, FileEntry } from './explorer/types'
+import type { FileEntry } from './explorer/types'
 import { createExplorer } from './explorer/ui'
 import { initAbout } from './about/index'
 import {
@@ -21,15 +21,22 @@ import {
   getFiles,
   getDirectories,
   hasUserContent,
+  listProjects,
+  getCurrentProject,
+  createProject,
+  switchProject,
+  renameProject,
+  deleteProject,
 } from './explorer/store'
 import { applyUrlLoad } from './urlload/applyUrlLoad'
-import { clearSharedLinkMark, markLoadedFromSharedLink } from './pygame/sharedLinkGuard'
-import { applyProjectLoad } from './fileio/applyProjectLoad'
+import { markLoadedFromSharedLink, setCurrentProjectIdProvider } from './pygame/sharedLinkGuard'
 import { createFileSwitcher } from './editor/fileSwitcher'
 import { initTheme } from './theme/index'
 import { initFormatController } from './format/controller'
 import { initHamburgerMenu } from './menu/ui'
-import { applyNewProject } from './menu/applyNewProject'
+import { applyProjectSwitch, type ApplyProjectSwitchDeps } from './project/applyProjectSwitch'
+import { initProjectBar } from './project/ui'
+import { DEFAULT_PROJECT_TITLE, titleFromFileName, toSafeFileName } from './project/title'
 import { initIndentVizPanel } from './indentViz/panel'
 import { createInstructorController } from './instructor/controller'
 import { createInstructorMenuAction, syncInstructorMenuItem, initInstructorBaselineButton } from './instructor/ui'
@@ -46,6 +53,9 @@ initTheme()
 const layout = initLayout()
 
 await initStore()
+
+// 共有リンク由来の確認は、現在のプロジェクトごとに管理する
+setCurrentProjectIdProvider(() => getCurrentProject().id)
 
 // Monaco Editor を初期化
 const editorContainer = document.getElementById('codeEditor') as HTMLElement
@@ -257,32 +267,58 @@ instructorController.setStateChangeListener(() => {
   instructorBaselineButton.sync()
 })
 
-// プロジェクト読込系オーケストレーション（.narapy を開く／新規作成）が共有する依存。
-// 別々に組み立てると、どちらかだけ直して食い違う事故が起きうるため一箇所にまとめる。
-const projectLoadDeps = {
-  // 共有リンク由来ではないプロジェクトに置き換わったら、pygame 実行前の確認対象から外す
-  loadProject: (files: FileEntry[], directories: DirectoryEntry[], activeFile: string) => {
-    clearSharedLinkMark()
-    loadProject(files, directories, activeFile)
-  },
+// --- プロジェクトバー (issue #86) ---
+// 作成・切替・削除・取り込みのすべてが同じ手順（applyProjectSwitch）でエディタと各UIを揃える。
+const switchDeps: ApplyProjectSwitchDeps = {
   refreshExplorer,
+  getFiles,
   getActiveFile,
   getActiveContent,
   openProjectFile: openProjectFileWithReset,
   setEditorFileName: (path: string) => { editorFileName.textContent = path },
+  refreshProjectBar: () => projectBar.refresh(),
+  clearLog,
   onExerciseLoaded: (exercise: ExerciseMeta | undefined, files: FileEntry[], activeFile: string) =>
     exerciseController.onProjectLoaded(exercise, files, activeFile),
 }
 
+function createNewProject(): void {
+  createProject(DEFAULT_PROJECT_TITLE)
+  applyProjectSwitch(switchDeps)
+  const titleInput = document.getElementById('projectTitleInput') as HTMLInputElement
+  titleInput.focus()
+  titleInput.select()
+}
+
+const projectBar = initProjectBar(document, {
+  listProjects,
+  getCurrent: getCurrentProject,
+  onCreate: createNewProject,
+  onSwitch: (id) => {
+    if (switchProject(id)) applyProjectSwitch(switchDeps)
+    else projectBar.refresh()
+  },
+  onRename: (title) => { renameProject(title) },
+  onDelete: (id) => {
+    const target = listProjects().find(p => p.id === id)
+    if (!target) return
+    if (!window.confirm(`プロジェクト「${target.title}」を削除しますか？この操作は取り消せません。`)) return
+    if (deleteProject(id)) applyProjectSwitch(switchDeps)
+  },
+})
+
 // --- プロジェクトを開く (.narapy / .exercise) ---
+// 現在のプロジェクトは上書きせず、新しいプロジェクトとして取り込む
 const importProjectBtn = document.getElementById('importProjectBtn') as HTMLButtonElement
 importProjectBtn.addEventListener('click', () => {
   openNarapyFilePicker(
-    (project) => {
-      applyProjectLoad(
-        { files: project.files, directories: project.directories, activeFile: project.activeFile, exercise: project.exercise },
-        projectLoadDeps,
-      )
+    (project, fileName) => {
+      createProject(titleFromFileName(fileName), {
+        files: project.files,
+        directories: project.directories,
+        activeFile: project.activeFile,
+      })
+      applyProjectSwitch(switchDeps, project.exercise)
     },
     (message) => window.alert(message),
   )
@@ -304,20 +340,17 @@ exportProjectBtn.addEventListener('click', async () => {
     })),
     directories: getDirectories().map(d => ({ path: d.path })),
     activeFile: getActiveFile(),
-  })
+  }, `${toSafeFileName(getCurrentProject().title)}.narapy`)
 })
 
 initAbout()
 
-// --- 新規プロジェクト作成 (issue #58) ---
+// --- 新規プロジェクト作成 (issue #58 / #86) ---
+// 既存のプロジェクトは失われないため、確認なしで新しいプロジェクトを作る
 initHamburgerMenu([
   {
     label: '新規プロジェクト作成',
-    onClick: () => {
-      // リセット対象外のプロジェクトの実行結果が残り続けないよう、
-      // 実際にリセットした場合のみログをクリアする（キャンセル時は何もしない）
-      if (applyNewProject({ hasUserContent, ...projectLoadDeps })) clearLog()
-    },
+    onClick: createNewProject,
   },
   createInstructorMenuAction(instructorController),
 ])

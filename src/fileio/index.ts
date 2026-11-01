@@ -74,7 +74,7 @@ export function downloadNarapyProject(project: NarapyProject, filename = 'projec
 }
 
 export function openNarapyFilePicker(
-  onLoad: (project: NarapyProject) => void,
+  onLoad: (project: NarapyProject, fileName: string) => void,
   onError: (message: string) => void,
 ): void {
   const input = document.createElement('input')
@@ -88,7 +88,7 @@ export function openNarapyFilePicker(
       const buf = await file.arrayBuffer()
       const data = new Uint8Array(buf)
       const project = parseNarapyArchive(data)
-      onLoad(project)
+      onLoad(project, file.name)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       onError(`.narapy ファイルの読み込みに失敗しました: ${message}`)

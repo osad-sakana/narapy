@@ -190,7 +190,8 @@
 
 /* ─── インデント構造パネル: Scratch 風ブロック（src/indentViz/render.ts） ─────────
    塗りの色・文字色は要素に inline で渡される --viz-color / --viz-ink（文の種類ごと）。
-   ここでは形（C 字型の腕と口・上下の切り欠き・白い入力欄）だけを作る。
+   ここでは形（C 字型の腕と口・白い入力欄）だけを作る。切り欠き（くぼみ・出っ張り）は付けず、
+   ブロック同士の境目は縁取りで示す。
    ハットブロックは付けず、積み木の並びと C 字型の入れ子で包含関係を示す。 */
 .viz-stack {
   display: flex;
@@ -213,26 +214,6 @@
   line-height: 1.5;
 }
 
-/* 下の出っ張り。次のブロックの上端に重ねて、積み木がつながって見えるようにする（上のくぼみは付けない） */
-.viz-block::after,
-.viz-c::after {
-  content: '';
-  position: absolute;
-  bottom: -5px;
-  left: 11px;
-  width: 18px;
-  height: 5px;
-  background-color: var(--viz-fill);
-  border: 1px solid color-mix(in srgb, var(--viz-color) 60%, #000);
-  border-top: 0;
-  border-radius: 0 0 4px 4px;
-  z-index: 1;
-}
-
-.viz-stack > :last-child::after {
-  display: none;
-}
-
 .viz-block,
 .viz-c-head {
   display: flex;
@@ -248,13 +229,23 @@
   flex-direction: column;
 }
 
-/* 口: 子の積み木が入る凹み。左の腕（C の背骨）は .viz-c の塗りがそのまま見える */
+/* 口: 子の積み木が入る凹み。左の腕（C の背骨）は .viz-c の塗りがそのまま見える。
+   見出し・下の腕との間に余白や角丸を作ると、見出しの直下に窪みができるので、
+   子は口の上下にぴったり付け、最初と最後の子の角は直角にする */
 .viz-c-mouth {
   min-height: 14px;
   margin-left: 12px;
-  padding: 2px 0;
   background-color: var(--color-panel);
-  border-radius: 4px 0 0 4px;
+}
+
+.viz-c-mouth > .viz-stack > :first-child {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.viz-c-mouth > .viz-stack > :last-child {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .viz-c-foot {

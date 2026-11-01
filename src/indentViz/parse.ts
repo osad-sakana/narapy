@@ -1,3 +1,4 @@
+import { findHeaderColon } from './headerColon'
 import { splitLogicalLines, type LogicalLine } from './logicalLines'
 
 export type StatementType =
@@ -72,6 +73,18 @@ function strayDecorators(decorators: readonly LogicalLine[]): VizNode[] {
   return decorators.map(d => ({ type: 'other', decorators: [], text: d.text, line: d.line, children: [] }))
 }
 
+/** 1行に書かれた複合文（`if x: y = 1`）を、見出しと本体（子の文）に分ける */
+function splitInlineBody(text: string): { header: string; body: string } {
+  const colon = findHeaderColon(text)
+  if (colon === -1) return { header: text, body: '' }
+  return { header: text.slice(0, colon + 1), body: text.slice(colon + 1).trim() }
+}
+
+function inlineBodyNode(body: string, line: number): VizNode[] {
+  if (body === '') return []
+  return [{ type: simpleType(body), decorators: [], text: body, line, children: [] }]
+}
+
 function parseScope(ctx: ParseContext, parentIndent: number, insideClass: boolean): VizNode[] {
   const nodes: VizNode[] = []
   let decorators: LogicalLine[] = []
@@ -87,11 +100,14 @@ function parseScope(ctx: ParseContext, parentIndent: number, insideClass: boolea
     const type = base === 'def' && insideClass ? 'method' : base
     const keepsDecorators = base === 'def' || base === 'class'
     if (!keepsDecorators) nodes.push(...strayDecorators(decorators))
-    const children = compound ? parseScope(ctx, line.indent, insideClass || compound === 'class') : []
+    const { header, body } = compound ? splitInlineBody(line.text) : { header: line.text, body: '' }
+    const children = compound
+      ? [...inlineBodyNode(body, line.line), ...parseScope(ctx, line.indent, insideClass || compound === 'class')]
+      : []
     nodes.push({
       type,
       decorators: keepsDecorators ? decorators.map(d => d.text) : [],
-      text: line.text,
+      text: header,
       // デコレータ付きは先頭のデコレータ行から数える（エディタ上端との対応を取るため）
       line: keepsDecorators && decorators.length > 0 ? decorators[0].line : line.line,
       children,

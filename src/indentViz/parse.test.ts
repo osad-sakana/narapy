@@ -95,8 +95,34 @@ describe('parseIndentTree', () => {
     expect(types(parseIndentTree('async with a as b:\n    pass'))).toEqual(['with'])
   })
 
-  it('1行に書かれた if も if として扱う', () => {
-    expect(types(parseIndentTree('if x: y = 1'))).toEqual(['if'])
+  it('1行に書かれた複合文は、見出しと本体（子の文）に分ける', () => {
+    const [node] = parseIndentTree('if x: y = 1')
+    expect(node.type).toBe('if')
+    expect(node.text).toBe('if x:')
+    expect(node.children.map(c => [c.type, c.text])).toEqual([['assignment', 'y = 1']])
+  })
+
+  it('1行の本体は、続くインデントされた子より前に並ぶ', () => {
+    const [node] = parseIndentTree('for i in x: print(i)\n    more()')
+    expect(node.children.map(c => c.text)).toEqual(['print(i)', 'more()'])
+  })
+
+  it('else: pass / try: f() / class A: pass も分ける', () => {
+    const tree = parseIndentTree('if a:\n    pass\nelse: pass\ntry: f()\nclass A: pass')
+    expect(tree.map(n => [n.type, n.text, n.children.map(c => c.text)])).toEqual([
+      ['if', 'if a:', ['pass']], ['else', 'else:', ['pass']], ['try', 'try:', ['f()']], ['class', 'class A:', ['pass']],
+    ])
+  })
+
+  it('1行の def は class 内ならメソッドになり、本体を子に持つ', () => {
+    const [cls] = parseIndentTree('class C:\n    def m(self): return 1')
+    expect(cls.children.map(c => [c.type, c.children.map(x => x.text)])).toEqual([['method', ['return 1']]])
+  })
+
+  it('見出しの式にコロン（辞書・添字・:=）があっても本体を取り違えない', () => {
+    const [node] = parseIndentTree('while (chunk := f.read(d["a"])): x = {1: 2}')
+    expect(node.text).toBe('while (chunk := f.read(d["a"])):')
+    expect(node.children.map(c => c.text)).toEqual(['x = {1: 2}'])
   })
 
   it('match / case はコロン終端のときだけ構文として扱う', () => {

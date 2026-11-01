@@ -26,8 +26,16 @@ describe('renderTree', () => {
     expect(mouth?.querySelector('[data-statement="assignment"]')).not.toBeNull()
   })
 
-  it('子のない複合文も空の口を持つ', () => {
-    const mouth = render('if x: y = 1').querySelector('[data-role="mouth"]')
+  it('1行に書かれた複合文は、本体が口の中のブロックになり、条件の入力欄に混ざらない', () => {
+    const root = render('if x: y = 1')
+    expect(roleTexts(root, 'input').slice(0, 1)).toEqual(['x'])
+    const mouth = root.querySelector('[data-role="mouth"]')
+    expect(mouth?.querySelectorAll('.viz-block')).toHaveLength(1)
+    expect(mouth?.querySelector('[data-statement="assignment"]')?.textContent).toContain('y')
+  })
+
+  it('本体のない複合文（入力途中）は空の口を持つ', () => {
+    const mouth = render('if x:').querySelector('[data-role="mouth"]')
     expect(mouth).not.toBeNull()
     expect(mouth?.querySelector('.viz-block')).toBeNull()
   })
@@ -104,6 +112,6 @@ describe('renderTree', () => {
 
   it('ハットブロックは付けない（先頭は積み木か C 字型ブロックのみ）', () => {
     const stack = render('x = 1\nif a:\n    pass')
-    expect([...stack.children].map(c => c.className)).toEqual(['viz-block', 'viz-c'])
+    expect([...stack.children].map(c => [c.classList.contains('viz-block'), c.classList.contains('viz-c')])).toEqual([[true, false], [false, true]])
   })
 })

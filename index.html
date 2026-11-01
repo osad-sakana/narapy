@@ -134,7 +134,7 @@
           id="runBtn"
           class="flex items-center gap-2 px-4 py-1.5 rounded-lg whitespace-nowrap shrink-0 text-sm font-bold transition-colors cursor-pointer border bg-accent text-accent-ink border-accent hover:bg-accent-ink hover:text-accent"
         >
-          ▶ 実行
+          <i class="fa-solid fa-play" aria-hidden="true"></i> 実行
         </button>
       </div>
     </header>
@@ -176,19 +176,19 @@
                 >基準を記録</button>
                 <!-- 演習(.exercise)読込時のみ表示（src/exercise/controller.ts が hidden ⇄ flex を切替、issue #65） -->
                 <div id="exerciseControls" class="hidden items-center gap-2 shrink-0">
-                  <span class="text-[11px] text-muted whitespace-nowrap">📘 演習モードで開いています</span>
+                  <span class="text-[11px] text-muted whitespace-nowrap"><i class="fa-solid fa-book" aria-hidden="true"></i> 演習モードで開いています</span>
                   <button
                     id="problemBtn"
                     type="button"
                     title="問題文の表示を切り替える"
                     class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-line bg-hover text-ink text-[11px] font-medium transition-colors cursor-pointer hover:bg-line shrink-0 whitespace-nowrap"
-                  >📄 問題</button>
+                  ><i class="fa-solid fa-file-lines" aria-hidden="true"></i> 問題</button>
                   <button
                     id="gradeBtn"
                     type="button"
                     title="テストケースに対して採点する"
                     class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-accent/40 bg-accent/15 text-accent text-[11px] font-medium transition-colors cursor-pointer hover:bg-accent/25 shrink-0 whitespace-nowrap"
-                  >✓ 採点</button>
+                  ><i class="fa-solid fa-check" aria-hidden="true"></i> 採点</button>
                 </div>
                 <button
                   id="formatBtn"
@@ -196,20 +196,20 @@
                   title="PEP8 に沿ってコードを整形する (Shift+Alt+F)"
                   aria-label="PEP8 に沿ってコードを整形する"
                   class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-line bg-hover text-ink text-[11px] font-medium transition-colors cursor-pointer hover:bg-line shrink-0 whitespace-nowrap disabled:opacity-50 disabled:cursor-default"
-                >✨ 整形</button>
+                ><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> 整形</button>
                 <button
                   id="stepRunBtn"
                   type="button"
                   title="1行ずつ実行して変数の変化を確認する"
                   aria-label="1行ずつ実行して変数の変化を確認する"
                   class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-accent/40 bg-accent/15 text-accent text-[11px] font-medium transition-colors cursor-pointer hover:bg-accent/25 shrink-0 whitespace-nowrap disabled:opacity-50 disabled:cursor-default"
-                >🐾 ステップ実行</button>
+                ><i class="fa-solid fa-shoe-prints" aria-hidden="true"></i> ステップ実行</button>
               </div>
             </div>
             <!-- 演習(.exercise)の問題文パネル（src/exercise/problemPanel.ts が開閉・内容表示を制御、issue #65） -->
             <div id="problemPanel" class="hidden flex-col border-b border-line bg-hover/40 shrink-0 max-h-56">
               <div class="flex items-center justify-between px-4 py-1.5 shrink-0">
-                <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">📄 問題</span>
+                <span class="text-[11px] font-bold text-muted uppercase tracking-[0.08em]"><i class="fa-solid fa-file-lines" aria-hidden="true"></i> 問題</span>
                 <button
                   id="problemPanelCloseBtn"
                   type="button"

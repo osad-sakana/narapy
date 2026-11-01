@@ -15,7 +15,7 @@ describe('renderTree', () => {
 
   it('アイコン付きラベルを出す（other は出さない）', () => {
     const root = renderTree(parseIndentTree('if a:\n    print(1)'))
-    expect(root.textContent).toContain('🔀 もし')
+    expect(root.textContent).toContain('もし')
     const other = root.querySelector('[data-statement="other"]')
     expect(other?.querySelector('span.rounded-md')).toBeNull()
   })

@@ -1,6 +1,7 @@
 import { buildVarList } from './varList'
 import type { VarWithChange } from '../trace/varDiff'
 import type { StepSpeed } from '../trace/session'
+import { createIcon, setIconLabel } from '../ui/icon'
 
 const SPEED_LABELS: Record<StepSpeed, string> = { 1: '遅', 2: '普通', 3: '速' }
 
@@ -54,19 +55,19 @@ function buildHeader(onClose: () => void): HTMLElement {
   closeBtn.type = 'button'
   closeBtn.title = '閉じる'
   closeBtn.className = 'text-muted hover:text-ink transition-colors cursor-pointer text-sm leading-none'
-  closeBtn.textContent = '✕'
+  closeBtn.appendChild(createIcon('xmark'))
   closeBtn.addEventListener('click', onClose)
 
   header.append(title, closeBtn)
   return header
 }
 
-function controlButton(label: string, title: string, onClick: () => void): HTMLButtonElement {
+function controlButton(icon: string, title: string, onClick: () => void): HTMLButtonElement {
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.title = title
   btn.className = 'flex-1 px-1.5 py-1 rounded-md border border-line text-xs hover:bg-hover transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-default'
-  btn.textContent = label
+  btn.appendChild(createIcon(icon))
   btn.addEventListener('click', onClick)
   return btn
 }
@@ -75,11 +76,11 @@ function buildControls(dispatch: (action: StepperAction) => void): ControlRefs {
   const root = document.createElement('div')
   root.className = 'flex items-center gap-1'
 
-  const firstBtn = controlButton('⏮', '最初のステップへ', () => dispatch({ type: 'first' }))
-  const prevBtn = controlButton('◀', '前のステップへ', () => dispatch({ type: 'prev' }))
-  const playBtn = controlButton('▶', '自動再生', () => dispatch({ type: 'togglePlay' }))
-  const nextBtn = controlButton('→', '次のステップへ', () => dispatch({ type: 'next' }))
-  const lastBtn = controlButton('⏭', '最後のステップへ', () => dispatch({ type: 'last' }))
+  const firstBtn = controlButton('backward-step', '最初のステップへ', () => dispatch({ type: 'first' }))
+  const prevBtn = controlButton('chevron-left', '前のステップへ', () => dispatch({ type: 'prev' }))
+  const playBtn = controlButton('play', '自動再生', () => dispatch({ type: 'togglePlay' }))
+  const nextBtn = controlButton('chevron-right', '次のステップへ', () => dispatch({ type: 'next' }))
+  const lastBtn = controlButton('forward-step', '最後のステップへ', () => dispatch({ type: 'last' }))
 
   root.append(firstBtn, prevBtn, playBtn, nextBtn, lastBtn)
   return { root, firstBtn, prevBtn, playBtn, nextBtn, lastBtn }
@@ -231,7 +232,7 @@ export function createStepperUI(): StepperUI {
     slider.max = String(Math.max(0, state.total - 1))
     slider.value = String(state.index)
 
-    controls.playBtn.textContent = state.playing ? '⏸' : '▶'
+    setIconLabel(controls.playBtn, state.playing ? 'pause' : 'play')
     controls.firstBtn.disabled = !state.canPrev
     controls.prevBtn.disabled = !state.canPrev
     controls.nextBtn.disabled = !state.canNext

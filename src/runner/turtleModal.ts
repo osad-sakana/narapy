@@ -1,5 +1,6 @@
 import type { TurtleCommands } from '../types'
 import { createTurtlePlayer, type PlayerState } from './turtlePlayer'
+import { createIcon, setIconLabel } from '../ui/icon'
 
 const CANVAS_SIZE = 480
 
@@ -19,12 +20,12 @@ export function showTurtleModal(data: TurtleCommands): void {
   header.className = 'flex items-center justify-between px-4 py-2 bg-panel border-b border-line flex-shrink-0'
 
   const titleEl = document.createElement('span')
-  titleEl.className = 'text-ink text-sm font-medium'
-  titleEl.textContent = '🐢 Turtle'
+  titleEl.className = 'text-ink text-sm font-medium flex items-center gap-1.5'
+  setIconLabel(titleEl, 'draw-polygon', 'Turtle')
 
   const closeBtn = document.createElement('button')
   closeBtn.className = 'text-muted hover:text-ink text-xl font-bold transition-colors w-7 h-7 flex items-center justify-center rounded hover:bg-hover'
-  closeBtn.textContent = '×'
+  closeBtn.appendChild(createIcon('xmark'))
   closeBtn.setAttribute('aria-label', '閉じる')
 
   const canvasContainer = document.createElement('div')
@@ -40,12 +41,12 @@ export function showTurtleModal(data: TurtleCommands): void {
   const controls = document.createElement('div')
   controls.className = 'flex items-center gap-2 flex-wrap px-4 py-2.5 bg-panel border-t border-line flex-shrink-0'
 
-  const playBtn = createButton('▶ 通常再生', BTN_PLAY)
-  const fastBtn = createButton('⏩ 高速再生', BTN_PLAY)
-  const stepBtn = createButton('⏭ ステップ', BTN_SUB)
-  const pauseBtn = createButton('⏸ 一時停止', BTN_SUB)
-  const resetBtn = createButton('↺ 最初から', BTN_SUB)
-  const viewBtn = createButton('🎯 タートル追従', BTN_SUB)
+  const playBtn = createButton('play', '通常再生', BTN_PLAY)
+  const fastBtn = createButton('forward', '高速再生', BTN_PLAY)
+  const stepBtn = createButton('forward-step', 'ステップ', BTN_SUB)
+  const pauseBtn = createButton('pause', '一時停止', BTN_SUB)
+  const resetBtn = createButton('rotate-left', '最初から', BTN_SUB)
+  const viewBtn = createButton('crosshairs', 'タートル追従', BTN_SUB)
 
   const progress = document.createElement('span')
   progress.className = 'ml-auto text-xs text-muted font-mono tabular-nums'
@@ -74,7 +75,8 @@ export function showTurtleModal(data: TurtleCommands): void {
     pauseBtn.classList.toggle('cursor-not-allowed', !state.playing)
     viewMode = state.viewMode
     // ボタンには「切り替え先」を表示する
-    viewBtn.textContent = state.viewMode === 'follow' ? '🗺 全体表示' : '🎯 タートル追従'
+    if (state.viewMode === 'follow') setIconLabel(viewBtn, 'map', '全体表示')
+    else setIconLabel(viewBtn, 'crosshairs', 'タートル追従')
   }
 
   // モーダルを開いたら通常再生で動きを見せる
@@ -102,9 +104,9 @@ export function showTurtleModal(data: TurtleCommands): void {
   document.addEventListener('keydown', handleKey)
 }
 
-function createButton(label: string, className: string): HTMLButtonElement {
+function createButton(icon: string, label: string, className: string): HTMLButtonElement {
   const btn = document.createElement('button')
   btn.className = className
-  btn.textContent = label
+  setIconLabel(btn, icon, label)
   return btn
 }

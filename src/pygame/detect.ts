@@ -19,7 +19,7 @@ export type RunRoute =
 
 const UNSUPPORTED_MESSAGES: Record<Exclude<RunMode, 'normal'>, string> = {
   trace:
-    'pygame を使うコードはステップ実行に対応していません。通常の実行（▶ 実行）を使ってください。',
+    'pygame を使うコードはステップ実行に対応していません。通常の実行（実行ボタン）を使ってください。',
   grade:
     'pygame を使うコードは自動採点に対応していません（採点は画面を持たない環境で実行されるため）。',
 }

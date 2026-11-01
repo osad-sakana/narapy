@@ -204,7 +204,9 @@
   background-color: var(--viz-color);
   color: var(--viz-ink);
   border-radius: 4px;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--viz-color) 70%, #000);
+  /* 縁取りは inset の影ではなく border にする。C 字型ブロックの口（子の面）は影を覆い隠すので、
+     影だと左の腕にしか線が出ず、ブロック同士の境目が右側で見えなくなる */
+  border: 1px solid color-mix(in srgb, var(--viz-color) 60%, #000);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -215,10 +217,10 @@
 .viz-c::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 12px;
+  top: -1px;
+  left: 11px;
   width: 18px;
-  height: 4px;
+  height: 5px;
   background-color: var(--color-panel);
   border-radius: 0 0 4px 4px;
 }
@@ -227,11 +229,13 @@
 .viz-c::after {
   content: '';
   position: absolute;
-  bottom: -4px;
-  left: 12px;
+  bottom: -5px;
+  left: 11px;
   width: 18px;
-  height: 4px;
+  height: 5px;
   background-color: var(--viz-color);
+  border: 1px solid color-mix(in srgb, var(--viz-color) 60%, #000);
+  border-top: 0;
   border-radius: 0 0 4px 4px;
   z-index: 1;
 }

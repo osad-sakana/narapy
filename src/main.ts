@@ -298,7 +298,7 @@ const switchDeps: ApplyProjectSwitchDeps = {
 // 実行中は切り替えない
 function canChangeProject(): boolean {
   if (!runner.isRunning()) return true
-  appendLog('⚠️ 実行中はプロジェクトを切り替えられません。停止してから操作してください', 'warn')
+  appendLog('実行中はプロジェクトを切り替えられません。停止してから操作してください', 'warn')
   projectBar.refresh()
   return false
 }
@@ -371,7 +371,7 @@ exportProjectBtn.addEventListener('click', async () => {
 
 initAbout()
 
-// 新規プロジェクトの作成はプロジェクトバーの「＋ 新規」から行う (issue #86)
+// 新規プロジェクトの作成はプロジェクトバーの「新規」から行う (issue #86)
 initHamburgerMenu([
   createInstructorMenuAction(instructorController),
 ])

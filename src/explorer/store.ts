@@ -65,12 +65,6 @@ function persist(): void {
   enqueue(() => saveProject(record))
 }
 
-// 新規プロジェクト作成(issue #58)で使う初期状態。cloneDefault() を経由させることで
-// 起動時のデフォルト状態と定義がずれないようにする。
-export function createDefaultProject(): FileState {
-  return cloneDefault()
-}
-
 export async function initStore(): Promise<void> {
   if (initialized) return
   const loaded = await loadAll(() => newDefaultRecord())

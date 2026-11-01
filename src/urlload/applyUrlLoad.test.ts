@@ -11,135 +11,35 @@ const dummyProject: NarapyProject = {
 
 describe('applyUrlLoad', () => {
   it('URLに読み込み対象がなければ何もしない', async () => {
-    const loadProject = vi.fn()
+    const createProject = vi.fn()
     const refreshExplorer = vi.fn()
-    await applyUrlLoad({
-      resolve: async () => null,
-      hasUserContent: () => false,
-      confirm: () => true,
-      loadProject,
-      refreshExplorer,
-    })
-    expect(loadProject).not.toHaveBeenCalled()
+    const clearUrl = vi.fn()
+    await applyUrlLoad({ resolve: async () => null, createProject, refreshExplorer, clearUrl })
+    expect(createProject).not.toHaveBeenCalled()
     expect(refreshExplorer).not.toHaveBeenCalled()
+    expect(clearUrl).not.toHaveBeenCalled()
   })
 
-  it('既存の作業内容がなければ確認なしで読み込む', async () => {
-    const loadProject = vi.fn()
+  it('読み込んだ内容を新しいプロジェクトとして作成し、URLを消す', async () => {
+    const createProject = vi.fn()
     const refreshExplorer = vi.fn()
-    const confirm = vi.fn()
-    await applyUrlLoad({
-      resolve: async () => ({ project: dummyProject, source: 'code' }),
-      hasUserContent: () => false,
-      confirm,
-      loadProject,
-      refreshExplorer,
-    })
-    expect(confirm).not.toHaveBeenCalled()
-    expect(loadProject).toHaveBeenCalledWith(dummyProject.files, dummyProject.directories, dummyProject.activeFile)
+    const clearUrl = vi.fn()
+    const result = { project: dummyProject, source: 'code' as const }
+    await applyUrlLoad({ resolve: async () => result, createProject, refreshExplorer, clearUrl })
+    expect(createProject).toHaveBeenCalledWith(result)
+    expect(clearUrl).toHaveBeenCalledTimes(1)
     expect(refreshExplorer).toHaveBeenCalledTimes(1)
   })
 
-  it('既存の作業内容があり確認で承認されれば読み込む', async () => {
-    const loadProject = vi.fn()
-    const refreshExplorer = vi.fn()
-    await applyUrlLoad({
-      resolve: async () => ({ project: dummyProject, source: 'project' }),
-      hasUserContent: () => true,
-      confirm: () => true,
-      loadProject,
-      refreshExplorer,
-    })
-    expect(loadProject).toHaveBeenCalledWith(dummyProject.files, dummyProject.directories, dummyProject.activeFile)
-    expect(refreshExplorer).toHaveBeenCalledTimes(1)
-  })
-
-  it('既存の作業内容があり確認が却下されれば読み込まない', async () => {
-    const loadProject = vi.fn()
-    const refreshExplorer = vi.fn()
-    await applyUrlLoad({
-      resolve: async () => ({ project: dummyProject, source: 'project' }),
-      hasUserContent: () => true,
-      confirm: () => false,
-      loadProject,
-      refreshExplorer,
-    })
-    expect(loadProject).not.toHaveBeenCalled()
-    expect(refreshExplorer).not.toHaveBeenCalled()
-  })
-
-  it('resolve側のエラーは呼び出し元に伝播する(呼び出し元でアラート表示するため)', async () => {
-    const loadProject = vi.fn()
-    const refreshExplorer = vi.fn()
-    await expect(applyUrlLoad({
-      resolve: async () => {
-        throw new Error('boom')
-      },
-      hasUserContent: () => false,
-      confirm: () => true,
-      loadProject,
-      refreshExplorer,
-    })).rejects.toThrow('boom')
-    expect(loadProject).not.toHaveBeenCalled()
-  })
-
-  it('exerciseメタデータ付きプロジェクトを読み込むとonExerciseLoadedへ渡る(issue #65)', async () => {
-    const exerciseProject: NarapyProject = {
-      ...dummyProject,
-      files: [
-        { path: 'main.py', content: { kind: 'text', data: 'def add(a, b): return a + b' } },
-        { path: 'problem.md', content: { kind: 'text', data: '# 足し算' } },
-        { path: 'test.py', content: { kind: 'text', data: 'def test_add(): assert add(1, 2) == 3' } },
-      ],
-      exercise: { problem: 'problem.md', test: 'test.py' },
-    }
+  it('演習メタを通知する', async () => {
     const onExerciseLoaded = vi.fn()
+    const exercise = { problem: 'p', test: 't' }
     await applyUrlLoad({
-      resolve: async () => ({ project: exerciseProject, source: 'project' }),
-      hasUserContent: () => false,
-      confirm: () => true,
-      loadProject: vi.fn(),
+      resolve: async () => ({ project: { ...dummyProject, exercise }, source: 'project' }),
+      createProject: vi.fn(),
       refreshExplorer: vi.fn(),
       onExerciseLoaded,
     })
-    expect(onExerciseLoaded).toHaveBeenCalledWith(exerciseProject.exercise, exerciseProject.files, exerciseProject.activeFile)
-  })
-
-  it('exerciseメタデータが無ければonExerciseLoadedにundefinedが渡る', async () => {
-    const onExerciseLoaded = vi.fn()
-    await applyUrlLoad({
-      resolve: async () => ({ project: dummyProject, source: 'code' }),
-      hasUserContent: () => false,
-      confirm: () => true,
-      loadProject: vi.fn(),
-      refreshExplorer: vi.fn(),
-      onExerciseLoaded,
-    })
-    expect(onExerciseLoaded).toHaveBeenCalledWith(undefined, dummyProject.files, dummyProject.activeFile)
-  })
-
-  it('読み込み成功時に onSharedLinkLoaded を出所つきで呼ぶ', async () => {
-    const onSharedLinkLoaded = vi.fn()
-    await applyUrlLoad({
-      resolve: async () => ({ project: dummyProject, source: 'code' }),
-      hasUserContent: () => false,
-      loadProject: vi.fn(),
-      refreshExplorer: vi.fn(),
-      onSharedLinkLoaded,
-    })
-    expect(onSharedLinkLoaded).toHaveBeenCalledWith('code')
-  })
-
-  it('上書き確認でキャンセルしたら onSharedLinkLoaded を呼ばない', async () => {
-    const onSharedLinkLoaded = vi.fn()
-    await applyUrlLoad({
-      resolve: async () => ({ project: dummyProject, source: 'project' }),
-      hasUserContent: () => true,
-      confirm: () => false,
-      loadProject: vi.fn(),
-      refreshExplorer: vi.fn(),
-      onSharedLinkLoaded,
-    })
-    expect(onSharedLinkLoaded).not.toHaveBeenCalled()
+    expect(onExerciseLoaded).toHaveBeenCalledWith(exercise, dummyProject.files, 'main.py')
   })
 })

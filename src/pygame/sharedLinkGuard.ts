@@ -3,21 +3,36 @@ import { setIconLabel } from '../ui/icon'
 
 type SharedSource = UrlLoadResult['source']
 
-// 共有リンク(#code= / #project= / ?project=<URL>)から読み込んだプロジェクトか、
-// その上でユーザーが pygame の実行を許可済みか。ページ読み込み中だけ持つ(永続化しない)。
-let state: { source: SharedSource; approved: boolean } | null = null
+interface SharedMark { source: SharedSource; approved: boolean }
 
-export function markLoadedFromSharedLink(source: SharedSource): void {
-  state = { source, approved: false }
+// 共有リンク(#code= / #project= / ?project=<URL>)から読み込んだプロジェクトと、
+// その上でユーザーが pygame の実行を許可済みか。ページ読み込み中だけ持つ(永続化しない)。
+// 複数プロジェクトがあるため、印はプロジェクト id に結びつける。別プロジェクトへ切り替えて
+// 戻っても、共有リンク由来のコードを確認なしで実行できないようにするため。
+const marks = new Map<string | undefined, SharedMark>()
+
+let currentProjectId: () => string | undefined = () => undefined
+
+// 現在のプロジェクト id の取得方法を差し込む（ストアへの依存をここに持ち込まないため）
+export function setCurrentProjectIdProvider(provider: () => string | undefined): void {
+  currentProjectId = provider
 }
 
-// 共有リンク以外の経路(.narapy を開く・新規作成)でプロジェクトが置き換わったとき
+export function markProjectFromSharedLink(projectId: string | undefined, source: SharedSource): void {
+  marks.set(projectId, { source, approved: false })
+}
+
+export function markLoadedFromSharedLink(source: SharedSource): void {
+  markProjectFromSharedLink(currentProjectId(), source)
+}
+
+// 共有リンク以外の経路でプロジェクトの中身が置き換わったとき（現在のプロジェクトのみ）
 export function clearSharedLinkMark(): void {
-  state = null
+  marks.delete(currentProjectId())
 }
 
 export function isFromSharedLink(): boolean {
-  return state !== null
+  return marks.has(currentProjectId())
 }
 
 function buildDialog(onChoice: (ok: boolean) => void): HTMLElement {
@@ -66,7 +81,8 @@ function buildDialog(onChoice: (ok: boolean) => void): HTMLElement {
 // pygame を実行してよいか確認する。共有リンク由来でなければ、または許可済みなら即 true。
 // 既定フォーカスは先頭の「キャンセル」に置き、Enter 連打で実行されないようにする。
 export function confirmPygameRun(): Promise<boolean> {
-  const current = state
+  const projectId = currentProjectId()
+  const current = marks.get(projectId)
   if (!current || current.approved) return Promise.resolve(true)
 
   return new Promise((resolve) => {
@@ -79,7 +95,7 @@ export function confirmPygameRun(): Promise<boolean> {
       document.removeEventListener('keydown', onKey, true)
       backdrop.remove()
       // 確認中に別の共有リンクへ置き換わっていたら、古い許可を新しい状態へ持ち越さない
-      if (ok && state === current) state = { ...current, approved: true }
+      if (ok && marks.get(projectId) === current) marks.set(projectId, { ...current, approved: true })
       previouslyFocused?.focus?.()
       resolve(ok)
     }

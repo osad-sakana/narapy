@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
+  setCurrentProjectIdProvider,
   clearSharedLinkMark,
   confirmPygameRun,
   isFromSharedLink,
   markLoadedFromSharedLink,
+  markProjectFromSharedLink,
 } from './sharedLinkGuard'
 
 const dialog = () => document.querySelector('[role="dialog"]')
@@ -12,7 +14,10 @@ const buttons = () => Array.from(document.querySelectorAll<HTMLButtonElement>('[
 const findBtn = (label: string) => buttons().find(b => b.textContent?.includes(label))
 
 describe('sharedLinkGuard', () => {
-  beforeEach(() => clearSharedLinkMark())
+  beforeEach(() => {
+    setCurrentProjectIdProvider(() => undefined)
+    clearSharedLinkMark()
+  })
   afterEach(() => {
     document.body.innerHTML = ''
   })
@@ -78,5 +83,48 @@ describe('sharedLinkGuard', () => {
     expect(dialog()).not.toBeNull()
     findBtn('キャンセル')!.click()
     expect(await p2).toBe(false)
+  })
+
+  it('別プロジェクトへ切り替えると確認不要になり、戻ると再び確認が必要', async () => {
+    let id = 'shared'
+    setCurrentProjectIdProvider(() => id)
+    markLoadedFromSharedLink('code')
+
+    id = 'other'
+    expect(isFromSharedLink()).toBe(false)
+    expect(await confirmPygameRun()).toBe(true)
+
+    id = 'shared'
+    expect(isFromSharedLink()).toBe(true)
+    const p = confirmPygameRun()
+    expect(dialog()).not.toBeNull()
+    findBtn('キャンセル')?.click()
+    expect(await p).toBe(false)
+  })
+
+  it('許可済みでも別プロジェクトの印には影響しない', async () => {
+    let id = 'a'
+    setCurrentProjectIdProvider(() => id)
+    markLoadedFromSharedLink('code')
+    id = 'b'
+    markLoadedFromSharedLink('code')
+    const p = confirmPygameRun()
+    findBtn('実行する')?.click()
+    expect(await p).toBe(true)
+
+    id = 'a'
+    const q = confirmPygameRun()
+    expect(dialog()).not.toBeNull()
+    findBtn('キャンセル')?.click()
+    expect(await q).toBe(false)
+  })
+
+  it('保存済みの共有リンク由来プロジェクトを id 指定で印付けできる', async () => {
+    let id = 'saved'
+    setCurrentProjectIdProvider(() => id)
+    markProjectFromSharedLink('saved', 'projectUrl')
+    expect(isFromSharedLink()).toBe(true)
+    id = 'other'
+    expect(isFromSharedLink()).toBe(false)
   })
 })

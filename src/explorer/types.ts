@@ -1,3 +1,15 @@
+import type { ExerciseMeta } from '../fileio/index'
+
+// 演習を取り込んだ時点の問題文・テスト・採点対象。復元時に現在のファイルから読み直すと、
+// 開いていたファイルや学生が書き換えた test.py が採点の基準になってしまうため固定して保存する
+export interface ExerciseSnapshot {
+  entryPath: string
+  problemText: string
+  testCode: string
+}
+
+export type SharedSource = 'project' | 'code' | 'projectUrl'
+
 export type FileContent =
   | { kind: 'text'; data: string }
   | { kind: 'binary'; data: Uint8Array; mime: string }
@@ -34,3 +46,25 @@ export interface TreeDirNode {
 }
 
 export type TreeNode = TreeFileNode | TreeDirNode
+
+export interface ProjectRecord extends FileState {
+  id: string
+  title: string
+  createdAt: number
+  updatedAt: number
+  // 取り込んだ演習(.exercise)のメタ。切替・リロード後も演習モードを復元するために保存する
+  exercise?: ExerciseMeta
+  exerciseSnapshot?: ExerciseSnapshot
+  // 共有リンク由来のプロジェクト。リロード後も pygame 実行前の確認を出すために保存する
+  sharedSource?: SharedSource
+}
+
+export interface ProjectInput extends FileState {
+  exercise?: ExerciseMeta
+  sharedSource?: SharedSource
+}
+
+export interface ProjectSummary {
+  id: string
+  title: string
+}

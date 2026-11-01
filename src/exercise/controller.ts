@@ -1,5 +1,6 @@
 import type { FileEntry } from '../explorer/types'
 import { resolveExercise, type ExerciseMeta, type LoadedExercise } from './types'
+import type { ExerciseSnapshot } from '../explorer/types'
 
 export interface ExerciseControllerDeps {
   setGradeControlsVisible: (visible: boolean) => void
@@ -16,6 +17,9 @@ export interface ExerciseController {
   // プロジェクトが（再）読込されるたびに呼ぶ。演習でなければ current を null にし、
   // 採点関連UIを隠す（通常のプロジェクトを開いた後に演習パネルが残らないようにする）
   onProjectLoaded: (exercise: ExerciseMeta | undefined, files: FileEntry[], activeFile: string) => void
+  // 保存済みの演習（取り込み時の問題文・テスト・採点対象）を復元する。リロードやプロジェクト
+  // 切替で使い、現在のファイル内容や開いているファイルに採点の基準が引きずられないようにする
+  restoreExercise: (saved: { meta: ExerciseMeta; snapshot: ExerciseSnapshot | null } | undefined) => void
   // 採点対象として固定するファイルのパス。呼び出し側（main.ts）がこのパスの「今の」
   // 内容をストアから取得して採点する（エディタで別ファイルを開いていても、常にこの
   // ファイルが採点されるようにするため、内容そのものではなくパスだけを返す。
@@ -38,8 +42,19 @@ export function createExerciseController(deps: ExerciseControllerDeps): Exercise
     }
   }
 
+  function restoreExercise(saved: { meta: ExerciseMeta; snapshot: ExerciseSnapshot | null } | undefined): void {
+    current = saved?.snapshot ? { meta: saved.meta, ...saved.snapshot } : null
+    deps.setGradeControlsVisible(current !== null)
+    if (current) {
+      deps.showProblem(current.problemText)
+    } else if (saved) {
+      deps.onBrokenExercise?.()
+    }
+  }
+
   return {
     onProjectLoaded,
+    restoreExercise,
     getEntryPath: () => current?.entryPath ?? null,
     getTestCode: () => current?.testCode ?? null,
     onGradeResult: deps.renderResult,

@@ -16,6 +16,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.6.5",
     "coi-serviceworker": "^0.1.7",
+    "fake-indexeddb": "^6.2.7",
     "happy-dom": "^21.0.4",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",

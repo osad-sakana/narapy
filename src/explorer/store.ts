@@ -1,6 +1,10 @@
-import type { DirectoryEntry, FileContent, FileEntry, FileState } from './types'
+import type { DirectoryEntry, FileContent, FileEntry, FileState, ExerciseSnapshot, ProjectInput, ProjectRecord, ProjectSummary, SharedSource } from './types'
+import type { ExerciseMeta } from '../fileio/index'
+import { resolveExercise } from '../exercise/types'
 import type { RunFile } from '../types'
-import { loadState, saveState } from './persistence'
+import { deleteProjectRecord, loadAll, saveCurrentId, saveProject } from './persistence'
+import { newProjectId, resolveActiveFile } from './migration'
+import { DEFAULT_PROJECT_TITLE, normalizeTitle } from '../project/title'
 import { getAncestorDirs } from './paths'
 import { planMove, type MovePlan, type MoveSource } from './move'
 
@@ -11,6 +15,9 @@ const DEFAULT_STATE: FileState = {
 }
 
 let state: FileState = cloneDefault()
+// initStore() 前でもストア操作が成立するよう、メモリ上に既定の現在プロジェクトを 1 件持つ
+let projects: ProjectRecord[] = [newDefaultRecord()]
+let currentId: string = projects[0].id
 let initialized = false
 let pendingWrite: Promise<void> = Promise.resolve()
 
@@ -25,30 +32,150 @@ function cloneDefault(): FileState {
   }
 }
 
-function persist(): void {
-  const snapshot = state
+function newDefaultRecord(title = DEFAULT_PROJECT_TITLE, now = Date.now()): ProjectRecord {
+  return { ...cloneDefault(), id: newProjectId(), title, createdAt: now, updatedAt: now }
+}
+
+function enqueue(task: () => Promise<void>): void {
   pendingWrite = pendingWrite
     .catch(() => undefined)
-    .then(() => saveState(snapshot))
+    .then(task)
     .catch(err => {
       console.error('IndexedDB 永続化に失敗', err)
     })
 }
 
-// 新規プロジェクト作成(issue #58)で使う初期状態。cloneDefault() を経由させることで
-// 起動時のデフォルト状態と定義がずれないようにする。
-export function createDefaultProject(): FileState {
-  return cloneDefault()
+function currentTitle(): string {
+  return projects.find(p => p.id === currentId)?.title ?? DEFAULT_PROJECT_TITLE
+}
+
+// 呼ばれた時点のスナップショットを書き込みキューに積む（キュー消化時に別プロジェクトへ
+// 切り替わっていても、元のプロジェクトへ書き込めるようにするため）
+function persist(): void {
+  const existing = projects.find(p => p.id === currentId)
+  const record: ProjectRecord = {
+    createdAt: Date.now(),
+    ...existing,
+    ...state,
+    id: currentId,
+    title: currentTitle(),
+    updatedAt: Date.now(),
+  }
+  projects = projects.map(p => p.id === currentId ? record : p)
+  enqueue(() => saveProject(record))
 }
 
 export async function initStore(): Promise<void> {
   if (initialized) return
-  state = await loadState(cloneDefault())
+  const loaded = await loadAll(() => newDefaultRecord())
+  projects = loaded.projects
+  currentId = loaded.currentId
+  const current = projects.find(p => p.id === currentId)!
+  state = { files: current.files, directories: current.directories, activeFile: current.activeFile }
   initialized = true
 }
 
 export async function flushStore(): Promise<void> {
   await pendingWrite
+}
+
+export function listProjects(): ProjectSummary[] {
+  return projects.map(p => ({ id: p.id, title: p.title }))
+}
+
+export function getCurrentProject(): ProjectSummary {
+  return { id: currentId, title: currentTitle() }
+}
+
+export interface CurrentExercise {
+  meta: ExerciseMeta
+  // 壊れた演習（問題/テスト/採点対象が見つからない等）は null
+  snapshot: ExerciseSnapshot | null
+}
+
+export function getCurrentExercise(): CurrentExercise | undefined {
+  const current = projects.find(p => p.id === currentId)
+  if (!current?.exercise) return undefined
+  return { meta: current.exercise, snapshot: current.exerciseSnapshot ?? null }
+}
+
+export function listSharedSources(): Array<{ id: string; source: SharedSource }> {
+  return projects.flatMap(p => p.sharedSource ? [{ id: p.id, source: p.sharedSource }] : [])
+}
+
+function cloneState(input: FileState): FileState {
+  const files = input.files.map(f => ({
+    path: f.path,
+    content: f.content.kind === 'text'
+      ? { kind: 'text' as const, data: f.content.data }
+      : { kind: 'binary' as const, data: f.content.data, mime: f.content.mime },
+  }))
+  return {
+    files,
+    directories: input.directories.map(d => ({ path: d.path })),
+    activeFile: resolveActiveFile(files, input.activeFile, DEFAULT_STATE.activeFile),
+  }
+}
+
+// 新しいプロジェクトを作って現在のプロジェクトにする。input が無ければ初期状態(main.py 1件)。
+export function createProject(title: string, input?: ProjectInput): ProjectSummary {
+  const now = Date.now()
+  const cloned = cloneState(input ?? cloneDefault())
+  // 補正前の activeFile で解決する（無効な activeFile の .exercise を壊れた演習として扱うため）
+  const resolved = resolveExercise(input?.exercise, cloned.files, input?.activeFile ?? cloned.activeFile)
+  const record: ProjectRecord = {
+    ...cloned,
+    id: newProjectId(),
+    title: normalizeTitle(title),
+    createdAt: now,
+    updatedAt: now,
+    ...(input?.exercise ? { exercise: input.exercise } : {}),
+    ...(resolved
+      ? { exerciseSnapshot: { entryPath: resolved.entryPath, problemText: resolved.problemText, testCode: resolved.testCode } }
+      : {}),
+    ...(input?.sharedSource ? { sharedSource: input.sharedSource } : {}),
+  }
+  projects = [...projects, record]
+  currentId = record.id
+  state = { files: record.files, directories: record.directories, activeFile: record.activeFile }
+  enqueue(() => saveProject(record))
+  enqueue(() => saveCurrentId(record.id))
+  return { id: record.id, title: record.title }
+}
+
+// 切替前の退避は不要（編集のたびに persist() 済み、issue #48）
+export function switchProject(id: string): boolean {
+  const target = projects.find(p => p.id === id)
+  if (!target) return false
+  if (id === currentId) return true
+  currentId = id
+  state = { files: target.files, directories: target.directories, activeFile: target.activeFile }
+  enqueue(() => saveCurrentId(id))
+  return true
+}
+
+export function renameProject(title: string): ProjectSummary {
+  const normalized = normalizeTitle(title)
+  projects = projects.map(p => p.id === currentId ? { ...p, title: normalized } : p)
+  persist()
+  return getCurrentProject()
+}
+
+// 最後の 1 件は削除できない。現在のプロジェクトを消したときは、最後に更新したものへ切り替える。
+export function deleteProject(id: string): boolean {
+  if (projects.length <= 1) return false
+  const target = projects.find(p => p.id === id)
+  if (!target) return false
+  const remaining = projects.filter(p => p.id !== id)
+  projects = remaining
+  enqueue(() => deleteProjectRecord(id))
+  if (id === currentId) {
+    const next = remaining.reduce((latest, p) => (p.updatedAt > latest.updatedAt ? p : latest))
+    currentId = next.id
+    state = { files: next.files, directories: next.directories, activeFile: next.activeFile }
+    enqueue(() => saveCurrentId(next.id))
+  }
+  return true
 }
 
 export function getFiles(): FileEntry[] {
@@ -218,17 +345,6 @@ export function hasUserContent(): boolean {
 }
 
 export function loadProject(files: FileEntry[], directories: DirectoryEntry[], activeFile: string): void {
-  const cloned = files.map(f => ({
-    path: f.path,
-    content: f.content.kind === 'text'
-      ? { kind: 'text' as const, data: f.content.data }
-      : { kind: 'binary' as const, data: f.content.data, mime: f.content.mime },
-  }))
-  const dirs = directories.map(d => ({ path: d.path }))
-  const resolvedActive = cloned.find(f => f.path === activeFile && f.content.kind === 'text')
-    ? activeFile
-    : (cloned.find(f => f.content.kind === 'text')?.path ?? cloned[0]?.path ?? DEFAULT_STATE.activeFile)
-  state = { files: cloned, directories: dirs, activeFile: resolvedActive }
+  state = cloneState({ files, directories, activeFile })
   persist()
 }
-

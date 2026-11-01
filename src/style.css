@@ -4,6 +4,17 @@
 @import "@fortawesome/fontawesome-free/css/fontawesome.min.css";
 @import "@fortawesome/fontawesome-free/css/solid.min.css";
 
+/* Tailwind v4 の preflight はボタンのカーソルを既定に戻すため、全ボタンでクリック可能と分かるようにする */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
 /* フォント設定: Tailwind v4 の @theme でデフォルトを上書き */
 @theme {
   --font-sans: 'BIZ UDPGothic', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;

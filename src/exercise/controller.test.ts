@@ -92,4 +92,37 @@ describe('createExerciseController', () => {
 
     expect(renderResult).toHaveBeenCalledWith('{"cases":[],"error":null}')
   })
+
+  it('保存済みの演習を復元すると、スナップショットの採点対象・テストを使う', () => {
+    const setGradeControlsVisible = vi.fn()
+    const showProblem = vi.fn()
+    const controller = createExerciseController({ setGradeControlsVisible, showProblem, renderResult: vi.fn() })
+
+    controller.restoreExercise({
+      meta: { problem: 'problem.md', test: 'test.py' },
+      snapshot: { entryPath: 'main.py', problemText: '# 足し算', testCode: 'ORIGINAL' },
+    })
+
+    expect(setGradeControlsVisible).toHaveBeenCalledWith(true)
+    expect(showProblem).toHaveBeenCalledWith('# 足し算')
+    expect(controller.getEntryPath()).toBe('main.py')
+    expect(controller.getTestCode()).toBe('ORIGINAL')
+  })
+
+  it('復元対象が無ければ採点UIを隠す。壊れた演習なら通知する', () => {
+    const setGradeControlsVisible = vi.fn()
+    const onBrokenExercise = vi.fn()
+    const controller = createExerciseController({
+      setGradeControlsVisible, showProblem: vi.fn(), renderResult: vi.fn(), onBrokenExercise,
+    })
+
+    controller.restoreExercise(undefined)
+    expect(setGradeControlsVisible).toHaveBeenLastCalledWith(false)
+    expect(onBrokenExercise).not.toHaveBeenCalled()
+
+    controller.restoreExercise({ meta: { problem: 'a', test: 'b' }, snapshot: null })
+    expect(setGradeControlsVisible).toHaveBeenLastCalledWith(false)
+    expect(onBrokenExercise).toHaveBeenCalledTimes(1)
+    expect(controller.getEntryPath()).toBeNull()
+  })
 })

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { applyProjectSwitch } from './applyProjectSwitch'
+import type { CurrentExercise } from '../explorer/store'
 
 function buildDeps() {
   const calls: string[] = []
@@ -10,15 +11,14 @@ function buildDeps() {
     files,
     deps: {
       refreshExplorer: track('refreshExplorer'),
-      getFiles: vi.fn(() => files),
       getActiveFile: vi.fn(() => 'a.py'),
       getActiveContent: vi.fn(() => 'x'),
       openProjectFile: track('openProjectFile'),
       setEditorFileName: track('setEditorFileName'),
       refreshProjectBar: track('refreshProjectBar'),
       clearLog: track('clearLog'),
-      getExercise: vi.fn(() => undefined as { problem: string; test: string } | undefined),
-      onExerciseLoaded: track('onExerciseLoaded'),
+      getExercise: vi.fn(() => undefined as CurrentExercise | undefined),
+      restoreExercise: track('restoreExercise'),
     },
   }
 }
@@ -33,23 +33,26 @@ describe('applyProjectSwitch', () => {
       'setEditorFileName',
       'refreshProjectBar',
       'clearLog',
-      'onExerciseLoaded',
+      'restoreExercise',
     ])
     expect(deps.openProjectFile).toHaveBeenCalledWith('a.py', 'x')
     expect(deps.setEditorFileName).toHaveBeenCalledWith('a.py')
   })
 
-  it('演習メタが無ければ undefined で通知する（演習パネルを閉じる契機）', () => {
-    const { deps, files } = buildDeps()
+  it('演習でなければ undefined で復元を呼ぶ（演習パネルを閉じる契機）', () => {
+    const { deps } = buildDeps()
     applyProjectSwitch(deps)
-    expect(deps.onExerciseLoaded).toHaveBeenCalledWith(undefined, files, 'a.py')
+    expect(deps.restoreExercise).toHaveBeenCalledWith(undefined)
   })
 
   it('現在のプロジェクトの演習メタを渡す', () => {
-    const { deps, files } = buildDeps()
-    const exercise = { problem: 'p', test: 't' }
+    const { deps } = buildDeps()
+    const exercise: CurrentExercise = {
+      meta: { problem: 'p', test: 't' },
+      snapshot: { entryPath: 'a.py', problemText: 'P', testCode: 'T' },
+    }
     deps.getExercise.mockReturnValue(exercise)
     applyProjectSwitch(deps)
-    expect(deps.onExerciseLoaded).toHaveBeenCalledWith(exercise, files, 'a.py')
+    expect(deps.restoreExercise).toHaveBeenCalledWith(exercise)
   })
 })

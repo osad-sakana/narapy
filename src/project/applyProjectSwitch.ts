@@ -1,9 +1,7 @@
-import type { ExerciseMeta } from '../fileio/index'
-import type { FileEntry } from '../explorer/types'
+import type { CurrentExercise } from '../explorer/store'
 
 export interface ApplyProjectSwitchDeps {
   refreshExplorer: () => void
-  getFiles: () => FileEntry[]
   getActiveFile: () => string
   getActiveContent: () => string
   openProjectFile: (path: string, content: string) => void
@@ -11,8 +9,8 @@ export interface ApplyProjectSwitchDeps {
   refreshProjectBar: () => void
   clearLog: () => void
   // 現在のプロジェクトの演習メタ。演習でなければ undefined（演習パネルを閉じる契機になる）
-  getExercise: () => ExerciseMeta | undefined
-  onExerciseLoaded?: (exercise: ExerciseMeta | undefined, files: FileEntry[], activeFile: string) => void
+  getExercise: () => CurrentExercise | undefined
+  restoreExercise: (saved: CurrentExercise | undefined) => void
 }
 
 // ストア側で現在のプロジェクトが入れ替わった「後」に、UI を新しい現在のプロジェクトへ揃える。
@@ -25,5 +23,5 @@ export function applyProjectSwitch(deps: ApplyProjectSwitchDeps): void {
   deps.setEditorFileName(path)
   deps.refreshProjectBar()
   deps.clearLog()
-  deps.onExerciseLoaded?.(deps.getExercise(), deps.getFiles(), path)
+  deps.restoreExercise(deps.getExercise())
 }

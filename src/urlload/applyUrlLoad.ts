@@ -8,6 +8,8 @@ export interface ApplyUrlLoadDeps {
   createProject: (result: UrlLoadResult) => void
   refreshExplorer: () => void
   resolve?: () => Promise<UrlLoadResult | null>
+  // プロジェクトの保存完了を待つ。完了前に URL を消すと、タブを閉じたときにどちらも失われる
+  flush?: () => Promise<void>
   // 読込後に URL を消す。残すとリロードのたびに同じプロジェクトが増える
   clearUrl?: () => void
   onExerciseLoaded?: (exercise: ExerciseMeta | undefined, files: FileEntry[], activeFile: string) => void
@@ -21,6 +23,7 @@ export async function applyUrlLoad(deps: ApplyUrlLoadDeps): Promise<void> {
   if (!result) return
 
   deps.createProject(result)
+  await deps.flush?.()
   deps.clearUrl?.()
   deps.refreshExplorer()
   deps.onExerciseLoaded?.(result.project.exercise, result.project.files, result.project.activeFile)

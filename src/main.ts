@@ -5,8 +5,7 @@ import { clearLog, appendLog } from './runner/log'
 import { createEditor, createEditorModelHost, getValue } from './editor/index'
 import { createFileOpener, createModelRegistry } from './editor/modelRegistry'
 import { initFontSizeControls } from './editor/fontSize'
-import { downloadNarapyProject, openNarapyFilePicker, type ExerciseMeta } from './fileio/index'
-import type { FileEntry } from './explorer/types'
+import { downloadNarapyProject, openNarapyFilePicker } from './fileio/index'
 import { createExplorer } from './explorer/ui'
 import { initAbout } from './about/index'
 import {
@@ -211,6 +210,7 @@ try {
       })
     },
     refreshExplorer,
+    flush: flushStore,
     clearUrl: () => window.history.replaceState(null, '', window.location.pathname),
   })
 } catch (err) {
@@ -221,7 +221,7 @@ try {
 // pygame 実行前の確認対象にする
 for (const { id, source } of listSharedSources()) markProjectFromSharedLink(id, source)
 // 現在のプロジェクトが演習なら、問題文と採点UIを復元する
-exerciseController.onProjectLoaded(getCurrentExercise(), getFiles(), getActiveFile())
+exerciseController.restoreExercise(getCurrentExercise())
 
 // エディタを永続化済みの内容で初期化。
 // ?project=<URL> の読込待ちの間にユーザーがファイルを選択するとモデルが作られうるため、
@@ -284,7 +284,6 @@ instructorController.setStateChangeListener(() => {
 // 作成・切替・削除・取り込みのすべてが同じ手順（applyProjectSwitch）でエディタと各UIを揃える。
 const switchDeps: ApplyProjectSwitchDeps = {
   refreshExplorer,
-  getFiles,
   getActiveFile,
   getActiveContent,
   openProjectFile: openProjectFileWithReset,
@@ -292,8 +291,7 @@ const switchDeps: ApplyProjectSwitchDeps = {
   refreshProjectBar: () => projectBar.refresh(),
   clearLog,
   getExercise: getCurrentExercise,
-  onExerciseLoaded: (exercise: ExerciseMeta | undefined, files: FileEntry[], activeFile: string) =>
-    exerciseController.onProjectLoaded(exercise, files, activeFile),
+  restoreExercise: (saved) => exerciseController.restoreExercise(saved),
 }
 
 // 実行中の結果（ステップ実行・採点・出力）が切替後のプロジェクトに混ざらないよう、

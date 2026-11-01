@@ -1,5 +1,6 @@
-import type { DirectoryEntry, FileContent, FileEntry, FileState, ProjectInput, ProjectRecord, ProjectSummary, SharedSource } from './types'
+import type { DirectoryEntry, FileContent, FileEntry, FileState, ExerciseSnapshot, ProjectInput, ProjectRecord, ProjectSummary, SharedSource } from './types'
 import type { ExerciseMeta } from '../fileio/index'
+import { resolveExercise } from '../exercise/types'
 import type { RunFile } from '../types'
 import { deleteProjectRecord, loadAll, saveCurrentId, saveProject } from './persistence'
 import { newProjectId, resolveActiveFile } from './migration'
@@ -92,8 +93,16 @@ export function getCurrentProject(): ProjectSummary {
   return { id: currentId, title: currentTitle() }
 }
 
-export function getCurrentExercise(): ExerciseMeta | undefined {
-  return projects.find(p => p.id === currentId)?.exercise
+export interface CurrentExercise {
+  meta: ExerciseMeta
+  // 壊れた演習（問題/テスト/採点対象が見つからない等）は null
+  snapshot: ExerciseSnapshot | null
+}
+
+export function getCurrentExercise(): CurrentExercise | undefined {
+  const current = projects.find(p => p.id === currentId)
+  if (!current?.exercise) return undefined
+  return { meta: current.exercise, snapshot: current.exerciseSnapshot ?? null }
 }
 
 export function listSharedSources(): Array<{ id: string; source: SharedSource }> {
@@ -117,13 +126,18 @@ function cloneState(input: FileState): FileState {
 // 新しいプロジェクトを作って現在のプロジェクトにする。input が無ければ初期状態(main.py 1件)。
 export function createProject(title: string, input?: ProjectInput): ProjectSummary {
   const now = Date.now()
+  const cloned = cloneState(input ?? cloneDefault())
+  const resolved = resolveExercise(input?.exercise, cloned.files, cloned.activeFile)
   const record: ProjectRecord = {
-    ...cloneState(input ?? cloneDefault()),
+    ...cloned,
     id: newProjectId(),
     title: normalizeTitle(title),
     createdAt: now,
     updatedAt: now,
     ...(input?.exercise ? { exercise: input.exercise } : {}),
+    ...(resolved
+      ? { exerciseSnapshot: { entryPath: resolved.entryPath, problemText: resolved.problemText, testCode: resolved.testCode } }
+      : {}),
     ...(input?.sharedSource ? { sharedSource: input.sharedSource } : {}),
   }
   projects = [...projects, record]

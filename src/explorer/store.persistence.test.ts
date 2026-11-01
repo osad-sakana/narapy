@@ -6,6 +6,7 @@ import {
   getCurrentExercise,
   initStore,
   listSharedSources,
+  setActiveFile,
   switchProject,
   updateFileContent,
 } from './store'
@@ -52,7 +53,41 @@ describe('store と IndexedDB の往復', () => {
     expect(getCurrentExercise()).toBeUndefined()
     switchProject(a.id)
     updateFileContent('main.py', 'x = 1')
-    expect(getCurrentExercise()).toEqual({ problem: 'p2', test: 't2' })
+    expect(getCurrentExercise()?.meta).toEqual({ problem: 'p2', test: 't2' })
     expect(listSharedSources().some(s => s.id === a.id && s.source === 'project')).toBe(true)
+  })
+
+  it('演習の採点対象と問題・テストは取り込み時点で固定され、開いたファイルや編集に影響されない', async () => {
+    const ex = createProject('EX', {
+      files: [
+        { path: 'main.py', content: { kind: 'text', data: '# 解答' } },
+        { path: 'problem.md', content: { kind: 'text', data: '問題文' } },
+        { path: 'test.py', content: { kind: 'text', data: 'ORIGINAL' } },
+      ],
+      directories: [],
+      activeFile: 'main.py',
+      exercise: { problem: 'problem.md', test: 'test.py' },
+    })
+    setActiveFile('test.py')
+    updateFileContent('test.py', 'TAMPERED')
+    createProject('OTHER')
+    switchProject(ex.id)
+    await flushStore()
+
+    const loaded = await loadAll(() => { throw new Error('既定プロジェクトは不要') })
+    const saved = loaded.projects.find(p => p.id === ex.id)
+    expect(saved?.activeFile).toBe('test.py')
+    expect(saved?.exerciseSnapshot).toEqual({ entryPath: 'main.py', problemText: '問題文', testCode: 'ORIGINAL' })
+    expect(getCurrentExercise()?.snapshot).toEqual(saved?.exerciseSnapshot)
+  })
+
+  it('壊れた演習は snapshot が null になる', () => {
+    createProject('BROKEN', {
+      files: [{ path: 'main.py', content: { kind: 'text', data: '' } }],
+      directories: [],
+      activeFile: 'main.py',
+      exercise: { problem: 'nope.md', test: 'nope.py' },
+    })
+    expect(getCurrentExercise()).toEqual({ meta: { problem: 'nope.md', test: 'nope.py' }, snapshot: null })
   })
 })

@@ -73,6 +73,12 @@ describe('renderTree', () => {
     expect(root.querySelector('[data-statement="other"] [data-role="label"]')).toBeNull()
   })
 
+  it('import はアイコンだけのラベルにして、語の重複を避ける', () => {
+    const root = render('import os')
+    expect(roleTexts(root, 'label')).toEqual([''])
+    expect(root.querySelector('[data-role="label"] i')).not.toBeNull()
+  })
+
   it('条件・式・名前は入力欄（白い楕円）になる', () => {
     expect(roleTexts(render('if x > 1:\n    pass'), 'input')).toEqual(['x > 1'])
     expect(roleTexts(render('total = a + b'), 'input')).toEqual(['total', 'a + b'])

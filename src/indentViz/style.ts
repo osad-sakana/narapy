@@ -16,7 +16,7 @@ export const TYPE_COLORS: Readonly<Record<StatementType, string>> = {
   other: '#9966ff',
 }
 
-/** ブロック見出しのラベル。other は付けない */
+/** ブロック見出しのラベル。other は付けない。import は語そのものが見出しなのでアイコンだけにする */
 export const TYPE_LABELS: Readonly<Partial<Record<StatementType, string>>> = {
   if: 'もし',
   elif: 'でなくてもし',
@@ -33,7 +33,6 @@ export const TYPE_LABELS: Readonly<Partial<Record<StatementType, string>>> = {
   match: 'マッチ',
   case: 'マッチ',
   assignment: '代入',
-  import: 'import',
 }
 
 /** ブロック見出しに添える FontAwesome のアイコン名 */

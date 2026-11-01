@@ -50,12 +50,12 @@ function renderCode(lines: readonly (readonly Segment[])[]): HTMLElement {
 
 function renderLabel(node: VizNode): HTMLElement | null {
   const label = TYPE_LABELS[node.type]
-  if (!label) return null
+  const icon = TYPE_ICONS[node.type]
+  if (!label && !icon) return null
   const pill = setRole(document.createElement('span'), 'label')
   pill.className = 'viz-label'
-  const icon = TYPE_ICONS[node.type]
   if (icon) setIconLabel(pill, icon, label)
-  else pill.textContent = label
+  else pill.textContent = label ?? ''
   return pill
 }
 

@@ -40,7 +40,11 @@ function compoundType(text: string): StatementType | null {
   const hard = HARD_COMPOUND.exec(text)
   if (hard) return hard[1] as StatementType
   const soft = SOFT_COMPOUND.exec(text)
-  if (soft && findHeaderColon(text) !== -1) return soft[1] as StatementType
+  if (!soft) return null
+  // match 文は文法上、同じ行に本体を書けない（コロンは行末）。1行の本体を許すのは case だけ。
+  // こうして match[0]: int = 1 のような添字つきの型注釈を match 文と取り違えない
+  const colon = findHeaderColon(text)
+  if (soft[1] === 'match' ? colon === text.length - 1 : colon !== -1) return soft[1] as StatementType
   return null
 }
 

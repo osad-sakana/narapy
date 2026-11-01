@@ -119,6 +119,12 @@ describe('parseIndentTree', () => {
     expect(types(parseIndentTree(src))).toEqual(['assignment', 'assignment', 'other', 'assignment', 'other', 'assignment'])
   })
 
+  it('添字・属性を左辺にした match の型注釈を match 文と取り違えない', () => {
+    expect(types(parseIndentTree('match[0]: int = 1\nmatch["k"]: int\nmatch(x).y: int = 1')))
+      .not.toContain('match')
+    expect(types(parseIndentTree('match x:\n    case 1: pass'))).toEqual(['match'])
+  })
+
   it('1行の本体は、続くインデントされた子より前に並ぶ', () => {
     const [node] = parseIndentTree('for i in x: print(i)\n    more()')
     expect(node.children.map(c => c.text)).toEqual(['print(i)', 'more()'])

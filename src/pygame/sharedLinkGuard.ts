@@ -1,4 +1,5 @@
 import type { UrlLoadResult } from '../urlload/loadFromUrl'
+import { setIconLabel } from '../ui/icon'
 
 type SharedSource = UrlLoadResult['source']
 
@@ -46,8 +47,8 @@ function buildDialog(onChoice: (ok: boolean) => void): HTMLElement {
 
   const title = document.createElement('h2')
   title.id = 'sharedLinkGuardTitle'
-  title.className = 'text-ink text-base font-bold'
-  title.textContent = '⚠️ 共有リンクのコードを実行しますか？'
+  title.className = 'text-ink text-base font-bold flex items-center gap-2'
+  setIconLabel(title, 'triangle-exclamation', '共有リンクのコードを実行しますか？')
 
   const body = document.createElement('div')
   body.className = 'text-sm text-ink flex flex-col gap-2'

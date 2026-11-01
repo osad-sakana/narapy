@@ -15,11 +15,11 @@ const TRANSLATABLE_TRACEBACK =
   'Traceback (most recent call last):\n  File "<exec>", line 2, in <module>\nTypeError: unsupported operand type(s) for +: \'int\' and \'str\''
 
 describe('renderGradeResult', () => {
-  it('合格ケースは✓付きでresultとして表示する', () => {
+  it('合格ケースは「合格:」付きでresultとして表示する', () => {
     appendLog.mockClear()
     renderGradeResult(JSON.stringify({ cases: [{ name: 'test_add', passed: true, message: null }], error: null }))
 
-    expect(appendLog).toHaveBeenCalledWith('✓ test_add', 'result')
+    expect(appendLog).toHaveBeenCalledWith('合格: test_add', 'result')
     expect(appendErrorBlock).not.toHaveBeenCalled()
   })
 
@@ -31,7 +31,7 @@ describe('renderGradeResult', () => {
       error: null,
     }))
 
-    expect(appendLog).toHaveBeenCalledWith('✗ test_add: 1+2は3のはず', 'error')
+    expect(appendLog).toHaveBeenCalledWith('不合格: test_add: 1+2は3のはず', 'error')
     expect(appendErrorBlock).not.toHaveBeenCalled()
   })
 
@@ -43,7 +43,7 @@ describe('renderGradeResult', () => {
       error: null,
     }))
 
-    expect(appendLog).toHaveBeenCalledWith('✗ test_add', 'error')
+    expect(appendLog).toHaveBeenCalledWith('不合格: test_add', 'error')
     expect(appendErrorBlock).toHaveBeenCalledTimes(1)
     const block = appendErrorBlock.mock.calls[0][0]
     expect(block.errorType).toBe('TypeError')

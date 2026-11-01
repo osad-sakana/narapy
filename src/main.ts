@@ -187,7 +187,7 @@ const exerciseController = createExerciseController({
   },
   showProblem: (problemText) => problemPanel.show(problemText),
   renderResult: (json) => renderGradeResult(json),
-  onBrokenExercise: () => appendLog('⚠️ この演習(.exercise)は壊れているため、問題として読み込めませんでした', 'warn'),
+  onBrokenExercise: () => appendLog('この演習(.exercise)は壊れているため、問題として読み込めませんでした', 'warn'),
 })
 
 // エディタ上部の常設パネルの開閉トグル。表示内容自体はcontroller経由で読み込み時に

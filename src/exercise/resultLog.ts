@@ -30,7 +30,7 @@ export function renderGradeResult(json: string): void {
 
   for (const testCase of result.cases) {
     if (testCase.passed) {
-      appendLog(`✓ ${testCase.name}`, 'result')
+      appendLog(`合格: ${testCase.name}`, 'result')
       continue
     }
     // AssertionErrorの独自メッセージ（例:「1+2は3のはず」）は translatePythonError に
@@ -39,11 +39,11 @@ export function renderGradeResult(json: string): void {
     // （issueの狙い「既存のエラー翻訳機能と組み合わせる」への対応）
     const translated = testCase.message ? translatePythonError(testCase.message) : null
     if (translated) {
-      appendLog(`✗ ${testCase.name}`, 'error')
+      appendLog(`不合格: ${testCase.name}`, 'error')
       appendErrorBlock({ ...translated, raw: testCase.message ?? '' })
     } else {
       const detail = testCase.message ? `: ${testCase.message}` : ''
-      appendLog(`✗ ${testCase.name}${detail}`, 'error')
+      appendLog(`不合格: ${testCase.name}${detail}`, 'error')
     }
   }
 

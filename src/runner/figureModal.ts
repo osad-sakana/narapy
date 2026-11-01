@@ -1,3 +1,5 @@
+import { createIcon, setIconLabel } from '../ui/icon'
+
 export function showFigureModal(base64: string, title: string): void {
   const backdrop = document.createElement('div')
   backdrop.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4'
@@ -9,12 +11,12 @@ export function showFigureModal(base64: string, title: string): void {
   header.className = 'flex items-center justify-between px-4 py-2 bg-panel border-b border-line flex-shrink-0'
 
   const titleEl = document.createElement('span')
-  titleEl.className = 'text-ink text-sm font-medium'
-  titleEl.textContent = `📊 ${title}`
+  titleEl.className = 'text-ink text-sm font-medium flex items-center gap-1.5'
+  setIconLabel(titleEl, 'chart-simple', title)
 
   const closeBtn = document.createElement('button')
   closeBtn.className = 'text-muted hover:text-ink text-xl font-bold transition-colors w-7 h-7 flex items-center justify-center rounded hover:bg-hover'
-  closeBtn.textContent = '×'
+  closeBtn.appendChild(createIcon('xmark'))
   closeBtn.setAttribute('aria-label', '閉じる')
 
   const imgContainer = document.createElement('div')

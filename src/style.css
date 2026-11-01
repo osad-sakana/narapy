@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* FontAwesome（自前バンドル。CSP の font-src 'self' で読める） */
+@import "@fortawesome/fontawesome-free/css/fontawesome.min.css";
+@import "@fortawesome/fontawesome-free/css/solid.min.css";
+
 /* Tailwind v4 の preflight はボタンのカーソルを既定に戻すため、全ボタンでクリック可能と分かるようにする */
 @layer base {
   button:not(:disabled),

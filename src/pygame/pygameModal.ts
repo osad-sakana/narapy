@@ -1,6 +1,7 @@
 import { PygameStalledError, startPygame, type PygameProject, type PygameSession } from './pygameRunner'
 import { appendErrorBlock, appendLog } from '../runner/log'
 import { translatePythonError } from '../runner/errorTranslator'
+import { setIconLabel } from '../ui/icon'
 
 // ブラウザが同期ループ（JSPI）に対応しているかで、固まったときの直し方が変わる
 function stallGuidance(syncLoop: boolean): string {
@@ -34,8 +35,8 @@ export function showPygameModal(code: string, project: PygameProject, hooks: Pyg
   header.className = 'flex items-center justify-between gap-4 px-4 py-2 border-b border-line'
 
   const titleEl = document.createElement('span')
-  titleEl.className = 'text-ink text-sm font-medium'
-  titleEl.textContent = '🎮 Pygame'
+  titleEl.className = 'text-ink text-sm font-medium flex items-center gap-1.5'
+  setIconLabel(titleEl, 'gamepad', 'Pygame')
 
   const statusEl = document.createElement('span')
   statusEl.className = 'text-xs text-muted'
@@ -43,14 +44,16 @@ export function showPygameModal(code: string, project: PygameProject, hooks: Pyg
 
   const closeBtn = document.createElement('button')
   closeBtn.className = 'text-muted hover:text-ink text-sm font-bold transition-colors px-3 h-7 flex items-center justify-center rounded hover:bg-hover'
-  closeBtn.textContent = '■ 停止して閉じる'
+  closeBtn.classList.add('gap-1.5')
+  setIconLabel(closeBtn, 'stop', '停止して閉じる')
 
   // canvas の外（モーダル本体）に置く。canvas に描かれた偽の入力画面にだまされないための常設の注意書き
   const warningEl = document.createElement('div')
   warningEl.className = 'px-4 py-1.5 text-xs text-ink bg-hover border-b border-line'
   warningEl.setAttribute('role', 'note')
   warningEl.dataset.testid = 'pygame-warning'
-  warningEl.textContent = '⚠ この画面はプログラムが描画しています。パスワードなどを入力しないでください。'
+  warningEl.classList.add('flex', 'items-center', 'gap-1.5')
+  setIconLabel(warningEl, 'triangle-exclamation', 'この画面はプログラムが描画しています。パスワードなどを入力しないでください。')
 
   const canvasContainer = document.createElement('div')
   canvasContainer.className = 'overflow-auto p-2 flex items-center justify-center bg-black'
@@ -99,7 +102,7 @@ export function showPygameModal(code: string, project: PygameProject, hooks: Pyg
       session = await startPygame(code, canvas, {
         onStdout: (text) => appendLog(text, 'output'),
         onCaption: (title) => {
-          titleEl.textContent = `🎮 ${title}`
+          setIconLabel(titleEl, 'gamepad', title)
         },
         onResize: (width, height) => {
           canvas.width = width

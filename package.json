@@ -18,6 +18,7 @@
     "coi-serviceworker": "^0.1.7",
     "fake-indexeddb": "^6.2.7",
     "happy-dom": "^21.0.4",
+    "pyodide": "0.27.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "vite": "^6.4.5",

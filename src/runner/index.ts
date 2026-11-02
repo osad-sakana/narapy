@@ -50,6 +50,8 @@ export function initRunner(
   onGradeResult?: (json: string) => void,
   // input() の入力欄を見せるため、折りたたまれた実行ログを開く
   ensureLogVisible: () => void = () => {},
+  // 実行ログに出す警告（() の付け忘れなど）。採点は entryPath のファイルが対象で行番号が合わないため出さない
+  getRunWarnings: () => readonly string[] = () => [],
 ): RunnerHandle {
   const runBtn     = document.getElementById('runBtn')     as HTMLButtonElement
   const copyLogBtn = document.getElementById('copyLogBtn') as HTMLButtonElement
@@ -267,6 +269,7 @@ export function initRunner(
     onRunStart?.()
     clearLog()
     appendLog('--- 実行開始（Pygame） ---', 'info')
+    getRunWarnings().forEach(line => appendLog(line, 'warn'))
     showPygameModal(code, project, {
       onOpen: () => {
         pygameOpen = true
@@ -321,6 +324,7 @@ export function initRunner(
     setRunning(true)
     clearLog()
     appendLog(mode === 'grade' ? '--- 採点開始 ---' : '--- 実行開始 ---', 'info')
+    if (mode !== 'grade') getRunWarnings().forEach(line => appendLog(line, 'warn'))
     const { files, directories } = project
     worker.postMessage({ type: 'run', code, files, directories, mode, testCode, entryPath } satisfies RunPayload)
   }

@@ -2,6 +2,7 @@
 
 import { PYODIDE_CDN, PYODIDE_MJS_HASH, verifiedImport } from './lib/pyodideLoader'
 import completionHelperSource from './completion_helper.py?raw'
+import missingCallSource from './lint/missingCall.py?raw'
 import { parseCompletionItems, type CompletionWorkerOut } from './editor/completionMeta'
 import { memoizeRetryable } from './lib/memoizeRetryable'
 import { AUTOPEP8_REQUIREMENTS, FORMAT_PY } from './format/formatModule'
@@ -12,7 +13,8 @@ type QueryMessage = { type: RequestType; id: number; code: string; line: number;
 type FormatMessage = { type: 'format'; id: number; code: string }
 // import の先読み。応答は返さない（読み込みは背景で進む）
 type PreloadMessage = { type: 'preload'; code: string; line: number }
-type InMessage = QueryMessage | FormatMessage | PreloadMessage
+type LintMessage = { type: 'lint'; id: number; code: string }
+type InMessage = QueryMessage | FormatMessage | LintMessage | PreloadMessage
 
 // 呼び出す Python 関数名は固定の対応表から選ぶ（メッセージ由来の文字列を実行に使わない）
 const PY_FUNCTIONS: Record<RequestType, string> = {
@@ -25,6 +27,8 @@ type OutMessage =
   | CompletionWorkerOut
   | { type: 'formatted'; id: number; result: unknown }
   | { type: 'format_error'; id: number }
+  | { type: 'linted'; id: number; result: unknown }
+  | { type: 'lint_error'; id: number }
 
 interface LoadPackageOptions {
   messageCallback?: (msg: string) => void
@@ -94,6 +98,7 @@ async function init(): Promise<void> {
   await py.loadPackage(['jedi'], { messageCallback: () => undefined })
 
   py.runPython(completionHelperSource)
+  py.runPython(missingCallSource)
 
   pyodide = py
   self.postMessage({ type: 'ready' } satisfies OutMessage)
@@ -181,6 +186,24 @@ async function handleFormat({ id, code }: FormatMessage): Promise<void> {
   }
 }
 
+function isLintMessage(msg: InMessage): msg is LintMessage {
+  return msg.type === 'lint' && isValidId(msg.id) && typeof msg.code === 'string'
+}
+
+// 解析は ast.parse だけで、autopep8 の導入には依存させない
+async function handleLint({ id, code }: LintMessage): Promise<void> {
+  try {
+    await getInit()
+    if (!pyodide) throw new Error('pyodide not ready')
+    pyodide.globals.set('_lint_src', code)
+    const raw = pyodide.runPython('_narapy_missing_call(_lint_src)')
+    const result: unknown = typeof raw === 'string' ? JSON.parse(raw) : null
+    self.postMessage({ type: 'linted', id, result } satisfies OutMessage)
+  } catch {
+    self.postMessage({ type: 'lint_error', id } satisfies OutMessage)
+  }
+}
+
 function postFailure(type: RequestType, id: number): void {
   const out: OutMessage =
     type === 'complete' ? { type: 'complete_error', id } : { type: 'query_result', id, value: null }
@@ -194,6 +217,10 @@ self.onmessage = async (event: MessageEvent<InMessage>) => {
   if (!msg) return
   if (isFormatMessage(msg)) {
     await handleFormat(msg)
+    return
+  }
+  if (isLintMessage(msg)) {
+    await handleLint(msg)
     return
   }
   if (isPreloadMessage(msg)) {

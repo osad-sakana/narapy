@@ -29,6 +29,7 @@ narapy/
 │   ├── lib/                # Pyodide ローダーなど共通ユーティリティ
 │   ├── explorer/           # ファイルエクスプローラー・アップロード
 │   ├── format/             # 整形ボタン(autopep8)。Python側は補完Worker(completion.worker.ts)のPyodideで実行、結果はexecuteEditsの最小差分で反映
+│   ├── lint/               # () 付け忘れ警告（Python ast を補完Workerで実行→Monaco黄色波線＋実行ログ。講師モードではOFF。issue #93）
 │   ├── fileio/             # .narapy / .exercise プロジェクト入出力
 │   ├── exercise/           # 演習(.exercise)の読込検知・問題文表示・採点結果表示（詳細はdocs/exercise-format.md）
 │   ├── urlload/            # URLの #code= / #project= / ?project=<URL> 読み込み

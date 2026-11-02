@@ -32,6 +32,7 @@ import { markProjectFromSharedLink, setCurrentProjectIdProvider } from './pygame
 import { createFileSwitcher } from './editor/fileSwitcher'
 import { initTheme } from './theme/index'
 import { initFormatController } from './format/controller'
+import { initMissingCallLint } from './lint/controller'
 import { initHamburgerMenu } from './menu/ui'
 import { applyProjectSwitch, type ApplyProjectSwitchDeps } from './project/applyProjectSwitch'
 import { initProjectBar } from './project/ui'
@@ -235,6 +236,13 @@ editorFileName.textContent = getActiveFile()
 initIndentVizPanel(editor, () => fileSwitcher.getEditorPath())
 
 
+// () の付け忘れ警告。講師モード中は出さない
+const missingCallLint = initMissingCallLint({
+  editor,
+  getEditorPath: () => fileSwitcher.getEditorPath(),
+  isSuppressed: () => instructorController.isOn(),
+})
+
 const runner = initRunner(
   editor,
   () => {
@@ -246,6 +254,7 @@ const runner = initRunner(
   () => stepperController.invalidate(),
   (json) => exerciseController.onGradeResult(json),
   layout.ensureLogPanelVisible,
+  () => missingCallLint.getRunWarnings(),
 )
 
 gradeBtn.addEventListener('click', () => {
@@ -279,6 +288,7 @@ instructorController.setStateChangeListener(() => {
   fontControls.refresh()
   syncInstructorMenuItem(instructorController.isOn())
   instructorBaselineButton.sync()
+  missingCallLint.onSuppressedChanged()
 })
 
 // --- プロジェクトバー (issue #86) ---

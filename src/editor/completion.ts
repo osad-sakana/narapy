@@ -5,11 +5,15 @@ import { lookupJaDoc } from './jaDocs'
 import type { CompletionWorkerOut, RawCompletion } from './completionMeta'
 import { createFormatRequester } from '../format/requester'
 import type { FormatResult } from '../format/result'
+import { createLintRequester } from '../lint/requester'
+import type { LintResult } from '../lint/result'
 
 type WorkerOut =
   | CompletionWorkerOut
   | { type: 'formatted'; id: number; result: unknown }
   | { type: 'format_error'; id: number }
+  | { type: 'linted'; id: number; result: unknown }
+  | { type: 'lint_error'; id: number }
 
 type PendingEntry = {
   resolve: (items: monaco.languages.CompletionItem[]) => void
@@ -152,6 +156,15 @@ const formatRequester = createFormatRequester({
   maxChars: FORMAT_MAX_CHARS,
 })
 
+// () 付け忘れの検査も補完とは別管理。ast.parse だけなので短い時間で返る
+const LINT_TIMEOUT_MS = 5_000
+const lintRequester = createLintRequester({
+  nextId: () => ++nextId,
+  post: (message) => getOrCreateWorker().postMessage(message),
+  timeoutMs: LINT_TIMEOUT_MS,
+  maxChars: CODE_MAX_CHARS,
+})
+
 // pending エントリをタイマーごとキャンセルして静的候補で解決する
 function evictEntry(id: number): void {
   const entry = pending.get(id)
@@ -166,6 +179,7 @@ function handleWorkerFailure(): void {
   for (const [id] of pending) evictEntry(id)
   for (const [id] of queries) settleQuery(id, null)
   formatRequester.failAll()
+  lintRequester.failAll()
   worker?.terminate()
   worker = null
   workerReady = false
@@ -190,6 +204,7 @@ function getOrCreateWorker(): Worker {
       return
     }
     if (formatRequester.handle(msg)) return
+    if (lintRequester.handle(msg)) return
     const entry = pending.get(msg.id)
     if (!entry) return
     clearTimeout(entry.timer)
@@ -230,6 +245,10 @@ function getOrCreateWorker(): Worker {
 
 export function requestFormat(code: string): Promise<FormatResult> {
   return formatRequester.request(code)
+}
+
+export function requestLint(code: string): Promise<LintResult> {
+  return lintRequester.request(code)
 }
 
 // import が書かれたら、補完の要求を待たずにそのパッケージの読み込みを Worker に頼む

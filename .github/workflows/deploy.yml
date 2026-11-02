@@ -1,4 +1,4 @@
-name: Deploy to お名前.com RS (FTPS)
+name: Deploy (FTPS)
 
 on:
   push:
@@ -36,7 +36,7 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # FTP アカウントの接続先が narapy.shisui.tokyo のフォルダに限定されているため server-dir はルート
+      # FTP アカウントの接続先が公開フォルダに限定されているため server-dir はルート
       - name: Deploy via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:

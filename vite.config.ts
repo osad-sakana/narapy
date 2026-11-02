@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 const root = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig({
-  // お名前.com RS のドメイン直下（narapy.shisui.tokyo）に配置するため常にルート
+  // ドメイン直下に配置するため常にルート
   base: '/',
 
   plugins: [

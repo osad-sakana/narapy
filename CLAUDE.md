@@ -67,10 +67,10 @@ pnpm test
 ### COOP/COEP ヘッダー
 
 `SharedArrayBuffer`（Pyodide に必要）のため `vite.config.ts` の `server.headers` に以下を設定済み。
-本番は お名前.com レンタルサーバー(RS) へ GitHub Actions（`.github/workflows/deploy.yml`）が
+本番は レンタルサーバーへ GitHub Actions（`.github/workflows/deploy.yml`）が
 FTPS で `dist/` を配置する。ヘッダーは `public/.htaccess` で付与し、`mod_headers` が使えない場合に備えて
 `coi-serviceworker.js` も残している（クロスオリジン分離済みなら何もしない）。
-`FTP_SERVER` / `FTP_USERNAME` / `FTP_PASSWORD` は GitHub Secrets（FTP アカウントの接続先は `narapy.shisui.tokyo` のフォルダに限定）。
+`FTP_SERVER` / `FTP_USERNAME` / `FTP_PASSWORD` は GitHub Secrets（FTP アカウントの接続先は公開フォルダに限定）。
 
 ```
 Cross-Origin-Opener-Policy: same-origin

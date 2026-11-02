@@ -1,4 +1,4 @@
-// pygame（pygame-ce）の主な関数・クラスの日本語説明。キーは jedi の full_name（実測値）。
+// pygame（pygame-ce）の主な関数・クラスの日本語説明。キーと引数名は jedi の実測値。
 import type { JaDoc } from './jaDocs'
 
 export const PYGAME_DOCS: Readonly<Record<string, JaDoc>> = {
@@ -48,8 +48,8 @@ export const PYGAME_DOCS: Readonly<Record<string, JaDoc>> = {
     params: { source: '貼り付ける画像', dest: '貼り付ける位置 (x, y)、または Rect', area: '画像の一部だけを使うときの範囲（省略可）', special_flags: '合成方法（省略可）' },
   },
   'pygame.surface.Surface.get_rect': { summary: 'この Surface と同じ大きさの Rect を返します。位置は x=0, y=0 から始まります。' },
-  'pygame.surface.Surface.convert': { summary: '画面と同じ形式に変換して、描画を速くした Surface を返します。' },
-  'pygame.surface.Surface.convert_alpha': { summary: '透明度を保ったまま画面向けに変換した Surface を返します。' },
+  'pygame.surface.Surface.convert': { summary: '画面と同じ形式に変換して、描画を速くした Surface を返します。set_mode() の後に呼びます。' },
+  'pygame.surface.Surface.convert_alpha': { summary: '透明度を保ったまま画面向けに変換した Surface を返します。set_mode() の後に呼びます。' },
   'pygame.rect.Rect': {
     summary: '四角形（x, y, 幅, 高さ）を表します。位置の管理や当たり判定に使います。',
     params: { left: '左端の x 座標', top: '上端の y 座標', width: '幅', height: '高さ' },
@@ -76,15 +76,15 @@ export const PYGAME_DOCS: Readonly<Record<string, JaDoc>> = {
   },
   'pygame.time.Clock': { summary: '時間を測り、ゲームの速さ（フレームレート）をそろえるための時計です。' },
   'pygame.time.Clock.tick': {
-    summary: '1秒あたりの更新回数が framerate を超えないよう待ちます。前回からの経過ミリ秒を返します。毎フレーム1回呼びます。',
+    summary: '1秒あたりの更新回数が framerate を超えないよう待ちます。前回からの経過ミリ秒を返します。毎フレーム1回呼びます。framerate を省略すると待たずに進みます。',
     params: { framerate: '1秒あたりの更新回数の上限（FPS）。例: 60' },
   },
-  'pygame.time.wait': { summary: '指定したミリ秒だけ処理を止めます。', params: { milliseconds: '待つ時間（ミリ秒）' } },
-  'pygame.time.delay': { summary: '指定したミリ秒だけ処理を止めます。', params: { milliseconds: '待つ時間（ミリ秒）' } },
+  'pygame.time.wait': { summary: '指定したミリ秒だけ処理を止めます（その間は CPU を休ませます）。', params: { milliseconds: '待つ時間（ミリ秒）' } },
+  'pygame.time.delay': { summary: '指定したミリ秒だけ処理を止めます（wait より正確ですが CPU を使い続けます）。', params: { milliseconds: '待つ時間（ミリ秒）' } },
   'pygame.time.get_ticks': { summary: 'pygame.init() を呼んでからの経過時間をミリ秒で返します。' },
   'pygame.image.load': {
     summary: '画像ファイルを読み込んで Surface として返します。',
-    params: { filename: '画像ファイルの名前' },
+    params: { file: '画像ファイルの名前', namehint: 'ファイルの種類を示すヒント（省略可）' },
   },
   'pygame.transform.scale': {
     summary: '画像を指定した大きさに拡大・縮小した新しい Surface を返します。',
@@ -92,7 +92,7 @@ export const PYGAME_DOCS: Readonly<Record<string, JaDoc>> = {
   },
   'pygame.font.Font': {
     summary: 'フォント（文字の書体）を読み込みます。文字を画像にするときに使います。',
-    params: { name: 'フォントファイルの名前。None なら標準のフォント', size: '文字の大きさ' },
+    params: { filename: 'フォントファイルの名前。None なら標準のフォント', size: '文字の大きさ' },
   },
   'pygame.font.Font.render': {
     summary: '文字列を画像（Surface）にして返します。blit で画面に貼り付けます。',

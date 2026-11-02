@@ -8,6 +8,10 @@ import { toLogLine, type MissingCallWarning } from './result'
 const MARKER_OWNER = 'narapy.missingCall'
 // 入力のたびに解析しないよう、入力が止まってから検査する
 const DEBOUNCE_MS = 500
+// 補完 Worker の起動（Pyodide・jedi の読み込み）を待つ間は timeout / unavailable になるので、
+// 内容が変わっていなければ間隔をあけて検査し直す
+const RETRY_MS = 2000
+const MAX_RETRIES = 6
 
 export interface MissingCallLintDeps {
   readonly editor: EditorInstance
@@ -32,6 +36,7 @@ interface Cache {
 export function initMissingCallLint({ editor, getEditorPath, isSuppressed }: MissingCallLintDeps): MissingCallLint {
   let timer: ReturnType<typeof setTimeout> | null = null
   let cache: Cache | null = null
+  let retries = 0
 
   const clearMarkers = (model: monaco.editor.ITextModel): void => {
     monaco.editor.setModelMarkers(model, MARKER_OWNER, [])
@@ -61,27 +66,39 @@ export function initMissingCallLint({ editor, getEditorPath, isSuppressed }: Mis
     if (decision === 'clear' || result.status !== 'ok') {
       cache = null
       clearMarkers(model)
+      if (decision === 'apply' && (result.status === 'timeout' || result.status === 'unavailable') && retries < MAX_RETRIES) {
+        retries += 1
+        arm(RETRY_MS)
+      }
       return
     }
     cache = { model, version: sentVersion, warnings: result.warnings }
     monaco.editor.setModelMarkers(model, MARKER_OWNER, toMarkers(result.warnings, monaco.MarkerSeverity.Warning))
   }
 
-  const schedule = (): void => {
+  const arm = (delayMs: number): void => {
     if (timer) clearTimeout(timer)
     timer = setTimeout(() => {
       timer = null
       void check()
-    }, DEBOUNCE_MS)
+    }, delayMs)
   }
 
-  editor.onDidChangeModelContent(schedule)
-  editor.onDidChangeModel(() => {
+  const runNow = (): void => {
     if (timer) clearTimeout(timer)
     timer = null
     void check()
+  }
+
+  editor.onDidChangeModelContent(() => {
+    retries = 0
+    arm(DEBOUNCE_MS)
   })
-  void check()
+  editor.onDidChangeModel(() => {
+    retries = 0
+    runNow()
+  })
+  runNow()
 
   return {
     onSuppressedChanged() {
@@ -91,7 +108,8 @@ export function initMissingCallLint({ editor, getEditorPath, isSuppressed }: Mis
         cache = null
         monaco.editor.getModels().forEach(clearMarkers)
       } else {
-        void check()
+        retries = 0
+        runNow()
       }
     },
 

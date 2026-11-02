@@ -87,6 +87,8 @@ describe('警告しないケース', () => {
     ['star import', 'from math import *\nprint'],
     ['属性アクセス', 'import os\nos.getcwd'],
     ['for のターゲット', 'for print in []:\n    pass\nprint'],
+    ['クラス直下のメソッド名', 'class A:\n    def run(self):\n        pass\nrun'],
+    ['デコレータ付きの def', 'def deco(f):\n    return f\n@deco\ndef foo():\n    pass\nfoo'],
     ['global 宣言', 'def foo():\n    pass\ndef g():\n    global foo\n    foo = 1\nfoo'],
   ])('%s', (_label, src) => {
     expect(detect(src)).toEqual({ status: 'ok', warnings: [] })

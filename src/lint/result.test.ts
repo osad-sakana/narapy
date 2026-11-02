@@ -31,12 +31,12 @@ describe('parseLintResult', () => {
 
 describe('メッセージ', () => {
   it('式文は () の付け方を説明する', () => {
-    expect(buildMessage(warning)).toBe('`print` の後ろに `()` がありません。`print()` のように `()` をつけて呼び出します')
+    expect(buildMessage(warning)).toBe('「print」の後ろに「()」がありません。「print()」のように「()」をつけて呼び出します')
   })
 
   it('条件は常に真になることを説明する', () => {
     const msg = buildMessage({ ...warning, name: 'foo', kind: 'if' })
-    expect(msg).toContain('`if` の条件が関数 `foo` そのもの')
+    expect(msg).toContain('条件が関数「foo」そのもの')
     expect(msg).toContain('常に真')
   })
 

@@ -9,9 +9,15 @@ def _narapy_collect_bindings(tree):
     # 関数かどうかを断定できる名前だけを警告対象にするため、def 以外で束縛されうる名前を集める。
     # スコープは区別せず、ファイル内のどこかで再束縛されていれば警告しない（誤検知より見逃しを選ぶ）
     defs, rebound, star = set(), set(), False
+    # クラス直下のメソッドは単独の名前では参照できず、デコレータは関数以外を返しうるため、
+    # どちらも「関数」と断定せず警告の対象にしない
+    methods = {id(child) for node in _ast.walk(tree) if isinstance(node, _ast.ClassDef) for child in node.body}
     for node in _ast.walk(tree):
         if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
-            defs.add(node.name)
+            if id(node) in methods or node.decorator_list:
+                rebound.add(node.name)
+            else:
+                defs.add(node.name)
         elif isinstance(node, _ast.ClassDef):
             rebound.add(node.name)
         elif isinstance(node, _ast.Name) and isinstance(node.ctx, (_ast.Store, _ast.Del)):

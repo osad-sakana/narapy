@@ -52,12 +52,12 @@ export function parseLintResult(value: unknown): LintResult | null {
   }
 }
 
-// マーカーと実行ログで同じ文言を使う
+// マーカーと実行ログはどちらも Markdown を描画しないので、記号は「」で囲む
 export function buildMessage(w: MissingCallWarning): string {
   if (w.kind === 'expr') {
-    return `\`${w.name}\` の後ろに \`()\` がありません。\`${w.name}()\` のように \`()\` をつけて呼び出します`
+    return `「${w.name}」の後ろに「()」がありません。「${w.name}()」のように「()」をつけて呼び出します`
   }
-  return `\`${w.kind}\` の条件が関数 \`${w.name}\` そのものです。関数は常に真として扱われます。\`${w.name}()\` のように \`()\` をつけて呼び出し、結果を使います`
+  return `条件が関数「${w.name}」そのものです。関数は常に真として扱われます。「${w.name}()」のように「()」をつけて呼び出し、結果を使います`
 }
 
 export function toLogLine(w: MissingCallWarning): string {

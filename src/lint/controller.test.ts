@@ -164,6 +164,34 @@ describe('initMissingCallLint', () => {
   })
 })
 
+describe('起動待ちの再試行', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    requestLint.mockReset()
+    setModelMarkers.mockReset()
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('初回が timeout でも、内容が変わっていなければ検査し直して波線を出す', async () => {
+    requestLint
+      .mockResolvedValueOnce({ status: 'timeout' })
+      .mockResolvedValue({ status: 'ok', warnings: [warning] })
+    setup()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(requestLint).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(requestLint).toHaveBeenCalledTimes(2)
+    expect(lastMarkers()).toHaveLength(1)
+  })
+
+  it('再試行は回数に上限がある', async () => {
+    requestLint.mockResolvedValue({ status: 'unavailable' })
+    setup()
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(requestLint).toHaveBeenCalledTimes(7)
+  })
+})
+
 describe('getRunWarnings', () => {
   beforeEach(() => {
     vi.useFakeTimers()

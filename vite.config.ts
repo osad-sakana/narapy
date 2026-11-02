@@ -5,8 +5,8 @@ import tailwindcss from '@tailwindcss/vite'
 const root = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig({
-  // CI 環境（GitHub Actions）では GitHub Pages のサブパスに合わせる
-  base: process.env.CI ? '/narapy/' : '/',
+  // ドメイン直下に配置するため常にルート
+  base: '/',
 
   plugins: [
     tailwindcss(),

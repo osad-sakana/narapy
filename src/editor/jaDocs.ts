@@ -1,5 +1,7 @@
-// 初学者向けの日本語説明（組み込み関数・str/list/dict の主なメソッド・random）。
+// 初学者向けの日本語説明（組み込み関数・str/list/dict の主なメソッド・random・pygame）。
 // キーは jedi の full_name。辞書にないものは英語の docstring をそのまま表示する。
+
+import { PYGAME_DOCS } from './jaDocsPygame'
 
 export type JaDoc = {
   summary: string
@@ -313,6 +315,7 @@ export const JA_DOCS: Readonly<Record<string, JaDoc>> = {
   ...BUILTIN_FUNCTIONS,
   ...BUILTIN_METHODS,
   ...RANDOM_FUNCTIONS,
+  ...PYGAME_DOCS,
 }
 
 // random.randint は代入で束ねられたメソッドとして解決されると random.Random.randint に、

@@ -37,6 +37,13 @@ describe('lookupJaDoc', () => {
     }
   })
 
+  it('pygame の関数・クラス・メソッドを引ける', () => {
+    expect(lookupJaDoc('pygame.display.set_mode')?.params?.size).toContain('幅')
+    expect(lookupJaDoc('pygame.surface.Surface.blit')?.summary).toContain('貼り付け')
+    expect(lookupJaDoc('pygame.time.Clock.tick')?.params?.framerate).toContain('FPS')
+    expect(lookupJaDoc('pygame.base.init')?.summary).toContain('初期化')
+  })
+
   it('randrange は引数が1つのときの意味を説明している', () => {
     expect(lookupJaDoc('random.randrange')?.params?.start).toContain('1つだけ')
   })

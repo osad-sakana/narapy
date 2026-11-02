@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy to お名前.com RS (FTPS)
 
 on:
   push:
@@ -7,18 +7,14 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
+# FTP は原子的でないため、デプロイ同士は直列にして新旧ファイルの混在を避ける
 concurrency:
-  group: pages
+  group: deploy
   cancel-in-progress: false
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,21 +31,18 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm build
-        env:
-          CI: true
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      # FTP アカウントの接続先が narapy.shisui.tokyo のフォルダに限定されているため server-dir はルート
+      - name: Deploy via FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          path: dist
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist/
+          server-dir: ./

@@ -347,6 +347,11 @@ const RULES: Record<string, Rule[]> = {
       hint: () => `True / False / None は変数名に使えません。別の名前に変えてください。`,
     },
     {
+      pattern: /cannot use assignment expressions with (True|False|None)/,
+      description: (kw) => `${kw} は予約語（特別な値）なので、「:=」で代入できません。`,
+      hint: () => `別の名前に変えてください。`,
+    },
+    {
       pattern: /cannot delete (True|False|None)/,
       description: (kw) => `${kw} は予約語（特別な値）なので、del で削除できません。`,
     },

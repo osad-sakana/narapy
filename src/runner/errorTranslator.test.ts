@@ -760,6 +760,14 @@ describe('translatePythonError（True / False / None への代入 / issue #71）
     expect(result?.description).toContain('True')
   })
 
+  it('代入式 (True := 1)', () => {
+    const result = translatePythonError(
+      syntaxTraceback('(True := 1)', 'SyntaxError: cannot use assignment expressions with True'),
+    )
+    expect(result?.matched).toBe(true)
+    expect(result?.description).toContain('True')
+  })
+
   it('cannot delete False', () => {
     const result = translatePythonError(syntaxTraceback('del False', 'SyntaxError: cannot delete False'))
     expect(result?.matched).toBe(true)

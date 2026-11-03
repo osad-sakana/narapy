@@ -18,7 +18,8 @@ const ASSIGN_OPS = '(?:=(?!=)|\\*\\*=|\\*=|//=|/=|\\+=|-=|%=|@=|&=|\\|=|\\^=|>>=
 // 合法な Python には現れない並びだけを選ぶ（SyntaxError が出ている行にだけ適用する）
 const MISUSE_PATTERNS: RegExp[] = [
   // class = 1 / obj.class = 1 / class += 1 / f(class=1)
-  new RegExp(`${NOT_AFTER}${KW}${NOT_BEFORE}\\s*${ASSIGN_OPS}`, 'u'),
+  // `x not = 1` や `x: None = 5` の not / None を拾わないよう、名前を置ける位置（行頭・; ( , の後・. の直後）に限る
+  new RegExp(`(?:^|[;(,]|\\.)\\s*${KW}${NOT_BEFORE}\\s*${ASSIGN_OPS}`, 'u'),
   // for class in ...
   new RegExp(`${NOT_AFTER}for\\s+${KW}${NOT_BEFORE}\\s+in${NOT_BEFORE}`, 'u'),
   // ... as class
@@ -36,7 +37,7 @@ const MISUSE_PATTERNS: RegExp[] = [
 ]
 
 // def f(class) / def f(a, *class) の引数位置
-const DEF_PARAMS = new RegExp(`${NOT_AFTER}def\\s+[\\p{L}_][\\p{L}\\p{N}_]*\\s*\\((.*)`, 'u')
+const DEF_PARAMS = new RegExp(`${NOT_AFTER}def\\s+[\\p{L}_][\\p{L}\\p{N}_]*\\s*\\(([^)]*)`, 'u')
 const PARAM_KEYWORD = new RegExp(`(?:^|,)\\s*\\*{0,2}\\s*${KW}${NOT_BEFORE}\\s*(?:[,):=]|$)`, 'u')
 
 // 文字列リテラルの中身と # コメントを空白にする（長さは保つ）。
@@ -68,7 +69,8 @@ export function stripStringsAndComments(line: string): string {
 }
 
 // 最後の <exec> フレームの直後の1行（エラー行のソース）を返す。
-// Pyodide 内部のフレーム（await CodeRunner( ...）を拾って誤検出しないよう、必ず <exec> の直後に限る
+// Pyodide 内部のフレーム（await CodeRunner( ...）や、exec()/import 先の別フレームの行を拾って
+// 誤検出しないよう、「ソース行＋キャレット」が例外ヘッダの直前に続く形のときだけ返す
 export function extractErrorSourceLine(raw: string): string | null {
   const lines = raw.split(/\r?\n/)
   let frame = -1
@@ -84,6 +86,10 @@ export function extractErrorSourceLine(raw: string): string | null {
   const isIndented = /^\s+\S/.test(next)
   const isCaretLine = /^\s*[\^~\s]*$/.test(next)
   if (!isIndented || isCaretLine) return null
+
+  const rest = lines.slice(frame + 2)
+  const header = rest.findIndex((l) => !/^\s*[\^~\s]*$/.test(l))
+  if (header < 0 || !/^\S/.test(rest[header])) return null
   return next.trim()
 }
 

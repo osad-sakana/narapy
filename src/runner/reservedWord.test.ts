@@ -136,9 +136,36 @@ describe('detectReservedWordMisuse（検出しない）', () => {
     'def f(a, b=None):',
     'import os as o',
     'f = lambda x: None',
+    // 演算子として使う予約語の直後の = は「名前に使った」ではない
+    'if x not = 1:',
+    'if x is = 1:',
+    'if a > 0 and = 1:',
+    'x = a if b else = 2',
+    'if x == True = 1:',
+    'while x is not None = 1:',
+    // 型注釈は合法
+    'x: None = 5 5',
+    // 1行で書いた関数の本体は引数リストではない
+    'def f(x): print(x, True) y',
+    'def f(x): return f(x, None) + 1 2',
   ]
   it.each(cases)('%s', (line) => {
     expect(detectReservedWordMisuse(stripStringsAndComments(line))).toBeNull()
+  })
+})
+
+describe('extractErrorSourceLine（SyntaxError が出た行だけを返す）', () => {
+  it('exec() 内の SyntaxError など、<exec> の後に別フレームが続くなら null', () => {
+    const raw = [
+      'Traceback (most recent call last):',
+      '  File "<exec>", line 2, in run',
+      '    exec("1 2", None)',
+      '  File "<string>", line 1',
+      '    1 2',
+      '      ^',
+      'SyntaxError: invalid syntax',
+    ].join('\n')
+    expect(extractErrorSourceLine(raw)).toBeNull()
   })
 })
 

@@ -1,3 +1,5 @@
+import { findMisusedReservedWord } from './reservedWord'
+
 export interface TranslatedError {
   line: number | null
   errorType: string
@@ -330,6 +332,25 @@ const RULES: Record<string, Rule[]> = {
       hint: () => `インデントや区切りには半角スペースを使ってください。`,
     },
     {
+      pattern: /cannot assign to (True|False|None) here\. Maybe you meant '=='/,
+      description: (kw) => `${kw} に代入しようとしています。比較のつもりで「=」を使っている可能性があります。`,
+      hint: (kw) => `値が等しいかを調べるときは「==」を使います。例: if x == ${kw}:`,
+    },
+    {
+      pattern: /cannot assign to (True|False|None)/,
+      description: (kw) => `${kw} は予約語（特別な値）なので、変数名として使ったり代入したりできません。`,
+      hint: () => `別の名前に変えてください。例: flag や is_ok`,
+    },
+    {
+      pattern: /'(True|False|None)' is an illegal expression for augmented assignment/,
+      description: (kw) => `${kw} は予約語（特別な値）なので、「+=」などで変更できません。`,
+      hint: () => `True / False / None は変数名に使えません。別の名前に変えてください。`,
+    },
+    {
+      pattern: /cannot delete (True|False|None)/,
+      description: (kw) => `${kw} は予約語（特別な値）なので、del で削除できません。`,
+    },
+    {
       pattern: /Missing parentheses in call to 'print'/,
       description: () => `print は関数なので、括弧 () を付けて呼び出す必要があります。`,
       hint: () => `例: print("こんにちは")`,
@@ -360,7 +381,7 @@ const RULES: Record<string, Rule[]> = {
     {
       pattern: /invalid syntax/,
       description: () => `文法エラーがあります。`,
-      hint: () => `コロン（:）の付け忘れ、括弧の対応ミス、予約語のスペルミスなどを確認してください。`,
+      hint: () => `コロン（:）の付け忘れ、括弧の対応ミス、予約語（if・for・class など）を名前に使っていないかなどを確認してください。`,
     },
   ],
 
@@ -453,6 +474,18 @@ function findErrorHeader(raw: string): { errorType: string; message: string } | 
   return null
 }
 
+// Python 3.12 は予約語を名前に使っても素の "invalid syntax" しか返さないため、ソース行から見つけた語で説明する
+function reservedWordError(keyword: string, line: number | null, message: string): TranslatedError {
+  return {
+    line,
+    errorType: 'SyntaxError',
+    description: `"${keyword}" は Python の予約語（特別な意味を持つ言葉）なので、変数名・関数名などには使えません。`,
+    hint: `別の名前に変えてください。\n例: ${keyword}_ や my_${keyword}`,
+    matched: true,
+    rawMessage: message,
+  }
+}
+
 export function translatePythonError(raw: string): TranslatedError | null {
   const header = findErrorHeader(raw)
   if (!header) return null
@@ -463,6 +496,12 @@ export function translatePythonError(raw: string): TranslatedError | null {
   const line = lineMatches.length > 0 ? parseInt(lineMatches[lineMatches.length - 1][1], 10) : null
 
   const { errorType, message } = header
+
+  if (errorType === 'SyntaxError' && message.trim() === 'invalid syntax') {
+    const reserved = findMisusedReservedWord(raw)
+    if (reserved) return reservedWordError(reserved, line, message)
+  }
+
   const rules = RULES[errorType]
 
   if (rules) {

@@ -674,3 +674,107 @@ describe('translatePythonError（TypeError: %演算子による書式指定エ�
     )
   })
 })
+
+function syntaxTraceback(source: string, message = 'SyntaxError: invalid syntax', line = 1): string {
+  return [
+    'Traceback (most recent call last):',
+    '  File "/lib/python312.zip/_pyodide/_base.py", line 573, in eval_code_async',
+    '    await CodeRunner(',
+    `  File "<exec>", line ${line}`,
+    `    ${source}`,
+    '    ^',
+    message,
+  ].join('\n')
+}
+
+describe('translatePythonError（予約語を名前に使った SyntaxError / issue #71）', () => {
+  const cases: Array<{ name: string; source: string; keyword: string }> = [
+    { name: '変数への代入', source: 'class = 1', keyword: 'class' },
+    { name: '関数名', source: 'def for():', keyword: 'for' },
+    { name: 'for の変数', source: 'for class in range(3):', keyword: 'class' },
+    { name: '引数名', source: 'def f(a, class):', keyword: 'class' },
+    { name: 'as の別名', source: 'import os as class', keyword: 'class' },
+  ]
+
+  it.each(cases)('$name: $source', ({ source, keyword }) => {
+    const result = translatePythonError(syntaxTraceback(source, 'SyntaxError: invalid syntax', 2))
+    expect(result?.errorType).toBe('SyntaxError')
+    expect(result?.line).toBe(2)
+    expect(result?.matched).toBe(true)
+    expect(result?.rawMessage).toBe('invalid syntax')
+    expect(result?.description).toBe(
+      `"${keyword}" は Python の予約語（特別な意味を持つ言葉）なので、変数名・関数名などには使えません。`,
+    )
+    expect(result?.hint).toBe(`別の名前に変えてください。\n例: ${keyword}_ や my_${keyword}`)
+  })
+
+  it('採点形式（Traceback ヘッダなし）でも同じ結果になる', () => {
+    const raw = ['  File "<exec>", line 1', '    class = 1', '          ^', 'SyntaxError: invalid syntax'].join('\n')
+    const result = translatePythonError(raw)
+    expect(result?.matched).toBe(true)
+    expect(result?.description).toContain('"class"')
+  })
+
+  it('ソース行が無ければ従来の汎用 invalid syntax 翻訳に戻る', () => {
+    const result = translatePythonError(traceback('SyntaxError: invalid syntax'))
+    expect(result?.description).toBe('文法エラーがあります。')
+  })
+
+  it('予約語の誤用でない invalid syntax は汎用翻訳のまま', () => {
+    const result = translatePythonError(syntaxTraceback('print(x'))
+    expect(result?.description).toBe('文法エラーがあります。')
+  })
+
+  it('文字列内の予約語では反応しない', () => {
+    const result = translatePythonError(syntaxTraceback('print("class = 1" x'))
+    expect(result?.description).toBe('文法エラーがあります。')
+  })
+
+  it('Perhaps you forgot a comma は既存ルールのまま', () => {
+    const result = translatePythonError(
+      syntaxTraceback('x = [class 1]', 'SyntaxError: invalid syntax. Perhaps you forgot a comma?'),
+    )
+    expect(result?.description).toContain('カンマ')
+  })
+})
+
+describe('translatePythonError（True / False / None への代入 / issue #71）', () => {
+  it('cannot assign to True', () => {
+    const result = translatePythonError(syntaxTraceback('True = 1', 'SyntaxError: cannot assign to True'))
+    expect(result?.matched).toBe(true)
+    expect(result?.description).toContain('True')
+    expect(result?.description).toContain('予約語')
+  })
+
+  it('cannot assign to None（for の変数）', () => {
+    const result = translatePythonError(syntaxTraceback('for None in x:', 'SyntaxError: cannot assign to None'))
+    expect(result?.matched).toBe(true)
+    expect(result?.description).toContain('None')
+  })
+
+  it('累算代入 True += 1', () => {
+    const result = translatePythonError(
+      syntaxTraceback('True += 1', "SyntaxError: 'True' is an illegal expression for augmented assignment"),
+    )
+    expect(result?.matched).toBe(true)
+    expect(result?.description).toContain('True')
+  })
+
+  it('cannot delete False', () => {
+    const result = translatePythonError(syntaxTraceback('del False', 'SyntaxError: cannot delete False'))
+    expect(result?.matched).toBe(true)
+    expect(result?.description).toContain('削除')
+  })
+
+  it('比較のつもりの if True = x: は「==」を案内する', () => {
+    const result = translatePythonError(
+      syntaxTraceback(
+        'if True = x:',
+        "SyntaxError: cannot assign to True here. Maybe you meant '==' instead of '='?",
+      ),
+    )
+    expect(result?.matched).toBe(true)
+    expect(result?.description).toContain('比較')
+    expect(result?.hint).toContain('==')
+  })
+})

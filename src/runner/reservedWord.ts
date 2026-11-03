@@ -13,13 +13,16 @@ const PYTHON_KEYWORDS = [
 const NOT_AFTER = '(?<![\\p{L}\\p{N}_])'
 const NOT_BEFORE = '(?![\\p{L}\\p{N}_])'
 const KW = `(${PYTHON_KEYWORDS.join('|')})`
+const KW_NO_CONSTANTS = `(${PYTHON_KEYWORDS.filter((k) => k !== 'True' && k !== 'False' && k !== 'None').join('|')})`
 const ASSIGN_OPS = '(?:=(?!=)|\\*\\*=|\\*=|//=|/=|\\+=|-=|%=|@=|&=|\\|=|\\^=|>>=|<<=|:=)'
 
 // 合法な Python には現れない並びだけを選ぶ（SyntaxError が出ている行にだけ適用する）
 const MISUSE_PATTERNS: RegExp[] = [
-  // class = 1 / obj.class = 1 / class += 1 / f(class=1)
-  // `x not = 1` や `x: None = 5` の not / None を拾わないよう、名前を置ける位置（行頭・; ( , の後・. の直後）に限る
-  new RegExp(`(?:^|[;(,]|\\.)\\s*${KW}${NOT_BEFORE}\\s*${ASSIGN_OPS}`, 'u'),
+  // class = 1 / obj.class = 1 / a = class = 1 / class += 1 / f(class=1)
+  // `x not = 1` の not を拾わないよう、名前を置ける位置（行頭・; ( , の後・. の直後・単独の = の後）に限る
+  new RegExp(`(?:^|[;(,]|\\.|(?<![=!<>])=(?!=))\\s*${KW}${NOT_BEFORE}\\s*${ASSIGN_OPS}`, 'u'),
+  // if x: class = 1 / for i in r: class = i（1行の複合文）。x: None = 5 の型注釈を拾わないよう True/False/None は除く
+  new RegExp(`:\\s*${KW_NO_CONSTANTS}${NOT_BEFORE}\\s*${ASSIGN_OPS}`, 'u'),
   // for class in ...
   new RegExp(`${NOT_AFTER}for\\s+${KW}${NOT_BEFORE}\\s+in${NOT_BEFORE}`, 'u'),
   // ... as class

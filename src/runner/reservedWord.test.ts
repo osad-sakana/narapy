@@ -107,6 +107,9 @@ describe('detectReservedWordMisuse（検出する）', () => {
     ['def f(True):', 'True'],
     ['f = lambda class: 1', 'class'],
     ['f(class=1)', 'class'],
+    ['a = class = 1', 'class'],
+    ['if x: class = 1', 'class'],
+    ['for i in range(3): class = i', 'class'],
   ]
   it.each(cases)('%s → %s', (line, kw) => {
     expect(detectReservedWordMisuse(stripStringsAndComments(line))).toBe(kw)

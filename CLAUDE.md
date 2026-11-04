@@ -67,10 +67,11 @@ pnpm test
 ### COOP/COEP ヘッダー
 
 `SharedArrayBuffer`（Pyodide に必要）のため `vite.config.ts` の `server.headers` に以下を設定済み。
-本番は レンタルサーバーへ GitHub Actions（`.github/workflows/deploy.yml`）が
-FTPS で `dist/` を配置する。ヘッダーは `public/.htaccess` で付与し、`mod_headers` が使えない場合に備えて
-`coi-serviceworker.js` も残している（クロスオリジン分離済みなら何もしない）。
-`FTP_SERVER` / `FTP_USERNAME` / `FTP_PASSWORD` は GitHub Secrets（FTP アカウントの接続先は公開フォルダに限定）。
+本番は S3 + CloudFront で配信する。`.github/workflows/deploy.yml` が OIDC でデプロイ用ロールを引き受け、
+`dist/` を S3 へ同期して CloudFront のキャッシュを無効化する。ヘッダーは CloudFront の
+Response Headers Policy で付与し、`coi-serviceworker.js` は保険として残している（クロスオリジン分離済みなら何もしない）。
+`/make-url` などの拡張子なしパスは CloudFront Function（viewer request）が `.html` へ補完する。
+ロール ARN・バケット名・ディストリビューション ID は GitHub Variables（`AWS_ROLE_ARN` / `S3_BUCKET` / `CLOUDFRONT_DISTRIBUTION_ID`）。
 
 ```
 Cross-Origin-Opener-Policy: same-origin

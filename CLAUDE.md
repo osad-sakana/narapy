@@ -71,7 +71,7 @@ pnpm test
 `dist/` を S3 へ同期して CloudFront のキャッシュを無効化する。ヘッダーは CloudFront の
 Response Headers Policy で付与し、`coi-serviceworker.js` は保険として残している（クロスオリジン分離済みなら何もしない）。
 `/make-url` などの拡張子なしパスは CloudFront Function（viewer request）が `.html` へ補完する。
-ロール ARN・バケット名・ディストリビューション ID は GitHub Variables（`AWS_ROLE_ARN` / `S3_BUCKET` / `CLOUDFRONT_DISTRIBUTION_ID`）。
+ロール ARN・バケット名・ディストリビューション ID は GitHub Variables（`AWS_ROLE_ARN` / `S3_BUCKET` / `CLOUDFRONT_DISTRIBUTION_ID`）。OGP の絶対URL用に `SITE_URL` も Variables で渡す（`src/build/ogpMeta.ts`。未設定なら og:url / og:image を出さない）。
 デプロイ・確認・ロールバック・初期構築・トラブルシュートの手順は `docs/deploy.md`。公開リポジトリなので実際の ID や ARN は書かない。
 
 ```

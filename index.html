@@ -8,7 +8,21 @@
     <meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'self'; form-action 'none'; frame-src 'none'" />
     <!-- GitHub Pages では COOP/COEP ヘッダーを設定できないため Service Worker で代替 -->
     <script src="%BASE_URL%coi-serviceworker.js"></script>
-    <title>Narapy — Python Learning Environment</title>
+    <title>Narapy（ナラパイ）— ブラウザで学べる Python 学習環境</title>
+    <meta
+      name="description"
+      content="インストール不要、ブラウザだけで動く Python 学習環境。コードを書いて実行し、ステップ実行で動きを確かめられます。"
+    />
+    <!-- OGP。og:url / og:image は絶対URLが必要なためビルド時に注入する（src/build/ogpMeta.ts） -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Narapy（ナラパイ）" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:title" content="Narapy（ナラパイ）— ブラウザで学べる Python 学習環境" />
+    <meta
+      property="og:description"
+      content="インストール不要、ブラウザだけで動く Python 学習環境。コードを書いて実行し、ステップ実行で動きを確かめられます。"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <!-- Google Fonts: BIZ UDPGothic (UI) + 0xProto (コード) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -25,7 +39,11 @@
     <header class="flex items-center justify-between px-3 lg:px-4 py-2.5 gap-2 bg-panel border-b border-line shrink-0">
       <div class="flex items-center gap-2.5 shrink-0">
         <img src="/favicon.svg" alt="Narapy" class="w-7 h-7 select-none shrink-0 hidden sm:block" draggable="false" />
-        <span class="text-[15px] font-bold tracking-tight text-ink shrink-0 hidden sm:inline">Narapy</span>
+        <!-- 読み方（ナラパイ）を常に見せる。Py は英語圏の慣習の「パイ」 -->
+        <div class="hidden sm:flex flex-col items-start shrink-0 leading-none">
+          <span class="text-[15px] font-bold tracking-tight text-ink">Narapy</span>
+          <span lang="ja" class="mt-0.5 text-[10px] tracking-[0.2em] text-muted">ナラパイ</span>
+        </div>
         <span class="text-[11px] font-mono px-1.5 py-0.5 rounded-md text-muted border border-line shrink-0 hidden lg:inline-block">
           Python Learning
         </span>

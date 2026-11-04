@@ -38,8 +38,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # SITE_URL は OGP の og:url / og:image（絶対URL）に使う。公開リポジトリにドメインを書かないため Variables で渡す
       - name: Build
         run: pnpm build
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
 
       # ロール ARN・バケット名・ディストリビューション ID は公開リポジトリに書かず Variables で渡す
       - name: Configure AWS credentials (OIDC)

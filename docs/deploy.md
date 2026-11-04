@@ -86,6 +86,7 @@ Settings → Secrets and variables → Actions → **Variables**（Secrets で�
 | `AWS_ROLE_ARN` | デプロイ用 IAM ロールの ARN |
 | `S3_BUCKET` | バケット名 |
 | `CLOUDFRONT_DISTRIBUTION_ID` | ディストリビューション ID（`E…`） |
+| `SITE_URL` | 公開URL（`https://<ドメイン>`）。OGP の `og:url` / `og:image`（絶対URL）に使う。未設定でもデプロイは通るが、この2つが出力されずリンクプレビューに画像が出ない |
 
 Secrets は使わない（OIDC のため保存する秘密がない）。
 

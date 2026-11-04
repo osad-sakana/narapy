@@ -1,8 +1,22 @@
 import { fileURLToPath } from 'node:url'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
+import { buildOgpTags } from './src/build/ogpMeta'
 
 const root = fileURLToPath(new URL('.', import.meta.url))
+
+// og:url / og:image は絶対URLが必要。本番ドメインは公開リポジトリに書かず、環境変数 SITE_URL から注入する。
+// 対象はメイン画面（index.html）のみ。SITE_URL 未設定なら何も足さない。
+function ogpPlugin(): Plugin {
+  return {
+    name: 'narapy-ogp',
+    transformIndexHtml(html, ctx) {
+      if (!ctx.filename.endsWith('/index.html')) return html
+      const tags = buildOgpTags(process.env.SITE_URL)
+      return tags ? html.replace('</head>', `    ${tags}\n  </head>`) : html
+    },
+  }
+}
 
 export default defineConfig({
   // ドメイン直下に配置するため常にルート
@@ -10,6 +24,7 @@ export default defineConfig({
 
   plugins: [
     tailwindcss(),
+    ogpPlugin(),
     // Monaco ワーカーは editor/index.ts で MonacoEnvironment を直接セットして管理する
     // (vite-plugin-monaco-editor のinlineスクリプト注入はCSPに違反するため不使用)
   ],

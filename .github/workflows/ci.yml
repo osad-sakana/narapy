@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
 
-# 同じ PR で新しい push があれば古い実行をキャンセルする。main への連続マージでは各コミットの結果を残す
+# 同じ PR で新しい push があれば古い実行をキャンセルする。main では実行中の run を中断しない
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

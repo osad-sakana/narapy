@@ -27,6 +27,7 @@ function createLicenseBadge(license: LicenseLink): HTMLAnchorElement {
 function createLicenseRow(entry: LicenseEntry): HTMLElement {
   const row = document.createElement('div')
   row.className = 'border border-line rounded-lg px-4 py-3 bg-canvas'
+  row.dataset.license = entry.name
 
   const topRow = document.createElement('div')
   topRow.className = 'flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1'
@@ -61,6 +62,7 @@ function createHeader(onClose: () => void): HTMLElement {
   header.className = 'flex items-center justify-between px-5 py-3 border-b border-line shrink-0'
 
   const title = document.createElement('span')
+  title.id = 'aboutTitle'
   title.className = 'text-sm font-bold text-ink'
   title.textContent = 'オープンソースライセンス'
 
@@ -100,6 +102,9 @@ function showAboutModal(): void {
 
   const card = document.createElement('div')
   card.className = 'bg-panel border border-line rounded-xl shadow-2xl max-w-lg w-full flex flex-col max-h-[80vh] overflow-hidden'
+  card.setAttribute('role', 'dialog')
+  card.setAttribute('aria-modal', 'true')
+  card.setAttribute('aria-labelledby', 'aboutTitle')
 
   const close = (): void => {
     backdrop.remove()

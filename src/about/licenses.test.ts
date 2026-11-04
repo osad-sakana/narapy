@@ -9,6 +9,19 @@ function find(name: string) {
   return entry
 }
 
+// 'x.y' のような省略表記でも 'x.y.z' に一致し、'0.8' が '0.80.0' に誤一致しないよう区切りまで見る
+function matchesVersion(installed: string, shown: string): boolean {
+  return shown !== '' && (installed === shown || installed.startsWith(`${shown}.`))
+}
+
+function readBundled(relative: string): string {
+  try {
+    return readFileSync(new URL(`../../node_modules/monaco-editor/esm/vs/base/${relative}`, import.meta.url), 'utf-8')
+  } catch {
+    throw new Error(`Monaco 内蔵の ${relative} が見つかりません。Monaco の構成が変わった可能性があるので、licenses.ts の版数と同梱元を確認すること`)
+  }
+}
+
 function installedVersion(pkg: string): string {
   const raw = readFileSync(new URL(`../../node_modules/${pkg}/package.json`, import.meta.url), 'utf-8')
   return (JSON.parse(raw) as { version: string }).version
@@ -59,16 +72,13 @@ describe('LICENSES の版数', () => {
 
   for (const [name, pkg] of npmPackages) {
     it(`${name} は node_modules の版と一致する`, () => {
-      expect(installedVersion(pkg).startsWith(find(name).version), name).toBe(true)
+      expect(matchesVersion(installedVersion(pkg), find(name).version), name).toBe(true)
     })
   }
 
   it('marked と DOMPurify は Monaco が内部に持つコピーの版と一致する', () => {
-    const base = '../../node_modules/monaco-editor/esm/vs/base/'
-    const dompurify = readFileSync(new URL(`${base}browser/dompurify/dompurify.js`, import.meta.url), 'utf-8')
-    expect(dompurify).toContain(`DOMPurify ${find('DOMPurify').version} `)
-    const marked = readFileSync(new URL(`${base}common/marked/marked.js`, import.meta.url), 'utf-8')
-    expect(marked).toContain(`marked v${find('marked').version}`)
+    expect(readBundled('browser/dompurify/dompurify.js')).toContain(`DOMPurify ${find('DOMPurify').version} `)
+    expect(readBundled('common/marked/marked.js')).toMatch(new RegExp(`marked v${find('marked').version.replace(/\./g, '\\.')}(\\.|\\b)`))
   })
 
   it('autopep8 と pycodestyle は整形で固定している版と一致する', () => {

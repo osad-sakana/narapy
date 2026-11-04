@@ -40,6 +40,7 @@ export const LICENSES: readonly LicenseEntry[] = [
     licenses: [MIT],
     copyright: 'Copyright (c) 2016 - present Microsoft Corporation',
     url: 'https://github.com/microsoft/monaco-editor',
+    note: 'Monaco が内部に含む他のソフトウェアは、同梱の ThirdPartyNotices.txt を参照。',
   },
   {
     name: 'Codicon',
@@ -82,7 +83,7 @@ export const LICENSES: readonly LicenseEntry[] = [
     name: 'marked',
     version: '14.0',
     licenses: [MIT],
-    copyright: 'Copyright (c) 2018+ MarkedJS, 2011-2018 Christopher Jeffrey, 2004 John Gruber (Markdown)',
+    copyright: 'Copyright (c) 2018+ MarkedJS, 2011-2018 Christopher Jeffrey',
     url: 'https://github.com/markedjs/marked',
     note: 'Monaco Editor が内部に持つコピーを利用。',
   },
@@ -123,7 +124,7 @@ export const LICENSES: readonly LicenseEntry[] = [
     licenses: [LGPL21],
     copyright: 'Copyright pygame community contributors',
     url: 'https://github.com/pygame-community/pygame-ce',
-    note: 'Pyodide 0.27.0 同梱の版を jsDelivr CDN から読み込んで利用。',
+    note: 'Pyodide 0.27.0 同梱の版（SDL2 などを静的リンク）を jsDelivr CDN から読み込んで利用。',
   },
   {
     name: 'micropip',

@@ -6,14 +6,18 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 # 同一ブランチで新しい push があれば古い実行をキャンセル
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# test と build を別ジョブにして、ブランチ保護の必須チェックに個別に指定できるようにする
 jobs:
-  frontend:
-    name: Frontend (typecheck / test / build)
+  test:
+    name: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +34,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Typecheck
         run: pnpm typecheck
@@ -38,7 +42,25 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Build
         run: pnpm build
-        env:
-          CI: true

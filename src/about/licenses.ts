@@ -1,3 +1,5 @@
+import { AUTOPEP8_REQUIREMENTS } from '../format/formatModule'
+
 export interface LicenseLink {
   readonly label: string
   readonly url: string
@@ -23,14 +25,20 @@ const LGPL21: LicenseLink = { label: 'LGPL-2.1', url: 'https://www.gnu.org/licen
 const PSF: LicenseLink = { label: 'PSF License', url: 'https://docs.python.org/3/license.html' }
 const MATPLOTLIB: LicenseLink = { label: 'Matplotlib License', url: 'https://matplotlib.org/stable/project/license.html' }
 
+// 整形ボタンの初回利用時に micropip が取得する版（formatModule.ts の固定値と二重管理にしない）
+function pinnedVersion(name: string): string {
+  const spec = AUTOPEP8_REQUIREMENTS.find(r => r.startsWith(`${name}==`))
+  return spec ? spec.slice(name.length + 2) : ''
+}
+
 // 版数は node_modules の package.json と Pyodide 0.27.0 の pyodide-lock.json で確認したもの。
-// autopep8 は初回の整形時に micropip で PyPI から取得するため版数を固定していない
+// DOMPurify と marked は npm のパッケージではなく Monaco Editor が内部に持つコピーがバンドルされる
 export const LICENSES: readonly LicenseEntry[] = [
   {
     name: 'Monaco Editor',
     version: '0.55',
     licenses: [MIT],
-    copyright: 'Copyright (c) Microsoft Corporation',
+    copyright: 'Copyright (c) 2016 - present Microsoft Corporation',
     url: 'https://github.com/microsoft/monaco-editor',
   },
   {
@@ -45,7 +53,7 @@ export const LICENSES: readonly LicenseEntry[] = [
     name: 'Font Awesome Free',
     version: '7.3',
     licenses: [CC_BY, OFL, MIT],
-    copyright: 'Copyright (c) Fonticons, Inc.',
+    copyright: 'Copyright (c) 2026 Fonticons, Inc.',
     url: 'https://fontawesome.com/license/free',
     note: 'アイコンは CC BY 4.0、フォントファイルは SIL OFL 1.1、コードは MIT。',
   },
@@ -53,7 +61,7 @@ export const LICENSES: readonly LicenseEntry[] = [
     name: 'split.js',
     version: '1.6',
     licenses: [MIT],
-    copyright: 'Copyright (c) Nathan Cahill',
+    copyright: 'Copyright (c) 2020 Nathan Cahill',
     url: 'https://github.com/nathancahill/split',
   },
   {
@@ -67,34 +75,36 @@ export const LICENSES: readonly LicenseEntry[] = [
     name: 'fflate',
     version: '0.8',
     licenses: [MIT],
-    copyright: 'Copyright (c) Arjun Barrett',
+    copyright: 'Copyright (c) 2026 Arjun Barrett',
     url: 'https://github.com/101arrowz/fflate',
   },
   {
     name: 'marked',
     version: '14.0',
     licenses: [MIT],
-    copyright: 'Copyright (c) MarkedJS / Christopher Jeffrey',
+    copyright: 'Copyright (c) 2018+ MarkedJS, 2011-2018 Christopher Jeffrey, 2004 John Gruber (Markdown)',
     url: 'https://github.com/markedjs/marked',
+    note: 'Monaco Editor が内部に持つコピーを利用。',
   },
   {
     name: 'DOMPurify',
-    version: '3.4',
+    version: '3.2.7',
     licenses: [MPL2, APACHE2],
     copyright: 'Copyright Dr.-Ing. Mario Heiderich, Cure53 and contributors',
     url: 'https://github.com/cure53/DOMPurify',
-    note: 'MPL-2.0 と Apache-2.0 のどちらかを選べるデュアルライセンス。',
+    note: 'Monaco Editor が内部に持つコピーを利用。MPL-2.0 と Apache-2.0 のどちらかを選べるデュアルライセンス。',
   },
   {
     name: 'coi-serviceworker',
     version: '0.1.7',
     licenses: [MIT],
-    copyright: 'Copyright (c) Guido Zuidhof',
+    copyright: 'Copyright (c) 2021 Guido Zuidhof',
     url: 'https://github.com/gzuidhof/coi-serviceworker',
   },
   {
     name: 'Pyodide',
     version: '0.27.0',
+    // npm の pyodide パッケージの package.json は Apache-2.0 だが、リポジトリの LICENSE は MPL-2.0
     licenses: [MPL2],
     copyright: 'Copyright Pyodide contributors',
     url: 'https://github.com/pyodide/pyodide',
@@ -113,7 +123,7 @@ export const LICENSES: readonly LicenseEntry[] = [
     licenses: [LGPL21],
     copyright: 'Copyright pygame community contributors',
     url: 'https://github.com/pygame-community/pygame-ce',
-    note: 'Pyodide 同梱の版を CDN から読み込んで利用（改変・再配布なし）。',
+    note: 'Pyodide 0.27.0 同梱の版を jsDelivr CDN から読み込んで利用。',
   },
   {
     name: 'micropip',
@@ -138,15 +148,15 @@ export const LICENSES: readonly LicenseEntry[] = [
   },
   {
     name: 'autopep8',
-    version: '',
+    version: pinnedVersion('autopep8'),
     licenses: [MIT],
     copyright: 'Copyright (C) 2010-2016 Hideo Hattori, Steven Myint, Bill Wendling',
     url: 'https://github.com/hhatto/autopep8',
-    note: '整形ボタンの初回利用時に PyPI から取得。',
+    note: '整形ボタンの初回利用時に PyPI から取得（版を固定）。',
   },
   {
     name: 'pycodestyle',
-    version: '',
+    version: pinnedVersion('pycodestyle'),
     licenses: [MIT],
     copyright: 'Copyright (c) 2006-2020 Johann C. Rocholl, Florent Xicluna, Ian Lee',
     url: 'https://github.com/PyCQA/pycodestyle',
@@ -169,6 +179,14 @@ export const LICENSES: readonly LicenseEntry[] = [
     note: 'コードが import したときだけ Pyodide から読み込む。',
   },
   {
+    name: 'Pyodide 配布パッケージ（その他）',
+    version: '',
+    licenses: [{ label: '各パッケージのライセンス', url: 'https://pyodide.org/en/0.27.0/usage/packages-in-pyodide.html' }],
+    copyright: 'Copyright 各パッケージの著作権者',
+    url: 'https://pyodide.org/',
+    note: 'Matplotlib の依存（Pillow、fonttools、kiwisolver、contourpy、pyparsing、python-dateutil、cycler、pytz、six など）や、コードが import したその他の Pyodide 配布パッケージ。それぞれのライセンスに従う。',
+  },
+  {
     name: 'BIZ UDPGothic',
     version: '',
     licenses: [OFL],
@@ -180,7 +198,7 @@ export const LICENSES: readonly LicenseEntry[] = [
     name: '0xProto',
     version: '',
     licenses: [OFL],
-    copyright: 'Copyright The 0xProto Project Authors',
+    copyright: 'Copyright (c) 2026 0xType Project Authors',
     url: 'https://github.com/0xType/0xProto',
     note: 'Google Fonts から読み込み。',
   },

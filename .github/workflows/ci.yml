@@ -9,10 +9,10 @@ on:
 permissions:
   contents: read
 
-# 同一ブランチで新しい push があれば古い実行をキャンセル
+# 同じ PR で新しい push があれば古い実行をキャンセルする。main への連続マージでは各コミットの結果を残す
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # test と build を別ジョブにして、ブランチ保護の必須チェックに個別に指定できるようにする
 jobs:

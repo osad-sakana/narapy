@@ -29,13 +29,13 @@ function createLicenseRow(entry: LicenseEntry): HTMLElement {
   row.className = 'border border-line rounded-lg px-4 py-3 bg-canvas'
 
   const topRow = document.createElement('div')
-  topRow.className = 'flex items-baseline justify-between gap-2'
+  topRow.className = 'flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1'
 
   const label = entry.name + (entry.version ? ` v${entry.version}` : '')
-  const nameEl = createLink(entry.url, label, 'text-sm font-semibold text-ink hover:underline')
+  const nameEl = createLink(entry.url, label, 'min-w-0 break-words text-sm font-semibold text-ink hover:underline')
 
   const badges = document.createElement('div')
-  badges.className = 'flex flex-wrap justify-end gap-1 shrink-0'
+  badges.className = 'flex flex-wrap justify-end gap-1'
   for (const license of entry.licenses) badges.appendChild(createLicenseBadge(license))
 
   topRow.appendChild(nameEl)

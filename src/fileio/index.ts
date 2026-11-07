@@ -33,6 +33,10 @@ interface NarapyMetadataV1 {
 }
 
 const META_FILENAME = 'narapy.json'
+
+// zip bomb 対策。共有リンク(?project=)経由で他人のアーカイブを開くため、展開前に宣言サイズで弾く
+export const MAX_UNCOMPRESSED_SIZE = 50 * 1024 * 1024 // 50 MB
+
 const FILES_PREFIX = 'files/'
 
 function triggerDownload(blob: Blob, filename: string): void {
@@ -103,7 +107,16 @@ export function parseNarapyArchive(data: Uint8Array): NarapyProject {
     return parseLegacyJson(strFromU8(data))
   }
 
-  const entries = unzipSync(data)
+  let totalSize = 0
+  const entries = unzipSync(data, {
+    filter: file => {
+      totalSize += file.originalSize
+      if (totalSize > MAX_UNCOMPRESSED_SIZE) {
+        throw new Error(`展開後のサイズが上限 (${MAX_UNCOMPRESSED_SIZE / 1024 / 1024} MB) を超えています`)
+      }
+      return true
+    },
+  })
   const metaBytes = entries[META_FILENAME]
   if (!metaBytes) {
     throw new Error(`${META_FILENAME} が見つかりません`)

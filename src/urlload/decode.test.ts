@@ -1,7 +1,8 @@
 import { strToU8, zipSync, zlibSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
 import { bytesToBase64Url } from './base64url'
-import { decodeCodeParam, decodeProjectParam } from './decode'
+import { decodeCodeParam, decodeProjectParam, MAX_CODE_PARAM_SIZE } from './decode'
+import { MAX_UNCOMPRESSED_SIZE } from '../fileio/index'
 
 function encodeCodeParamForTest(source: string): string {
   return bytesToBase64Url(zlibSync(strToU8(source), { level: 9 }))
@@ -48,5 +49,22 @@ describe('decodeProjectParam', () => {
   it('展開後のバイト列が.narapy形式でない場合はエラーになる', () => {
     const encoded = bytesToBase64Url(zlibSync(strToU8('not a zip'), { level: 9 }))
     expect(() => decodeProjectParam(encoded)).toThrow()
+  })
+})
+
+describe('zlib bomb 対策', () => {
+  it('#code が展開後に上限を超えるなら拒否する', () => {
+    const bomb = bytesToBase64Url(zlibSync(new Uint8Array(MAX_CODE_PARAM_SIZE + 1), { level: 9 }))
+    expect(() => decodeCodeParam(bomb)).toThrow('展開後のサイズが上限')
+  })
+
+  it('#project が展開後に上限を超えるなら拒否する', () => {
+    const bomb = bytesToBase64Url(zlibSync(new Uint8Array(MAX_UNCOMPRESSED_SIZE + 1), { level: 9 }))
+    expect(() => decodeProjectParam(bomb)).toThrow('展開後のサイズが上限')
+  })
+
+  it('上限ちょうどのコードは受け付ける', () => {
+    const src = 'a'.repeat(MAX_CODE_PARAM_SIZE)
+    expect(decodeCodeParam(encodeCodeParamForTest(src)).files[0].content).toEqual({ kind: 'text', data: src })
   })
 })

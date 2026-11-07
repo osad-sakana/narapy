@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- GitHub Pages ではヘッダーで CSP を設定できないため meta で代替。メタ CSP は frame-ancestors / sandbox / report-uri を使えない。
          script-src 等の絞り込みは動作確認が済んだものだけ入れる（vite.config.ts の server.headers と同期すること） -->
-    <meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'self'; form-action 'none'; frame-src 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' cdn.jsdelivr.net; worker-src 'self' blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com data:; connect-src 'self' https: cdn.jsdelivr.net files.pythonhosted.org pypi.org; object-src 'none'; base-uri 'self'; form-action 'none'; frame-src 'none'" />
     <title>Narapy — 演習を作る</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />

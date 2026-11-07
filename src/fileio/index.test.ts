@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { zipSync, strToU8 } from 'fflate'
-import { buildNarapyArchive, parseNarapyArchive, type NarapyProject } from './index'
+import { buildNarapyArchive, MAX_UNCOMPRESSED_SIZE, parseNarapyArchive, type NarapyProject } from './index'
 
 describe('buildNarapyArchive / parseNarapyArchive', () => {
   it('組み立てたアーカイブを再度パースすると元のプロジェクトに戻る', () => {
@@ -58,5 +58,15 @@ describe('buildNarapyArchive / parseNarapyArchive', () => {
     }
     const bytes = zipSync(archive)
     expect(() => parseNarapyArchive(bytes)).toThrow('メタデータの形式が不正です')
+  })
+
+  it('展開後サイズが上限を超えるアーカイブ(zip bomb)は展開せず拒否する', () => {
+    const big = new Uint8Array(MAX_UNCOMPRESSED_SIZE + 1)
+    const archive = zipSync({
+      'narapy.json': strToU8(JSON.stringify({ version: 2, directories: [], activeFile: 'main.py' })),
+      'files/main.py': big,
+    })
+    expect(archive.byteLength).toBeLessThan(1024 * 1024)
+    expect(() => parseNarapyArchive(archive)).toThrow('展開後のサイズが上限')
   })
 })

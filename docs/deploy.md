@@ -18,7 +18,7 @@ GitHub (main) ──push──▶ GitHub Actions ──OIDC──▶ IAM ロー�
 |---|---|
 | S3 バケット | `dist/` の置き場。パブリックアクセスはすべてブロックし、CloudFront の OAC だけが読む |
 | CloudFront | HTTPS 配信。HTTP は HTTPS へリダイレクト |
-| Response Headers Policy | `Cross-Origin-Opener-Policy: same-origin` / `Cross-Origin-Embedder-Policy: require-corp`（Pyodide の SharedArrayBuffer に必要） |
+| Response Headers Policy | `Cross-Origin-Opener-Policy: same-origin` / `Cross-Origin-Embedder-Policy: require-corp`（Pyodide の SharedArrayBuffer に必要）。加えて下記「推奨セキュリティヘッダー」 |
 | CloudFront Function（viewer request） | 拡張子なしのパスを補完（`/make-url` → `/make-url.html`、`/` → `/index.html`） |
 | ACM 証明書 | CloudFront 用は **`us-east-1`** で発行する |
 | Route 53 | 公開ドメインの A / AAAA（Alias）を CloudFront に向ける |
@@ -151,3 +151,16 @@ CloudFront の従量課金には上限がない。無料枠（毎月 1TB・1000 
 | `/make-url` が 404 | CloudFront Function が viewer request に関連付けられ、公開されているか |
 | COOP/COEP のヘッダーがない | 動作（Behavior）の Response Headers Policy の関連付け。Free プランだと選べない |
 | 更新が反映されない | 無効化が完了しているか（数十秒〜数分）、ブラウザのキャッシュ |
+
+## 推奨セキュリティヘッダー
+
+Response Headers Policy（`narapy-coop-coep`）に次を足す。いずれも「オリジンの値を上書き」オン。`<meta>` の CSP では `frame-ancestors` が使えず、クリックジャッキング対策はヘッダーでしかできない。
+
+| ヘッダー | 値 | 目的 |
+|---|---|---|
+| `Content-Security-Policy` | `index.html` の `<meta>` と同じ内容 + `frame-ancestors 'none'` | XSS の被害抑止・他サイトへの埋め込み禁止 |
+| `X-Content-Type-Options` | `nosniff` | MIME スニッフィング防止 |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | HTTPS 強制 |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | URL（`?project=` 等）の漏えい抑制 |
+
+CSP の中身は `vite.config.ts` の `server.headers` と `index.html` の meta と同じにする（3 か所を同期）。反映後は本番で「実行」と `#code=` の読み込みが動くことを確認する。

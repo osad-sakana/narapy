@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- GitHub Pages ではヘッダーで CSP を設定できないため meta で代替。メタ CSP は frame-ancestors / sandbox / report-uri を使えない。
-         script-src 等の絞り込みは動作確認が済んだものだけ入れる（vite.config.ts の server.headers と同期すること） -->
-    <meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'self'; form-action 'none'; frame-src 'none'" />
+         本番(CloudFront)はヘッダーでも同じ内容を付与する。vite.config.ts の server.headers と同期すること -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' cdn.jsdelivr.net; worker-src 'self' blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com data:; connect-src 'self' https: cdn.jsdelivr.net files.pythonhosted.org pypi.org; object-src 'none'; base-uri 'self'; form-action 'none'; frame-src 'none'" />
     <!-- GitHub Pages では COOP/COEP ヘッダーを設定できないため Service Worker で代替 -->
     <script src="%BASE_URL%coi-serviceworker.js"></script>
     <title>Narapy（ナラパイ）— ブラウザで学べる Python 学習環境</title>

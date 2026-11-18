@@ -25,7 +25,7 @@ export function buildDownloadFileName(title: string, now: Date): string {
   return `${yy}${mm}${dd}_${toSafeFileName(title)}.narapy`
 }
 
-// 取り込んだファイル名（my.project.narapy）から拡張子を除いたタイトルを作る
+// 取り込んだファイル名（my.project.narapy）から、拡張子とダウンロード時に付けた YYMMDD_ 接頭辞を除いたタイトルを作る
 export function titleFromFileName(fileName: string): string {
   return normalizeTitle(fileName.replace(/\.(narapy|exercise)$/i, '').replace(/^\d{6}_(?=.)/, ''))
 }

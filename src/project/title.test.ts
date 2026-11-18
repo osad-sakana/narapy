@@ -35,7 +35,21 @@ describe('buildDownloadFileName', () => {
   })
 })
 
+describe('ダウンロード名と取り込みの往復', () => {
+  it('年の下2桁をゼロ埋めする', () => {
+    expect(buildDownloadFileName('a', new Date(2005, 0, 1))).toBe('050101_a.narapy')
+  })
+  it('保存したファイル名から元のタイトルに戻る', () => {
+    const name = buildDownloadFileName('課題1', new Date(2026, 10, 18))
+    expect(titleFromFileName(name)).toBe('課題1')
+  })
+})
+
 describe('titleFromFileName', () => {
+  it('6桁以外の数字や接頭辞のみの名前は消さない', () => {
+    expect(titleFromFileName('1234567_x.narapy')).toBe('1234567_x')
+    expect(titleFromFileName('261118_.narapy')).toBe('261118_')
+  })
   it('YYMMDD_ の接頭辞を除く', () => {
     expect(titleFromFileName('261118_課題1.narapy')).toBe('課題1')
   })

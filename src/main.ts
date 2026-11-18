@@ -37,7 +37,7 @@ import { initHamburgerMenu } from './menu/ui'
 import { applyProjectSwitch, type ApplyProjectSwitchDeps } from './project/applyProjectSwitch'
 import { initProjectBar } from './project/ui'
 import { openShareModal } from './share/shareModal'
-import { DEFAULT_PROJECT_TITLE, SHARED_PROJECT_TITLE, titleFromFileName, toSafeFileName } from './project/title'
+import { DEFAULT_PROJECT_TITLE, SHARED_PROJECT_TITLE, buildDownloadFileName, titleFromFileName } from './project/title'
 import { initIndentVizPanel } from './indentViz/panel'
 import { createInstructorController } from './instructor/controller'
 import { createInstructorMenuAction, syncInstructorMenuItem, initInstructorBaselineButton } from './instructor/ui'
@@ -388,7 +388,7 @@ exportProjectBtn.addEventListener('click', async () => {
     })),
     directories: getDirectories().map(d => ({ path: d.path })),
     activeFile: getActiveFile(),
-  }, `${toSafeFileName(getCurrentProject().title)}.narapy`)
+  }, buildDownloadFileName(getCurrentProject().title, new Date()))
 })
 
 initAbout()

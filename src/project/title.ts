@@ -17,7 +17,15 @@ export function toSafeFileName(title: string): string {
   return replaced === '' ? DEFAULT_PROJECT_TITLE : replaced
 }
 
+// ダウンロード名: YYMMDD_タイトル.narapy（日付はローカル時刻）
+export function buildDownloadFileName(title: string, now: Date): string {
+  const yy = String(now.getFullYear() % 100).padStart(2, '0')
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).padStart(2, '0')
+  return `${yy}${mm}${dd}_${toSafeFileName(title)}.narapy`
+}
+
 // 取り込んだファイル名（my.project.narapy）から拡張子を除いたタイトルを作る
 export function titleFromFileName(fileName: string): string {
-  return normalizeTitle(fileName.replace(/\.(narapy|exercise)$/i, ''))
+  return normalizeTitle(fileName.replace(/\.(narapy|exercise)$/i, '').replace(/^\d{6}_(?=.)/, ''))
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_PROJECT_TITLE, normalizeTitle, titleFromFileName, toSafeFileName } from './title'
+import { DEFAULT_PROJECT_TITLE, buildDownloadFileName, normalizeTitle, titleFromFileName, toSafeFileName } from './title'
 
 describe('normalizeTitle', () => {
   it('前後の空白を除く', () => {
@@ -23,7 +23,22 @@ describe('toSafeFileName', () => {
   })
 })
 
+describe('buildDownloadFileName', () => {
+  it('YYMMDD_タイトル.narapy 形式になる', () => {
+    expect(buildDownloadFileName('課題1', new Date(2026, 10, 18))).toBe('261118_課題1.narapy')
+  })
+  it('月日は2桁にゼロ埋めする', () => {
+    expect(buildDownloadFileName('a', new Date(2026, 0, 5))).toBe('260105_a.narapy')
+  })
+  it('ファイル名に使えない文字は置き換える', () => {
+    expect(buildDownloadFileName('a/b', new Date(2026, 10, 18))).toBe('261118_a_b.narapy')
+  })
+})
+
 describe('titleFromFileName', () => {
+  it('YYMMDD_ の接頭辞を除く', () => {
+    expect(titleFromFileName('261118_課題1.narapy')).toBe('課題1')
+  })
   it('拡張子を除く', () => {
     expect(titleFromFileName('foo.narapy')).toBe('foo')
     expect(titleFromFileName('my.project.exercise')).toBe('my.project')

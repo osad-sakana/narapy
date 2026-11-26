@@ -4,8 +4,20 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
+    # 設計が Pyodide v0.27（pygame-ce 2.4.1 同梱・Worker/CDN構成）前提のため、
+    # メジャー更新は自動提案させない。
+    ignore:
+      - dependency-name: pyodide
+        update-types: ['version-update:semver-major']
+    # 更新PRを1本にまとめ、CI・レビューの手間を減らす。
+    groups:
+      npm-minor-patch:
+        update-types: ['minor', 'patch']
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      github-actions:
+        patterns: ['*']
